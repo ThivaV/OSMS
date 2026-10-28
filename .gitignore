@@ -224,3 +224,6 @@ AGENTS.md
 
 # Local data: scraped items, transcripts, newsletter mail, imported OPML. Never commit.
 data/
+
+# Tilt run files (pid files for Flutter reloads)
+.tilt/
