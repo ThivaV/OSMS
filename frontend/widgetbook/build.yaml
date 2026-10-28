@@ -1,0 +1,7 @@
+targets:
+  $default:
+    builders:
+      # Off: it sends usage reports (hashed git identity, repo owner URL) to
+      # an analytics service on every build.
+      widgetbook_generator:telemetry:
+        enabled: false

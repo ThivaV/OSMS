@@ -17,3 +17,18 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Bundled, not fetched from a font CDN at runtime. All SIL Open Font License
+  # (OFL.txt next to each font).
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/inter/Inter-Variable.ttf
+    - family: Newsreader
+      fonts:
+        - asset: assets/fonts/newsreader/Newsreader-Variable.ttf
+        - asset: assets/fonts/newsreader/Newsreader-Italic-Variable.ttf
+          style: italic
+    - family: NotoSansTamil
+      fonts:
+        - asset: assets/fonts/noto_sans_tamil/NotoSansTamil-Variable.ttf
