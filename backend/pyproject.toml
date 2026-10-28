@@ -1,0 +1,10 @@
+[project]
+name = "osms-backend"
+version = "0.1.0"
+description = "OSMS backend: ingestion, story clustering, claims and the overnight agent."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

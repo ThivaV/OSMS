@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+AGENTS.md
+
+# Local data: scraped items, transcripts, newsletter mail, imported OPML. Never commit.
+data/

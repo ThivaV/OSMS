@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demo and onboarding sources: one folder per onboarding topic.
+     Public feed URLs only, all non-political (technology, AI research, science,
+     business/product news). This is the only OPML file in the repo. -->
+<opml version="2.0">
+  <head>
+    <title>OSMS seed sources</title>
+  </head>
+  <body>
+    <outline text="AI research" title="AI research"/>
+    <outline text="Developer tools" title="Developer tools"/>
+    <outline text="Science" title="Science"/>
+    <outline text="Space" title="Space"/>
+    <outline text="Startups and product" title="Startups and product"/>
+  </body>
+</opml>
