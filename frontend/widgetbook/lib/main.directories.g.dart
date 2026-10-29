@@ -284,6 +284,23 @@ final directories = <_widgetbook.WidgetbookNode>[
         ],
       ),
       _widgetbook.WidgetbookComponent(
+        name: 'InterestsEditor',
+        useCases: [
+          _widgetbook.WidgetbookUseCase(
+            name: 'Empty',
+            builder: _osms_widgetbook_use_cases_sources.interestsEmpty,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Extreme content',
+            builder: _osms_widgetbook_use_cases_sources.interestsExtreme,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Normal',
+            builder: _osms_widgetbook_use_cases_sources.interestsNormal,
+          ),
+        ],
+      ),
+      _widgetbook.WidgetbookComponent(
         name: 'ItemCard',
         useCases: [
           _widgetbook.WidgetbookUseCase(

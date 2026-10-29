@@ -16,6 +16,7 @@ class WhatWeKeepPage extends StatelessWidget {
       [
         (Icons.badge_outlined, 'Your email and name', 'From Google, so OSMS knows it’s you when you sign in.'),
         (Icons.tune_rounded, 'Your language, topics and kinds of source', 'To choose and summarise your stories.'),
+        (Icons.science_outlined, 'Your research interests', 'The keywords and arXiv categories you follow, to find new papers.'),
         (Icons.rss_feed_rounded, 'The sources you follow', 'So OSMS collects what they publish.'),
         (Icons.bookmark_outline_rounded, 'What you have read and saved', 'So it can show what’s new since you last looked.'),
         (Icons.wb_twilight_rounded, 'Your morning briefings', 'So you can play them again.'),
@@ -37,8 +38,10 @@ class WhatWeKeepPage extends StatelessWidget {
         (
           Icons.memory_rounded,
           'Meta’s AI models',
-          'Read story content to write summaries and briefings. Never your email, name or reading history.',
+          'Read story content to write summaries and briefings, and your research keywords to suggest related '
+              'terms, without being told whose they are. Never your email, name or reading history.',
         ),
+        (Icons.science_outlined, 'arXiv', 'Receives the search words from your research interests, never your name or account.'),
       ],
     ),
     (

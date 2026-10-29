@@ -114,7 +114,22 @@ const labNotes = Source(
   url: 'https://labnotes.example/feed',
 );
 
+// arXiv category feeds. Paper ids below use 2610.9xxxx, well above arXiv's monthly
+// volume, so they can't be real papers; links use the reserved arxiv.example domain.
+const arxivCsCl = Source(
+  id: 'arxiv-cs-cl',
+  name: 'arXiv cs.CL',
+  type: SourceType.arxiv,
+  language: 'en',
+  url: 'https://arxiv.example/list/cs.CL',
+  followed: true,
+);
+const arxivCsIr = Source(id: 'arxiv-cs-ir', name: 'arXiv cs.IR', type: SourceType.arxiv, language: 'en');
+const arxivEessAs = Source(id: 'arxiv-eess-as', name: 'arXiv eess.AS', type: SourceType.arxiv, language: 'en');
+const arxivAstroEp = Source(id: 'arxiv-astro-ep', name: 'arXiv astro-ph.EP', type: SourceType.arxiv, language: 'en');
+
 const followedSources = [
+  arxivCsCl,
   orbitalWeekly,
   inferenceBrief,
   fieldnoteScience,
@@ -166,6 +181,7 @@ final halcyon = Story(
   updatedAt: ago(h: 2),
   lastReadAt: ago(d: 1, h: 3),
   sources: const [
+    arxivCsCl,
     inferenceBrief,
     circuitLedger,
     gradientHour,
@@ -181,7 +197,7 @@ final halcyon = Story(
     kodehjornet,
     launchpadLens,
   ],
-  kindCounts: const {ItemKind.article: 6, ItemKind.episode: 2, ItemKind.video: 1, ItemKind.post: 5},
+  kindCounts: const {ItemKind.paper: 1, ItemKind.article: 6, ItemKind.episode: 2, ItemKind.video: 1, ItemKind.post: 5},
   languages: const ['en', 'da', 'ta'],
   visualSeed: 11,
   whatsNew: [
@@ -210,8 +226,8 @@ final halcyon = Story(
         ),
         DisagreementSide(
           value: '900 billion',
-          claim: 'Parameters active per token, which some outlets reported as the size.',
-          sources: [siliconTides, teknologiposten],
+          claim: 'Parameters active per token, as given in the technical report on arXiv.',
+          sources: [arxivCsCl, siliconTides, teknologiposten],
         ),
       ],
     ),
@@ -246,6 +262,13 @@ final halcyon = Story(
       text: 'Early benchmark numbers appear in developer posts.',
       kind: ItemKind.post,
       sourceCount: 6,
+    ),
+    TimelineEvent(
+      id: 'h-t2b',
+      at: ago(d: 1, h: 9),
+      text: 'Technical report posted on arXiv.',
+      kind: ItemKind.paper,
+      sourceCount: 1,
     ),
     TimelineEvent(
       id: 'h-t3',
@@ -422,6 +445,7 @@ final extremeStory = Story(
   lastReadAt: ago(d: 6),
   sources: manySources(40),
   kindCounts: const {
+    ItemKind.paper: 7,
     ItemKind.article: 18,
     ItemKind.episode: 4,
     ItemKind.video: 6,
@@ -516,9 +540,145 @@ final comicItem = Item(
   publishedAt: ago(d: 2),
   title: 'Debug Duck #214: The model is very confident',
 );
-final items = [articleItem, postItem, videoItem, episodeItem, photoItem, comicItem];
+// ── Papers and research interests (arXiv) ────────────────────────────────────
+
+final paperRag = Item(
+  id: 'p-rag',
+  source: arxivCsCl,
+  kind: ItemKind.paper,
+  publishedAt: ago(h: 5),
+  title: 'Grounded Retrieval for Multilingual Question Answering in Low-Resource Languages',
+  text:
+      'We study retrieval-augmented generation for question answering in Danish, Tamil and Swahili. '
+      'A multilingual dense retriever with a small reranker closes most of the gap to English, and we '
+      'release an evaluation set of 4,000 questions.',
+  authors: const ['I. Solvik', 'K. Ramanan', 'M. Lundgaard', 'A. Pillay'],
+  categories: const ['cs.CL', 'cs.IR'],
+  paperId: '2610.98123',
+  version: 1,
+  matchedTerms: const ['retrieval-augmented generation'],
+);
+final paperRerank = Item(
+  id: 'p-rerank',
+  source: arxivCsIr,
+  kind: ItemKind.paper,
+  publishedAt: ago(h: 6),
+  title: 'How Much Do Rerankers Help? A Cost-Aware Study of Retrieval Pipelines',
+  text: 'Across nine benchmarks, a reranker adds 3 to 11 points of recall at a fifth of the cost of a larger retriever.',
+  authors: const ['T. Okonjo', 'L. Varga'],
+  categories: const ['cs.IR'],
+  paperId: '2610.98456',
+  version: 2,
+  matchedByMeaning: true,
+);
+final paperSpeech = Item(
+  id: 'p-speech',
+  source: arxivEessAs,
+  kind: ItemKind.paper,
+  publishedAt: ago(h: 7),
+  title: 'Streaming Speech Recognition for Danish with Sub-Second Latency',
+  text: 'A streaming model trained on 3,000 hours of Danish reaches a 7.9% word error rate at 400 ms latency.',
+  authors: const ['S. Højgaard', 'E. Brandt', 'N. Aalto'],
+  categories: const ['eess.AS', 'cs.CL'],
+  paperId: '2610.98789',
+  version: 1,
+  matchedTerms: const ['speech recognition', 'Danish'],
+);
+final paperExoplanet = Item(
+  id: 'p-exo',
+  source: arxivAstroEp,
+  kind: ItemKind.paper,
+  publishedAt: ago(h: 8),
+  title: 'Water Vapour Signatures in the Atmosphere of a Temperate Sub-Neptune',
+  text: 'Transmission spectra from four transits show water absorption at 3.1 sigma and no detectable methane.',
+  authors: const ['R. Castell', 'J. Mwangi', 'P. Thorsen', 'H. Ilves', 'C. Duarte'],
+  categories: const ['astro-ph.EP'],
+  paperId: '2610.99012',
+  version: 1,
+  matchedTerms: const ['exoplanet atmospheres'],
+);
+final paperLongContext = Item(
+  id: 'p-long',
+  source: arxivCsCl,
+  kind: ItemKind.paper,
+  publishedAt: ago(d: 1),
+  title: 'Benchmarking Long-Context Models on Evolving Document Collections',
+  text: 'Models that score well on static long-context tests lose up to 20 points when documents change over time.',
+  authors: const ['Y. Harlow'],
+  categories: const ['cs.CL'],
+  paperId: '2610.99345',
+  version: 1,
+  matchedByMeaning: true,
+);
+
+/// New papers for the reader's interests, best first (Today's research section).
+final research = [paperRag, paperSpeech, paperExoplanet, paperRerank, paperLongContext];
+
+const interests = [
+  ResearchInterest(
+    id: 'interest-rag',
+    keywords: ['retrieval-augmented generation', 'RAG evaluation'],
+    relatedTerms: ['dense retrieval', 'reranking'],
+    categories: ['cs.CL', 'cs.IR'],
+    newThisWeek: 4,
+  ),
+  ResearchInterest(
+    id: 'interest-speech',
+    keywords: ['speech recognition', 'Danish'],
+    categories: ['eess.AS', 'cs.CL'],
+    newThisWeek: 1,
+  ),
+  ResearchInterest(id: 'interest-exo', keywords: ['exoplanet atmospheres'], categories: ['astro-ph.EP']),
+];
+
+/// What the interest agent might suggest for the RAG interest.
+const researchSuggestions = ['dense retrieval', 'reranking', 'long-context models', 'hallucination detection'];
+
+/// An interest with every edge case: many keywords, long phrases, one outside rule 3.
+const extremeKeywords = [
+  'retrieval-augmented generation',
+  'RAG evaluation',
+  'grounded question answering in low-resource languages with multilingual dense retrievers',
+  'reranking',
+  'long-context models',
+  'speech recognition',
+  'Danish',
+  'Tamil',
+  'protein structure prediction',
+  'exoplanet atmospheres',
+  'quantum error correction',
+  'program synthesis',
+  'election forecasting',
+  'robot manipulation',
+  'materials discovery',
+  'tokenizer design',
+  'model distillation',
+  'evaluation contamination',
+  'agent benchmarks',
+  'speculative decoding',
+];
+const flaggedKeywords = {'election forecasting'};
+
+final extremePaper = Item(
+  id: 'x-paper',
+  source: arxivCsCl,
+  kind: ItemKind.paper,
+  publishedAt: ago(d: 3),
+  title:
+      'A paper title that runs to two hundred characters to make sure the paper card truncates gracefully '
+      'instead of pushing its authors, abstract, categories and links off the bottom of a narrow card',
+  text: List.filled(8, 'A long abstract that keeps going over many lines.').join(' '),
+  authors: [for (var i = 0; i < 40; i++) 'Author ${i + 1}'],
+  categories: const ['cs.CL', 'cs.LG', 'cs.IR', 'cs.AI', 'stat.ML', 'eess.AS'],
+  paperId: '2610.99678',
+  version: 4,
+  matchedTerms: const ['retrieval-augmented generation', 'grounded question answering', 'reranking'],
+);
+
+final items = [paperRag, articleItem, postItem, videoItem, episodeItem, photoItem, comicItem];
 
 final emptyItems = [
+  Item(id: 'e-paper', source: arxivCsCl, kind: ItemKind.paper, publishedAt: ago(m: 1)),
   Item(id: 'e-article', source: circuitLedger, kind: ItemKind.article, publishedAt: ago(m: 3)),
   Item(id: 'e-post', source: junoVale, kind: ItemKind.post, publishedAt: ago(m: 8)),
   Item(id: 'e-video', source: launchpadLens, kind: ItemKind.video, publishedAt: ago(m: 30), hasThumbnail: false),
@@ -526,6 +686,7 @@ final emptyItems = [
 ];
 
 final extremeItems = [
+  extremePaper,
   Item(
     id: 'x-article',
     source: manySources(1).first,
@@ -627,6 +788,9 @@ final manyTopics = [
 ];
 
 const suggestions = [
+  SourceSuggestion(source: arxivCsCl, topicId: 'ai-research', kind: ItemKind.paper, note: 'New papers daily'),
+  SourceSuggestion(source: arxivCsIr, topicId: 'ai-research', kind: ItemKind.paper, note: 'New papers daily'),
+  SourceSuggestion(source: arxivAstroEp, topicId: 'space', kind: ItemKind.paper, note: 'New papers daily'),
   SourceSuggestion(source: inferenceBrief, topicId: 'ai-research', kind: ItemKind.article, note: 'Weekly'),
   SourceSuggestion(source: circuitLedger, topicId: 'ai-research', kind: ItemKind.article, note: 'About 6 a day'),
   SourceSuggestion(source: gradientHour, topicId: 'ai-research', kind: ItemKind.episode, note: 'Weekly episodes'),

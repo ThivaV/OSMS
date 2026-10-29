@@ -46,6 +46,7 @@ class _LiveSettingsState extends State<_LiveSettings> {
         previewStory: fx.halcyon,
         onBack: () {},
         onWhatWeKeep: () {},
+        onResearchInterests: () {},
         onSignOut: () {},
         onDeleteAccount: () {},
       ),

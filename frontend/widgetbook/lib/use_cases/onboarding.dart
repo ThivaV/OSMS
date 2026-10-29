@@ -23,6 +23,7 @@ Widget onboardingNormal(BuildContext context) {
       languages: fx.languages,
       topics: fx.topics,
       suggestions: fx.suggestions,
+      researchSuggestions: fx.researchSuggestions,
       initialStep: step,
       initialTopics: const {'ai-research', 'space'},
     ),
@@ -49,10 +50,11 @@ Widget onboardingExtreme(BuildContext context) {
     child: Onboarding(
       key: ValueKey(step),
       languages: fx.languages,
-      topics: fx.manyTopics,
+      topics: [...fx.topics, ...fx.manyTopics],
       suggestions: fx.manySuggestions,
+      researchSuggestions: [...fx.researchSuggestions, ...fx.extremeKeywords],
       initialStep: step,
-      initialTopics: {for (final t in fx.manyTopics.take(12)) t.id},
+      initialTopics: {'ai-research', for (final t in fx.manyTopics.take(12)) t.id},
     ),
   );
 }

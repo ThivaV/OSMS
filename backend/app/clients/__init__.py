@@ -1,1 +1,2 @@
-"""Clients for the Meta Model API and Baseten/Modal."""
+"""Clients for Meta Model API (text, image, transcription, segmentation), Baseten
+(Muse Spark Open) and the Muse Glimmer server."""

@@ -16,7 +16,16 @@ import 'frame.dart';
 
 @widgetbook.UseCase(name: 'Normal', type: TodayOverview, path: '[Story]')
 Widget todayNormal(BuildContext context) =>
-    Material(child: TodayOverview(stories: fx.stories, briefing: fx.briefing, user: fx.user, onOpen: (_) {}));
+    Material(
+      child: TodayOverview(
+        stories: fx.stories,
+        briefing: fx.briefing,
+        user: fx.user,
+        research: fx.research,
+        onOpen: (_) {},
+        onOpenPaper: (_) {},
+      ),
+    );
 
 @widgetbook.UseCase(name: 'Empty', type: TodayOverview, path: '[Story]')
 Widget todayEmpty(BuildContext context) => const Material(child: TodayOverview(stories: []));
@@ -27,7 +36,9 @@ Widget todayExtreme(BuildContext context) => Material(
     stories: [fx.extremeStory, ...fx.stories, ...fx.stories],
     briefing: fx.extremeBriefing,
     user: fx.longUser,
+    research: [fx.extremePaper, ...fx.research, ...fx.research],
     onOpen: (_) {},
+    onOpenPaper: (_) {},
   ),
 );
 
@@ -120,6 +131,7 @@ List<CommandItem> _items(int sources) => [
     ),
   const CommandItem(icon: Icons.headphones_rounded, label: 'Play the morning briefing', group: 'Actions', shortcut: 'Space'),
   const CommandItem(icon: Icons.add_rounded, label: 'Add a source', group: 'Actions', shortcut: 'N'),
+  const CommandItem(icon: Icons.science_outlined, label: 'Follow research on arXiv', group: 'Actions'),
   const CommandItem(icon: Icons.tune_rounded, label: 'Settings and themes', group: 'Actions', shortcut: '⌘,'),
 ];
 

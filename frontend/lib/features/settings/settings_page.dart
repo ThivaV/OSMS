@@ -25,7 +25,11 @@ class SettingsPage extends StatelessWidget {
     this.onWhatWeKeep,
     this.onSignOut,
     this.onDeleteAccount,
+    this.onResearchInterests,
   });
+
+  /// Opens the arXiv research interests editor.
+  final VoidCallback? onResearchInterests;
 
   final Appearance appearance;
   final ValueChanged<Appearance> onAppearanceChanged;
@@ -210,6 +214,11 @@ class SettingsPage extends StatelessWidget {
                         onSelectionChanged:
                             onDefaultLayoutChanged == null ? null : (s) => onDefaultLayoutChanged!(s.first),
                       ),
+                    ),
+                    _LinkRow(
+                      icon: Icons.science_outlined,
+                      title: 'Research interests on arXiv',
+                      onTap: onResearchInterests,
                     ),
                   ],
                 ),

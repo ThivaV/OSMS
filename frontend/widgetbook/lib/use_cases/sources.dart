@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:osms/core/models/models.dart';
 import 'package:osms/core/theme/tokens.dart';
 import 'package:osms/features/sources/add_source_sheet.dart';
+import 'package:osms/features/sources/interests_editor.dart';
 import 'package:osms/shared/widgets/item_card.dart';
 import 'package:osms/shared/widgets/source_chip.dart';
 import 'package:widgetbook/widgetbook.dart';
@@ -13,6 +14,7 @@ import 'frame.dart';
 // ── Source chip ──────────────────────────────────────────────────────────────
 
 const _oneOfEachType = [
+  fx.arxivCsCl,
   fx.orbitalWeekly,
   fx.inferenceBrief,
   fx.gradientHour,
@@ -125,6 +127,7 @@ Widget addSourceNormal(BuildContext context) {
       found: fx.foundSource,
       opmlFileName: 'reader-export.opml',
       opmlSources: fx.opmlSources(18),
+      onFollowResearch: () {},
     ),
   );
 }
@@ -139,5 +142,41 @@ Widget addSourceExtreme(BuildContext context) => Frame(
     status: AddSourceStatus.opml,
     opmlFileName: 'a-very-long-export-file-name-from-another-reader-2026-10-28.opml',
     opmlSources: fx.opmlSources(120),
+  ),
+);
+
+// ── Research interests (arXiv) ───────────────────────────────────────────────
+
+@widgetbook.UseCase(name: 'Normal', type: InterestsEditor, path: '[Sources]')
+Widget interestsNormal(BuildContext context) => Frame(
+  maxWidth: _sheetWidth,
+  child: InterestsEditor(
+    initialKeywords: fx.interests.first.keywords,
+    suggestedTerms: fx.researchSuggestions,
+    initialRelated: fx.interests.first.relatedTerms.toSet(),
+    initialCategories: fx.interests.first.categories.toSet(),
+    preview: fx.research.take(3).toList(),
+    previewCount: 46,
+    onSave: () {},
+    onClose: () {},
+  ),
+);
+
+@widgetbook.UseCase(name: 'Empty', type: InterestsEditor, path: '[Sources]')
+Widget interestsEmpty(BuildContext context) =>
+    Frame(maxWidth: _sheetWidth, child: InterestsEditor(onSave: () {}, onClose: () {}));
+
+@widgetbook.UseCase(name: 'Extreme content', type: InterestsEditor, path: '[Sources]')
+Widget interestsExtreme(BuildContext context) => Frame(
+  maxWidth: _sheetWidth,
+  child: InterestsEditor(
+    initialKeywords: fx.extremeKeywords,
+    suggestedTerms: [...fx.researchSuggestions, ...fx.extremeKeywords.take(8)],
+    initialCategories: {for (final c in arxivCategories) c.code},
+    flagged: fx.flaggedKeywords,
+    preview: [fx.extremePaper, ...fx.research],
+    previewCount: 2000,
+    onSave: () {},
+    onClose: () {},
   ),
 );

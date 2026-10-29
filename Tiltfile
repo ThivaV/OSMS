@@ -1,8 +1,9 @@
 # OSMS local development: `make up` (or `tilt up`) at the repo root.
 # Tilt UI: http://localhost:10350. Rules: AGENTS.md, "Local development with Tilt".
 #
-# A resource joins when its code exists. The backend ones (postgres, api, worker,
-# overnight-agent, backend-checks, eval) arrive with the backend code.
+# A resource joins when its code exists. The backend ones (milvus, glimmer, api,
+# worker, overnight-agent, backend-checks, eval) arrive with the backend code. SQLite
+# needs none: it is a file in data/.
 
 load('ext://uibutton', 'cmd_button')
 

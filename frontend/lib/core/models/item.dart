@@ -2,6 +2,7 @@ import 'source.dart';
 
 enum ItemKind {
   article('article', 'articles'),
+  paper('paper', 'papers'),
   episode('episode', 'episodes'),
   post('post', 'posts'),
   video('video', 'videos'),
@@ -15,7 +16,7 @@ enum ItemKind {
   String count(int n) => '$n ${n == 1 ? singular : plural}';
 
   ItemRole get role => switch (this) {
-    article || episode => ItemRole.facts,
+    article || paper || episode => ItemRole.facts,
     post || video => ItemRole.context,
     photo || comic => ItemRole.timelineOnly,
   };
@@ -45,6 +46,12 @@ class Item {
     this.duration,
     this.linkTitle,
     this.hasThumbnail = true,
+    this.authors = const [],
+    this.categories = const [],
+    this.paperId,
+    this.version,
+    this.matchedTerms = const [],
+    this.matchedByMeaning = false,
   });
 
   final String id;
@@ -55,7 +62,7 @@ class Item {
   /// Posts usually have none.
   final String? title;
 
-  /// An excerpt or our own summary, never the full third-party text.
+  /// An excerpt, our own summary, or a paper's abstract; never full third-party text.
   final String? text;
   final String? url;
 
@@ -65,4 +72,15 @@ class Item {
   /// The page a post links to, if any.
   final String? linkTitle;
   final bool hasThumbnail;
+
+  /// Papers: authors in order, arXiv categories (primary first), id and version.
+  final List<String> authors;
+  final List<String> categories;
+  final String? paperId;
+  final int? version;
+
+  /// Why a paper reached this reader: the interest keywords it matched, or
+  /// [matchedByMeaning] when it is related without using them.
+  final List<String> matchedTerms;
+  final bool matchedByMeaning;
 }

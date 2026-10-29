@@ -15,6 +15,7 @@ class SourcesSidebar extends StatelessWidget {
     super.key,
     required this.topics,
     required this.sources,
+    this.interests = const [],
     this.briefing,
     this.user,
     this.selected = 'today',
@@ -32,6 +33,9 @@ class SourcesSidebar extends StatelessWidget {
 
   final List<Topic> topics;
   final List<Source> sources;
+
+  /// The reader's arXiv research interests.
+  final List<ResearchInterest> interests;
   final Briefing? briefing;
 
   /// Null while signed out: the sidebar then shows the demo's sources and a
@@ -96,6 +100,21 @@ class SourcesSidebar extends StatelessWidget {
               _Heading('Topics'),
               for (final topic in topics)
                 _NavRow(icon: Icons.tag_rounded, label: topic.name, selected: selected == topic.id),
+              if (interests.isNotEmpty) ...[
+                _Heading('Research on arXiv'),
+                for (final interest in interests)
+                  _NavRow(
+                    icon: Icons.science_outlined,
+                    label: interest.label,
+                    trailing: interest.newThisWeek == 0
+                        ? null
+                        : Text(
+                            '${interest.newThisWeek} new',
+                            style: t.caption.copyWith(color: c.newSignal, fontWeight: FontWeight.w600),
+                          ),
+                    selected: selected == interest.id,
+                  ),
+              ],
               _Heading(user == null ? 'Demo sources' : 'Sources'),
               if (sources.isEmpty)
                 Padding(

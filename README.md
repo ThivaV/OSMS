@@ -1,8 +1,12 @@
 # OSMS: One Story, Many Sources
 
-A news reader that groups articles, newsletters, podcasts, videos and posts about the
-same event into one story, then shows what's new since you last looked, where sources
-disagree, and how the story developed.
+A news reader that groups articles, research papers, newsletters, podcasts, videos and
+posts about the same event into one story, then shows what's new since you last looked,
+where sources disagree, and how the story developed.
+
+arXiv is one of its main sources: type your research interests as keywords, and OSMS
+pulls every new paper that mentions them or is related to them by meaning, and tells you
+why each one is there.
 
 Built for the Meta Global AI Developer Hackathon (Indie Developer track),
 Oct 27 – Nov 4, 2026.
@@ -13,11 +17,30 @@ _Filled in as work lands._
 
 ## Which Meta models do what
 
-See [docs/architecture.md](docs/architecture.md).
+The plan; each line is marked as it lands. Muse Spark agents make the judgement calls,
+and a different model checks every generated output before a reader sees it.
+
+| Model | What OSMS uses it for |
+|---|---|
+| Muse Spark | The interest, claims, verifier, editor and writer agents |
+| Muse Spark Open (open weights, Baseten) | The judge: are two items about the same event? |
+| Muse Glimmer (open weights, local) | Triage of every incoming item |
+| Muse Wonder | The overnight editor, if our agent tests favour it |
+| Muse Image | One illustration per story |
+| SAM 3.1 | Checks and crops each illustration |
+| Muse Voice Transcribe | Podcast episodes, and a check on the briefing audio |
+| Muse Code | Parts of the build (listed below) |
+
+Details and diagrams: [docs/architecture.md](docs/architecture.md).
 
 ## Built with Muse Code
 
 _Which parts were written with Muse Code._
+
+## Thanks
+
+Thank you to arXiv for use of its open access interoperability. OSMS shows arXiv's
+metadata and links to each paper on arXiv; it is not endorsed by arXiv.
 
 ## How to run
 

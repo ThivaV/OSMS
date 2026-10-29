@@ -2,6 +2,7 @@
 /// its logo never is.
 enum SourceType {
   feed('Feed'),
+  arxiv('arXiv'),
   newsletter('Newsletter'),
   podcast('Podcast'),
   soundcloud('SoundCloud'),

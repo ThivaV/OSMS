@@ -12,6 +12,7 @@ import 'package:osms/features/briefing/briefing_player.dart';
 import 'package:osms/features/onboarding/onboarding_flow.dart';
 import 'package:osms/features/search/command_palette.dart';
 import 'package:osms/features/settings/settings_page.dart';
+import 'package:osms/features/sources/interests_editor.dart';
 import 'package:osms/features/sources/sources_sidebar.dart';
 import 'package:osms/features/stories/story_list.dart';
 import 'package:osms/features/stories/today_overview.dart';
@@ -24,7 +25,7 @@ import 'package:widgetbook_annotation/widgetbook_annotation.dart' as widgetbook;
 
 import '../fixtures/fixtures.dart' as fx;
 
-enum _Screen { shell, signIn, whatWeKeep, onboarding, settings }
+enum _Screen { shell, signIn, whatWeKeep, onboarding, settings, interests }
 
 const _phoneTabs = [
   PillNavDestination(icon: Icons.wb_sunny_outlined, label: 'Today'),
@@ -34,8 +35,8 @@ const _phoneTabs = [
 ];
 
 /// The whole app as a clickable prototype: Today overview, three panes,
-/// floating player, phone tab bar, ⌘K palette, simulated sign-in, onboarding
-/// and Settings, whose theme choices re-theme everything live.
+/// floating player, phone tab bar, ⌘K palette, simulated sign-in, onboarding,
+/// research interests and Settings, whose theme choices re-theme everything live.
 class _Shell extends StatefulWidget {
   const _Shell({required this.stories, required this.sources, this.user, this.briefing, this.initialSelection});
 
@@ -101,6 +102,12 @@ class _ShellState extends State<_Shell> {
     CommandItem(icon: Icons.headphones_rounded, label: 'Play the morning briefing', group: 'Actions', shortcut: 'Space'),
     const CommandItem(icon: Icons.add_rounded, label: 'Add a source', group: 'Actions', shortcut: 'N'),
     CommandItem(
+      icon: Icons.science_outlined,
+      label: 'Follow research on arXiv',
+      group: 'Actions',
+      onRun: () => _go(_Screen.interests),
+    ),
+    CommandItem(
       icon: Icons.tune_rounded,
       label: 'Settings and themes',
       group: 'Actions',
@@ -153,6 +160,7 @@ class _ShellState extends State<_Shell> {
             languages: fx.languages,
             topics: fx.topics,
             suggestions: fx.suggestions,
+            researchSuggestions: fx.researchSuggestions,
             onDone: () => _go(_Screen.shell),
           ),
         ),
@@ -168,6 +176,7 @@ class _ShellState extends State<_Shell> {
       previewStory: widget.stories.firstOrNull,
       onBack: () => _go(_Screen.shell),
       onWhatWeKeep: () => _go(_Screen.whatWeKeep),
+      onResearchInterests: () => _go(_Screen.interests),
       onSignOut: () => setState(() {
         _user = null;
         _screen = _Screen.shell;
@@ -177,16 +186,39 @@ class _ShellState extends State<_Shell> {
         _screen = _Screen.shell;
       }),
     ),
+    _Screen.interests => Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(Space.xl),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: Sizes.sheetMaxWidth),
+            child: InterestsEditor(
+              initialKeywords: fx.interests.first.keywords,
+              suggestedTerms: fx.researchSuggestions,
+              initialRelated: fx.interests.first.relatedTerms.toSet(),
+              initialCategories: fx.interests.first.categories.toSet(),
+              preview: fx.research.take(3).toList(),
+              previewCount: 46,
+              onSave: () => _go(_Screen.shell),
+              onClose: () => _go(_Screen.shell),
+            ),
+          ),
+        ),
+      ),
+    ),
     _Screen.shell => _buildShell(context),
   };
 
   Widget _buildShell(BuildContext context) {
     final story = widget.stories.where((s) => s.id == _selected).firstOrNull;
     final briefing = widget.briefing;
+    // Research interests are the signed-in reader's own; the demo has none.
+    final interests = _user == null ? const <ResearchInterest>[] : fx.interests;
     return ThreePaneLayout(
       sidebar: SourcesSidebar(
         topics: fx.topics,
         sources: widget.sources,
+        interests: interests,
         user: _user,
         onSignIn: () => _openSignIn(SignInIntent.signIn),
         onSearch: () => _openPalette(context),
@@ -212,7 +244,9 @@ class _ShellState extends State<_Shell> {
         stories: widget.stories,
         briefing: briefing,
         user: _user,
+        research: interests.isEmpty ? const [] : fx.research,
         onOpen: (s) => setState(() => _selected = s.id),
+        onOpenPaper: (_) {},
       ),
       detail: story == null ? null : StoryDetailView(key: ValueKey(story.id), story: story),
       floatingPlayer: briefing == null ? null : BriefingFloatingBar(briefing: briefing),
@@ -233,6 +267,7 @@ class _ShellState extends State<_Shell> {
         3 => SourcesSidebar(
           topics: fx.topics,
           sources: widget.sources,
+          interests: interests,
           user: _user,
           onSignIn: () => _openSignIn(SignInIntent.signIn),
           onSettings: () => _go(_Screen.settings),

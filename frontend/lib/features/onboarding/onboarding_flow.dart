@@ -5,16 +5,22 @@ import '../../core/theme/tokens.dart';
 import '../../shared/formatting.dart';
 import '../../shared/widgets/kind_icons.dart';
 import '../../shared/widgets/source_chip.dart';
+import '../sources/interests_editor.dart';
 
-enum OnboardingStep { language, topics, kinds, sources }
+enum OnboardingStep { language, topics, kinds, research, sources }
 
-/// Four short steps, every one skippable. Picks survive going back and forth.
+/// Topics that make the arXiv research step worth showing.
+const _researchTopics = {'ai-research', 'science', 'space'};
+
+/// Short steps, every one skippable. The arXiv research step appears only when a
+/// research topic is picked. Picks survive going back and forth.
 class Onboarding extends StatefulWidget {
   const Onboarding({
     super.key,
     required this.languages,
     required this.topics,
     required this.suggestions,
+    this.researchSuggestions = const [],
     this.initialStep = OnboardingStep.language,
     this.initialLanguage = 'en',
     this.initialTopics = const {},
@@ -24,6 +30,9 @@ class Onboarding extends StatefulWidget {
   final List<AppLanguage> languages;
   final List<Topic> topics;
   final List<SourceSuggestion> suggestions;
+
+  /// Related terms the interest agent offers in the research step.
+  final List<String> researchSuggestions;
   final OnboardingStep initialStep;
   final String initialLanguage;
   final Set<String> initialTopics;
@@ -37,16 +46,25 @@ class _OnboardingState extends State<Onboarding> {
   late OnboardingStep _step = widget.initialStep;
   late String _language = widget.initialLanguage;
   late final Set<String> _topics = {...widget.initialTopics};
-  final Set<ItemKind> _kinds = {ItemKind.article, ItemKind.episode, ItemKind.video, ItemKind.post};
+  final Set<ItemKind> _kinds = {ItemKind.article, ItemKind.paper, ItemKind.episode, ItemKind.video, ItemKind.post};
   final Set<String> _unticked = {};
 
+  List<OnboardingStep> get _steps => [
+    OnboardingStep.language,
+    OnboardingStep.topics,
+    OnboardingStep.kinds,
+    if (_topics.any(_researchTopics.contains)) OnboardingStep.research,
+    OnboardingStep.sources,
+  ];
+
   void _go(int delta) {
-    final next = _step.index + delta;
-    if (next >= OnboardingStep.values.length) {
+    final steps = _steps;
+    final next = steps.indexOf(_step).clamp(0, steps.length - 1) + delta;
+    if (next >= steps.length) {
       widget.onDone?.call();
       return;
     }
-    setState(() => _step = OnboardingStep.values[next.clamp(0, OnboardingStep.values.length - 1)]);
+    setState(() => _step = steps[next.clamp(0, steps.length - 1)]);
   }
 
   @override
@@ -63,8 +81,15 @@ class _OnboardingState extends State<Onboarding> {
         'Which kinds of sources?',
         'We suggest these first. Photos and comics appear in your timeline but don’t join stories.',
       ),
+      OnboardingStep.research => (
+        'Follow research on arXiv?',
+        'Add keywords from your field and OSMS pulls new papers about them every morning. '
+            'Skip this if you don’t read papers.',
+      ),
       OnboardingStep.sources => ('Here’s a starting set', 'All ticked. Untick anything you don’t want.'),
     };
+    final steps = _steps;
+    final index = steps.indexOf(_step).clamp(0, steps.length - 1);
     final last = _step == OnboardingStep.sources;
 
     return ConstrainedBox(
@@ -73,7 +98,7 @@ class _OnboardingState extends State<Onboarding> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Progress(step: _step, onSkip: widget.onDone),
+          _Progress(index: index, total: steps.length, onSkip: widget.onDone),
           const SizedBox(height: Space.xl),
           Text(title, style: t.title),
           const SizedBox(height: Space.sm),
@@ -94,6 +119,7 @@ class _OnboardingState extends State<Onboarding> {
               selected: _kinds,
               onToggle: (k) => setState(() => _kinds.contains(k) ? _kinds.remove(k) : _kinds.add(k)),
             ),
+            OnboardingStep.research => InterestsEditor(embedded: true, suggestedTerms: widget.researchSuggestions),
             OnboardingStep.sources => _SourceStep(
               topics: widget.topics.where((topic) => _topics.contains(topic.id)).toList(),
               suggestions: widget.suggestions.where((s) => _topics.contains(s.topicId) && _kinds.contains(s.kind)).toList(),
@@ -104,7 +130,7 @@ class _OnboardingState extends State<Onboarding> {
           const SizedBox(height: Space.xl),
           Row(
             children: [
-              if (_step.index > 0) OutlinedButton(onPressed: () => _go(-1), child: const Text('Back')),
+              if (index > 0) OutlinedButton(onPressed: () => _go(-1), child: const Text('Back')),
               const Spacer(),
               FilledButton(onPressed: () => _go(1), child: Text(last ? 'Start reading' : 'Continue')),
             ],
@@ -116,21 +142,21 @@ class _OnboardingState extends State<Onboarding> {
 }
 
 class _Progress extends StatelessWidget {
-  const _Progress({required this.step, this.onSkip});
+  const _Progress({required this.index, required this.total, this.onSkip});
 
-  final OnboardingStep step;
+  final int index;
+  final int total;
   final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final total = OnboardingStep.values.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            Text('Step ${step.index + 1} of $total', style: context.text.caption.copyWith(color: c.textTertiary)),
+            Text('Step ${index + 1} of $total', style: context.text.caption.copyWith(color: c.textTertiary)),
             const Spacer(),
             TextButton(onPressed: onSkip ?? () {}, child: const Text('Skip')),
           ],
@@ -143,7 +169,7 @@ class _Progress extends StatelessWidget {
                 child: Container(
                   height: Sizes.rail,
                   decoration: BoxDecoration(
-                    color: i <= step.index ? c.accent : c.border,
+                    color: i <= index ? c.accent : c.border,
                     borderRadius: BorderRadius.circular(Radii.pill),
                   ),
                 ),
@@ -321,6 +347,7 @@ class _KindStep extends StatelessWidget {
 
   static const _names = {
     ItemKind.article: ('Articles', 'Blogs, news sites, newsletters'),
+    ItemKind.paper: ('Research papers', 'From arXiv, matched to your keywords'),
     ItemKind.episode: ('Podcasts', 'Transcribed, so they join stories'),
     ItemKind.video: ('Videos', 'Channels and playlists'),
     ItemKind.post: ('Social posts', 'Mastodon, Bluesky, Reddit and more'),

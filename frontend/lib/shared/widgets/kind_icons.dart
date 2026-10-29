@@ -5,6 +5,7 @@ import '../../core/models/models.dart';
 /// Generic glyphs only: never a platform's logo.
 IconData iconForKind(ItemKind kind) => switch (kind) {
   ItemKind.article => Icons.article_outlined,
+  ItemKind.paper => Icons.description_outlined,
   ItemKind.episode => Icons.podcasts_rounded,
   ItemKind.post => Icons.chat_bubble_outline_rounded,
   ItemKind.video => Icons.smart_display_outlined,
@@ -14,6 +15,7 @@ IconData iconForKind(ItemKind kind) => switch (kind) {
 
 IconData iconForSourceType(SourceType type) => switch (type) {
   SourceType.feed => Icons.rss_feed_rounded,
+  SourceType.arxiv => Icons.science_outlined,
   SourceType.newsletter => Icons.mail_outline_rounded,
   SourceType.podcast || SourceType.soundcloud => Icons.podcasts_rounded,
   SourceType.youtube => Icons.smart_display_outlined,

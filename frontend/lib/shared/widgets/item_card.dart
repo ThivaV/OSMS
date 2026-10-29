@@ -39,6 +39,7 @@ class ItemCard extends StatelessWidget {
                 const SizedBox(height: Space.md),
                 ...switch (item.kind) {
                   ItemKind.article => _article(context),
+                  ItemKind.paper => _paper(context),
                   ItemKind.post => _post(context),
                   ItemKind.video => _video(context),
                   ItemKind.episode => _episode(context),
@@ -61,6 +62,68 @@ class ItemCard extends StatelessWidget {
       if (item.text != null)
         Text(item.text!, maxLines: 3, overflow: TextOverflow.ellipsis, style: t.bodySmall.copyWith(color: c.textSecondary)),
       if (item.title == null && item.text == null) const _NoPreview(),
+    ];
+  }
+
+  /// A paper: title, authors, abstract, categories, why it's here, and links that
+  /// open on arXiv. OSMS never hosts the PDF.
+  List<Widget> _paper(BuildContext context) {
+    final c = context.colors;
+    final t = context.text;
+    final authors = item.authors;
+    final byline = authors.isEmpty
+        ? null
+        : authors.length <= 3
+        ? authors.join(', ')
+        : '${authors.take(3).join(', ')} et al. (${authors.length} authors)';
+    final reasons = [
+      for (final term in item.matchedTerms) 'Matches “$term”',
+      if (item.matchedTerms.isEmpty && item.matchedByMeaning) 'Related to your interests',
+    ];
+    return [
+      if (item.title != null) Text(item.title!, maxLines: 3, overflow: TextOverflow.ellipsis, style: t.headlineSmall),
+      if (byline != null) ...[
+        const SizedBox(height: Space.xs),
+        Text(byline, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.caption.copyWith(color: c.textSecondary)),
+      ],
+      if (item.text != null) ...[
+        const SizedBox(height: Space.sm),
+        Text(item.text!, maxLines: 4, overflow: TextOverflow.ellipsis, style: t.bodySmall.copyWith(color: c.textSecondary)),
+      ],
+      if (item.title == null && item.text == null) const _NoPreview(),
+      if (item.categories.isNotEmpty || reasons.isNotEmpty) ...[
+        const SizedBox(height: Space.md),
+        Wrap(
+          spacing: Space.xs,
+          runSpacing: Space.xs,
+          children: [
+            for (final reason in reasons) PaperTag(label: reason, emphasis: true),
+            for (final category in item.categories) PaperTag(label: category),
+          ],
+        ),
+      ],
+      const SizedBox(height: Space.sm),
+      Wrap(
+        spacing: Space.sm,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          if (item.paperId != null)
+            Text(
+              'arXiv ${item.paperId}${item.version == null ? '' : ' · v${item.version}'}',
+              style: t.caption.copyWith(color: c.textTertiary),
+            ),
+          TextButton.icon(
+            onPressed: onTap ?? () {},
+            icon: const Icon(Icons.open_in_new_rounded, size: Sizes.iconSm),
+            label: const Text('Abstract'),
+          ),
+          TextButton.icon(
+            onPressed: onTap ?? () {},
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: Sizes.iconSm),
+            label: const Text('PDF on arXiv'),
+          ),
+        ],
+      ),
     ];
   }
 
@@ -267,5 +330,48 @@ class _NoPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Text('No preview available', style: context.text.bodySmall.copyWith(color: c.textTertiary));
+  }
+}
+
+/// A small label on a paper: a category (`cs.CL`) or why it's here. The reason
+/// is set apart by weight and an icon, never colour alone.
+class PaperTag extends StatelessWidget {
+  const PaperTag({super.key, required this.label, this.emphasis = false});
+
+  final String label;
+  final bool emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      // The reason is the point of the tag, so only the card's width cuts it short.
+      constraints: emphasis ? null : const BoxConstraints(maxWidth: Sizes.chipMaxWidth),
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
+      decoration: BoxDecoration(
+        color: emphasis ? c.accentSoft : c.surfaceMuted,
+        borderRadius: BorderRadius.circular(Radii.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (emphasis) ...[
+            Icon(Icons.manage_search_rounded, size: Sizes.iconXs, color: c.text),
+            const SizedBox(width: Space.xs),
+          ],
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.caption.copyWith(
+                color: emphasis ? c.text : c.textSecondary,
+                fontWeight: emphasis ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

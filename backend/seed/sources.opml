@@ -1,16 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demo and onboarding sources: one folder per onboarding topic.
      Public feed URLs only, all non-political (technology, AI research, science,
-     business/product news). This is the only OPML file in the repo. -->
+     business/product news). This is the only OPML file in the repo.
+     arXiv category feeds update once a day; arXiv allows one request every three
+     seconds across all of OSMS, so the fetcher reads them one at a time. -->
 <opml version="2.0">
   <head>
     <title>OSMS seed sources</title>
   </head>
   <body>
-    <outline text="AI research" title="AI research"/>
-    <outline text="Developer tools" title="Developer tools"/>
-    <outline text="Science" title="Science"/>
-    <outline text="Space" title="Space"/>
+    <outline text="AI research" title="AI research">
+      <outline type="rss" text="arXiv cs.AI: Artificial Intelligence" title="arXiv cs.AI: Artificial Intelligence" xmlUrl="https://rss.arxiv.org/rss/cs.AI" htmlUrl="https://arxiv.org/list/cs.AI/recent"/>
+      <outline type="rss" text="arXiv cs.CL: Computation and Language" title="arXiv cs.CL: Computation and Language" xmlUrl="https://rss.arxiv.org/rss/cs.CL" htmlUrl="https://arxiv.org/list/cs.CL/recent"/>
+      <outline type="rss" text="arXiv cs.LG: Machine Learning" title="arXiv cs.LG: Machine Learning" xmlUrl="https://rss.arxiv.org/rss/cs.LG" htmlUrl="https://arxiv.org/list/cs.LG/recent"/>
+      <outline type="rss" text="arXiv cs.IR: Information Retrieval" title="arXiv cs.IR: Information Retrieval" xmlUrl="https://rss.arxiv.org/rss/cs.IR" htmlUrl="https://arxiv.org/list/cs.IR/recent"/>
+    </outline>
+    <outline text="Developer tools" title="Developer tools">
+      <outline type="rss" text="arXiv cs.SE: Software Engineering" title="arXiv cs.SE: Software Engineering" xmlUrl="https://rss.arxiv.org/rss/cs.SE" htmlUrl="https://arxiv.org/list/cs.SE/recent"/>
+      <outline type="rss" text="arXiv cs.PL: Programming Languages" title="arXiv cs.PL: Programming Languages" xmlUrl="https://rss.arxiv.org/rss/cs.PL" htmlUrl="https://arxiv.org/list/cs.PL/recent"/>
+    </outline>
+    <outline text="Science" title="Science">
+      <outline type="rss" text="arXiv q-bio.BM: Biomolecules" title="arXiv q-bio.BM: Biomolecules" xmlUrl="https://rss.arxiv.org/rss/q-bio.BM" htmlUrl="https://arxiv.org/list/q-bio.BM/recent"/>
+      <outline type="rss" text="arXiv cond-mat.mtrl-sci: Materials Science" title="arXiv cond-mat.mtrl-sci: Materials Science" xmlUrl="https://rss.arxiv.org/rss/cond-mat.mtrl-sci" htmlUrl="https://arxiv.org/list/cond-mat.mtrl-sci/recent"/>
+      <outline type="rss" text="arXiv quant-ph: Quantum Physics" title="arXiv quant-ph: Quantum Physics" xmlUrl="https://rss.arxiv.org/rss/quant-ph" htmlUrl="https://arxiv.org/list/quant-ph/recent"/>
+    </outline>
+    <outline text="Space" title="Space">
+      <outline type="rss" text="arXiv astro-ph.EP: Earth and Planetary Astrophysics" title="arXiv astro-ph.EP: Earth and Planetary Astrophysics" xmlUrl="https://rss.arxiv.org/rss/astro-ph.EP" htmlUrl="https://arxiv.org/list/astro-ph.EP/recent"/>
+      <outline type="rss" text="arXiv astro-ph.IM: Astrophysics Instrumentation" title="arXiv astro-ph.IM: Astrophysics Instrumentation" xmlUrl="https://rss.arxiv.org/rss/astro-ph.IM" htmlUrl="https://arxiv.org/list/astro-ph.IM/recent"/>
+    </outline>
     <outline text="Startups and product" title="Startups and product"/>
   </body>
 </opml>

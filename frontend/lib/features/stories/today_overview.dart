@@ -4,6 +4,7 @@ import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
 import '../../shared/formatting.dart';
 import '../../shared/widgets/hover_lift.dart';
+import '../../shared/widgets/item_card.dart';
 import '../../shared/widgets/new_facts_badge.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/story_card.dart';
@@ -12,13 +13,26 @@ import '../../shared/widgets/story_visual.dart';
 /// Today at a glance: a lead story, the briefing and what's new beside it,
 /// then the rest as a grid. Fills the reading pane until a story is opened.
 class TodayOverview extends StatelessWidget {
-  const TodayOverview({super.key, required this.stories, this.briefing, this.user, this.onOpen, this.onPlayBriefing});
+  const TodayOverview({
+    super.key,
+    required this.stories,
+    this.research = const [],
+    this.briefing,
+    this.user,
+    this.onOpen,
+    this.onOpenPaper,
+    this.onPlayBriefing,
+  });
 
   /// Ranked: the first is the lead.
   final List<Story> stories;
+
+  /// New arXiv papers matched to the reader's research interests, best first.
+  final List<Item> research;
   final Briefing? briefing;
   final User? user;
   final ValueChanged<Story>? onOpen;
+  final ValueChanged<Item>? onOpenPaper;
   final VoidCallback? onPlayBriefing;
 
   static const _maxWidth = 1200.0;
@@ -114,6 +128,10 @@ class TodayOverview extends StatelessWidget {
                   header,
                   const SizedBox(height: Space.xl),
                   top,
+                  if (research.isNotEmpty) ...[
+                    const SizedBox(height: Space.xxl),
+                    _ResearchSection(papers: research, onOpen: onOpenPaper),
+                  ],
                   if (stories.length > 1) ...[
                     const SizedBox(height: Space.xxl),
                     const SectionHeader(icon: Icons.view_agenda_outlined, title: 'More stories'),
@@ -339,6 +357,103 @@ class _NewSinceTile extends StatelessWidget {
                 ),
               ),
         ],
+      ),
+    );
+  }
+}
+
+/// New arXiv papers for the reader's research interests, each with why it's here.
+class _ResearchSection extends StatelessWidget {
+  const _ResearchSection({required this.papers, this.onOpen});
+
+  final List<Item> papers;
+  final ValueChanged<Item>? onOpen;
+
+  static const _shown = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final t = context.text;
+    return Container(
+      padding: const EdgeInsets.all(Space.lg),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionHeader(
+            icon: Icons.science_outlined,
+            title: 'New research for you',
+            trailing: CountPill(count: papers.length),
+          ),
+          const SizedBox(height: Space.xxs),
+          Text(
+            'From arXiv, matched to your research interests.',
+            style: t.caption.copyWith(color: c.textTertiary),
+          ),
+          const SizedBox(height: Space.sm),
+          for (final (i, p) in papers.take(_shown).indexed) ...[
+            if (i > 0) const Divider(),
+            _PaperRow(paper: p, onTap: onOpen == null ? null : () => onOpen!(p)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PaperRow extends StatelessWidget {
+  const _PaperRow({required this.paper, this.onTap});
+
+  final Item paper;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final t = context.text;
+    final first = paper.authors.isEmpty ? null : paper.authors.first;
+    final meta = [
+      if (first != null) paper.authors.length > 1 ? '$first et al.' : first,
+      if (paper.categories.isNotEmpty) paper.categories.first,
+      timeAgo(paper.publishedAt),
+    ].join('  ·  ');
+    final reason = paper.matchedTerms.isNotEmpty
+        ? 'Matches “${paper.matchedTerms.first}”'
+        : (paper.matchedByMeaning ? 'Related to your interests' : null);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(Radii.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: Space.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: Space.xxs),
+              child: Icon(Icons.description_outlined, size: Sizes.iconMd, color: c.textTertiary),
+            ),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(paper.title ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: t.headlineSmall),
+                  const SizedBox(height: Space.xxs),
+                  Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.caption.copyWith(color: c.textTertiary)),
+                  if (reason != null) ...[
+                    const SizedBox(height: Space.xs),
+                    PaperTag(label: reason, emphasis: true),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

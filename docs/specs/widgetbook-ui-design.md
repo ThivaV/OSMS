@@ -6,9 +6,11 @@ exists, so the look can be reviewed and changed cheaply.
 ## Inputs
 
 Invented fixtures only, in `frontend/widgetbook/lib/fixtures/`: users, sources of every
-type, items of every kind, stories, claims, disagreements, timeline events, briefings,
-topics and onboarding suggestions. Reserved `.example` domains, non-political topics,
-no real people, accounts or publications.
+type, items of every kind (papers included), stories, claims, disagreements, timeline
+events, briefings, topics, onboarding suggestions, research interests and suggested
+terms. Reserved `.example` domains, non-political topics, no real people, accounts or
+publications. Fake papers use invented authors, ids like `2610.9xxxx` and
+`arxiv.example` links.
 
 ## Outputs
 
@@ -19,11 +21,15 @@ no real people, accounts or publications.
 - **Components**, each with *Normal*, *Empty* and *Extreme content* use cases:
   `StoryCard`, `WhatsNewSection`, `DisagreementPanel`, `StoryTimeline`, `BriefingPlayer`,
   `SourceChip`, `ThreePaneLayout`, `ItemCard`, `AddSourceSheet`, `Onboarding`,
-  `SignInPage`, `WhatWeKeepPage`, `AccountRow`, `DemoBanner`, `SettingsPage`, `ThemePicker`.
+  `SignInPage`, `WhatWeKeepPage`, `AccountRow`, `DemoBanner`, `SettingsPage`, `ThemePicker`,
+  `TodayOverview`, `PillNav`, `CommandPalette` and `InterestsEditor`. `ItemCard` has a
+  paper variant; `TodayOverview` has a "New research for you" section.
 - **Themes:** five palettes (Folio, Fjord, Clay, Nordlys, High contrast), each light and
   dark, plus pure black; every one passes a WCAG contrast test.
 - **A clickable sign-in flow** in the shell: demo → sign in or create account →
-  onboarding → Today (sign-in is simulated).
+  onboarding (with the research step when a research topic is picked) → Today (sign-in
+  is simulated). "Follow research on arXiv" in ⌘K or Settings opens the interests
+  editor.
 - **Addons:** light/dark theme, phone/tablet/desktop viewports, text scale.
 
 ## Not in scope

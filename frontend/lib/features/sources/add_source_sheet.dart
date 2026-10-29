@@ -19,8 +19,11 @@ class AddSourceSheet extends StatefulWidget {
     this.opmlFileName,
     this.opmlSources = const [],
     this.onClose,
+    this.onFollowResearch,
   });
 
+  /// Opens the arXiv interests editor.
+  final VoidCallback? onFollowResearch;
   final AddSourceStatus status;
   final String query;
   final DiscoveredSource? found;
@@ -85,13 +88,21 @@ class _AddSourceSheetState extends State<AddSourceSheet> {
             ],
           ),
           const SizedBox(height: Space.md),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.upload_file_rounded, size: Sizes.iconMd),
-              label: const Text('Import an OPML file'),
-            ),
+          Wrap(
+            spacing: Space.sm,
+            runSpacing: Space.sm,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.upload_file_rounded, size: Sizes.iconMd),
+                label: const Text('Import an OPML file'),
+              ),
+              OutlinedButton.icon(
+                onPressed: widget.onFollowResearch ?? () {},
+                icon: const Icon(Icons.science_outlined, size: Sizes.iconMd),
+                label: const Text('Follow research on arXiv'),
+              ),
+            ],
           ),
           const SizedBox(height: Space.xl),
           switch (widget.status) {
@@ -116,6 +127,7 @@ class _Idle extends StatelessWidget {
     final t = context.text;
     const types = [
       SourceType.feed,
+      SourceType.arxiv,
       SourceType.newsletter,
       SourceType.podcast,
       SourceType.youtube,
