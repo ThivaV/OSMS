@@ -6,7 +6,6 @@ import '../formatting.dart';
 import 'hover_lift.dart';
 import 'kind_icons.dart';
 import 'source_chip.dart';
-import 'story_visual.dart';
 
 /// One item outside a story. Every kind shares the same source line on top;
 /// the body suits the kind. Videos open on the platform.
@@ -275,50 +274,62 @@ class _Thumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final t = context.text;
+    // Single items never reuse the multi-thread story art: a quiet kind
+    // glyph until the backend serves real thumbnails from the original.
+    if (!item.hasThumbnail) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(Radii.sm),
+        child: AspectRatio(
+          aspectRatio: aspectRatio,
+          child: Container(
+            color: c.surfaceSunken,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.hide_image_outlined, color: c.textTertiary, size: Sizes.iconLg),
+                const SizedBox(height: Space.xs),
+                Text('No preview', style: t.caption.copyWith(color: c.textTertiary)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(Radii.sm),
-      child: item.hasThumbnail
-          ? Stack(
-              alignment: Alignment.center,
-              children: [
-                StoryVisual(seed: item.id.hashCode, threads: 5, aspectRatio: aspectRatio),
-                if (overlayIcon != null)
-                  Container(
-                    width: Sizes.playButton,
-                    height: Sizes.playButton,
-                    decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.85), shape: BoxShape.circle),
-                    child: Icon(overlayIcon, color: c.onAccent, size: Sizes.iconXl),
-                  ),
-                if (item.duration != null)
-                  Positioned(
-                    right: Space.sm,
-                    bottom: Space.sm,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: Space.sm - Space.xxs, vertical: Space.xxs),
-                      decoration: BoxDecoration(
-                        color: c.accent.withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(Radii.sm),
-                      ),
-                      child: Text(playerTime(item.duration!), style: t.caption.copyWith(color: c.onAccent)),
-                    ),
-                  ),
-              ],
-            )
-          : AspectRatio(
-              aspectRatio: aspectRatio,
-              child: Container(
-                color: c.surfaceSunken,
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.hide_image_outlined, color: c.textTertiary, size: Sizes.iconLg),
-                    const SizedBox(height: Space.xs),
-                    Text('No preview', style: t.caption.copyWith(color: c.textTertiary)),
-                  ],
+      child: AspectRatio(
+        aspectRatio: aspectRatio,
+        child: Container(
+          color: c.surfaceSunken,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(iconForKind(item.kind), size: Sizes.iconXl, color: c.textTertiary),
+              if (overlayIcon != null)
+                Container(
+                  width: Sizes.playButton,
+                  height: Sizes.playButton,
+                  decoration: BoxDecoration(color: c.accent.withValues(alpha: 0.85), shape: BoxShape.circle),
+                  child: Icon(overlayIcon, color: c.onAccent, size: Sizes.iconXl),
                 ),
-              ),
-            ),
+              if (item.duration != null)
+                Positioned(
+                  right: Space.sm,
+                  bottom: Space.sm,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: Space.sm - Space.xxs, vertical: Space.xxs),
+                    decoration: BoxDecoration(
+                      color: c.text.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(Radii.sm),
+                    ),
+                    child: Text(playerTime(item.duration!), style: t.caption.copyWith(color: c.surface)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

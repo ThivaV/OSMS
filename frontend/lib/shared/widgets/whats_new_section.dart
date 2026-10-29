@@ -47,6 +47,7 @@ class _WhatsNewSectionState extends State<WhatsNewSection> {
       decoration: BoxDecoration(
         color: c.newSignalSoft,
         borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(color: c.newSignal.withValues(alpha: 0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

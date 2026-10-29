@@ -200,6 +200,7 @@ final halcyon = Story(
   kindCounts: const {ItemKind.paper: 1, ItemKind.article: 6, ItemKind.episode: 2, ItemKind.video: 1, ItemKind.post: 5},
   languages: const ['en', 'da', 'ta'],
   visualSeed: 11,
+  hasIllustration: true,
   whatsNew: [
     Claim(
       id: 'h-c1',

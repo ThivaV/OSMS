@@ -69,7 +69,12 @@ class _CardLayout extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            StoryVisual(seed: story.visualSeed, threads: story.sources.length, aspectRatio: 2.2),
+            StoryVisual(
+              seed: story.visualSeed,
+              threads: story.sources.length,
+              aspectRatio: 2.2,
+              isIllustration: story.hasIllustration,
+            ),
             Padding(
               padding: const EdgeInsets.all(Space.lg),
               child: Column(
@@ -85,12 +90,12 @@ class _CardLayout extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: t.bodySmall.copyWith(color: c.textSecondary),
                   ),
-                  if (story.lastReadAt != null) ...[
+                  if (story.lastReadAt != null && story.newFactCount > 0) ...[
                     const SizedBox(height: Space.md),
                     NewFactsBadge(count: story.newFactCount, since: story.lastReadAt),
                   ],
                   const SizedBox(height: Space.md),
-                  const Divider(),
+                  Container(height: Sizes.hairline, color: c.border),
                   const SizedBox(height: Space.md),
                   SourceSummary(story: story),
                 ],

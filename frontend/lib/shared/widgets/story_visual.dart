@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/tokens.dart';
 
-/// Placeholder story art until Muse Image provides it: one thread per source,
-/// all converging into a single story thread. Deterministic per [seed].
+/// Story art: drawn threads until Muse Image provides an illustration.
+/// One thread per source, all converging into a single story thread.
+/// Deterministic per [seed]. Generated illustrations set [isIllustration] so
+/// the required "Illustration" label shows; the fallback never carries it.
 class StoryVisual extends StatelessWidget {
-  const StoryVisual({super.key, required this.seed, this.threads = 7, this.aspectRatio = 16 / 9});
+  const StoryVisual({super.key, required this.seed, this.threads = 7, this.aspectRatio = 16 / 9, this.isIllustration = false});
 
   final int seed;
 
@@ -15,21 +17,49 @@ class StoryVisual extends StatelessWidget {
   final int threads;
   final double aspectRatio;
 
+  /// True for Muse Image art. Shows the small mandated label.
+  final bool isIllustration;
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return ExcludeSemantics(
-      child: AspectRatio(
-        aspectRatio: aspectRatio,
-        child: CustomPaint(
-          painter: _ThreadsPainter(
-            seed: seed,
-            threads: threads.clamp(3, 12),
-            inks: c.visualInks,
-            ground: c.visualGround,
-            ring: c.surface,
-          ),
+    final art = AspectRatio(
+      aspectRatio: aspectRatio,
+      child: CustomPaint(
+        painter: _ThreadsPainter(
+          seed: seed,
+          threads: threads.clamp(3, 12),
+          inks: c.visualInks,
+          ground: c.visualGround,
+          ring: c.surface,
         ),
+      ),
+    );
+    if (!isIllustration) return ExcludeSemantics(child: art);
+    final t = context.text;
+    return Semantics(
+      image: true,
+      label: 'Illustration for this story',
+      child: Stack(
+        children: [
+          art,
+          Positioned(
+            left: Space.md,
+            bottom: Space.md,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
+              decoration: BoxDecoration(
+                color: c.surface.withValues(alpha: 0.88),
+                borderRadius: BorderRadius.circular(Radii.pill),
+                border: Border.all(color: c.border),
+              ),
+              child: Text(
+                'Illustration',
+                style: t.caption.copyWith(color: c.textSecondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -102,7 +102,12 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                       const SizedBox(height: Space.xl),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(Radii.lg),
-                        child: StoryVisual(seed: story.visualSeed, threads: story.sources.length, aspectRatio: 2.6),
+                        child: StoryVisual(
+                          seed: story.visualSeed,
+                          threads: story.sources.length,
+                          aspectRatio: 2.6,
+                          isIllustration: story.hasIllustration,
+                        ),
                       ),
                       const SizedBox(height: Space.xl),
                       if (story.summaryPoints.isEmpty)
@@ -252,9 +257,9 @@ class _StoryToolbar extends StatelessWidget {
                 icon: const Icon(Icons.update_rounded),
               ),
               IconButton(
-                tooltip: 'Where sources disagree',
+                tooltip: hasDisagreements ? 'Where sources disagree' : 'Sources agree so far',
                 visualDensity: density,
-                onPressed: hasDisagreements ? onDisagreements : null,
+                onPressed: onDisagreements,
                 icon: const Icon(Icons.compare_arrows_rounded),
               ),
               IconButton(

@@ -22,6 +22,7 @@ class TodayOverview extends StatelessWidget {
     this.onOpen,
     this.onOpenPaper,
     this.onPlayBriefing,
+    this.onAddSource,
   });
 
   /// Ranked: the first is the lead.
@@ -34,6 +35,7 @@ class TodayOverview extends StatelessWidget {
   final ValueChanged<Story>? onOpen;
   final ValueChanged<Item>? onOpenPaper;
   final VoidCallback? onPlayBriefing;
+  final VoidCallback? onAddSource;
 
   static const _maxWidth = 1200.0;
   static const _sideBySideMin = 900.0;
@@ -73,7 +75,46 @@ class TodayOverview extends StatelessWidget {
         );
 
         if (stories.isEmpty) {
-          return SingleChildScrollView(padding: const EdgeInsets.all(Space.xl), child: header);
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(Space.xl),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: Sizes.sheetMaxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    header,
+                    const SizedBox(height: Space.xl),
+                    Container(
+                      padding: const EdgeInsets.all(Space.xl),
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(Radii.lg),
+                        border: Border.all(color: c.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Your stories will appear here', style: t.subhead),
+                          const SizedBox(height: Space.xs),
+                          Text(
+                            'Add a few sources and OSMS groups everything they publish about the same event into one story.',
+                            style: t.bodySmall.copyWith(color: c.textSecondary),
+                          ),
+                          const SizedBox(height: Space.lg),
+                          FilledButton.icon(
+                            onPressed: onAddSource ?? () {},
+                            icon: const Icon(Icons.add_rounded, size: Sizes.iconMd),
+                            label: const Text('Add a source'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         final lead = _LeadCard(story: stories.first, large: width >= _sideBySideMin, onTap: () => onOpen?.call(stories.first));
@@ -182,7 +223,12 @@ class _LeadCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              StoryVisual(seed: story.visualSeed, threads: story.sources.length, aspectRatio: large ? 2.2 : 16 / 9),
+              StoryVisual(
+                seed: story.visualSeed,
+                threads: story.sources.length,
+                aspectRatio: large ? 2.2 : 16 / 9,
+                isIllustration: story.hasIllustration,
+              ),
               Padding(
                 padding: EdgeInsets.all(large ? Space.xl : Space.lg),
                 child: Column(

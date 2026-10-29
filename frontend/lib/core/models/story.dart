@@ -68,6 +68,7 @@ class Story {
     required this.kindCounts,
     required this.languages,
     required this.visualSeed,
+    this.hasIllustration = false,
     this.lastReadAt,
     this.summaryPoints = const [],
     this.whatsNew = const [],
@@ -95,6 +96,10 @@ class Story {
   /// Seeds the placeholder visual until Muse Image provides one.
   final int visualSeed;
 
+  /// True once Muse Image has provided an illustration (SAM 3.1 checked).
+  /// Shows the mandated "Illustration" label over the art.
+  final bool hasIllustration;
+
   /// When the reader last opened it. Null if never.
   final DateTime? lastReadAt;
 
@@ -106,7 +111,7 @@ class Story {
   int get newFactCount => whatsNew.length;
   int get itemCount => kindCounts.values.fold(0, (sum, n) => sum + n);
 
-  Story copyWith({String? title, List<Claim>? whatsNew, DateTime? lastReadAt}) => Story(
+  Story copyWith({String? title, List<Claim>? whatsNew, DateTime? lastReadAt, bool? hasIllustration}) => Story(
     id: id,
     title: title ?? this.title,
     summary: summary,
@@ -116,6 +121,7 @@ class Story {
     kindCounts: kindCounts,
     languages: languages,
     visualSeed: visualSeed,
+    hasIllustration: hasIllustration ?? this.hasIllustration,
     lastReadAt: lastReadAt ?? this.lastReadAt,
     summaryPoints: summaryPoints,
     whatsNew: whatsNew ?? this.whatsNew,

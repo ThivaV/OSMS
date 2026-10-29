@@ -13,7 +13,24 @@ Oct 27 – Nov 4, 2026.
 
 ## What was built during the hackathon
 
-_Filled in as work lands._
+- [x] **Widgetbook UI design (Oct 28):** every component with fake data —
+  `StoryCard`, what's-new, disagreements, timeline, briefing player, source
+  chips, three-pane shell, item cards incl. the arXiv paper variant,
+  add-source sheet, onboarding, sign-in, settings + five palettes, Today
+  overview, floating bars, ⌘K palette, research interests editor. Each with
+  Normal / Empty / Extreme use cases, light + dark, phone / tablet / desktop.
+  Open it with `make widgetbook` (http://localhost:8090).
+- [ ] Ingestion, clustering + judge, agents, arXiv interests, briefing audio,
+  sign-in wiring, illustrations — in build-plan order (see AGENTS.md).
+
+## How judging maps to the repo
+
+| Criterion | Where to look |
+|---|---|
+| Impact | One story, not ten summaries: `StoryCard`, `WhatsNewSection`, `DisagreementPanel`, `TodayOverview` |
+| Meta AI tooling | Table below; agents in `backend/app/agent/`, routing in `backend/app/config.py` |
+| Technical depth | Clustering + eval in `eval/`, decision log (`agent_runs`, `agent_steps`), `docs/architecture.md` |
+| Demo | 3-min video + `make widgetbook` catalogue + clickable shell (`[Layout]` → shell use cases) |
 
 ## Which Meta models do what
 
