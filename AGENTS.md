@@ -1,0 +1,1187 @@
+# OSMS: One Story, Many Sources
+
+## 1. What we are building
+
+**OSMS (One Story, Many Sources)** is a news and newsletter reader that solves the real
+overload problem: when ten feeds cover the same event, today's AI readers give you ten
+separate summaries. OSMS groups items from RSS feeds, research papers on arXiv,
+newsletters, podcasts, YouTube, Mastodon, Bluesky, Reddit and more into **stories**, so 60
+unread items become 7 stories.
+
+For each story, OSMS shows:
+
+- **What's new** since the user last read about it (new facts only, not a re-summary).
+- **Where sources disagree** on facts or numbers, each claim linked to its source.
+- **A timeline** of how the story developed.
+- **Source chips** showing how many sources fed into the story.
+
+It works **across languages**: a Danish and an English article about the same event land
+in one story, summarised in the language the user chooses (English, Danish, Tamil).
+Each morning an editor agent, working with specialist Muse Spark agents, produces a short
+**audio briefing** built from stories rather than individual articles (see *Agents*).
+
+Users sign in with Google, pick the topics and kinds of source they want, and OSMS
+collects exactly those. They add more the way they do in Reeder: paste a link or a
+handle, search by name, or import an OPML file from another reader. Everything lands in
+one timeline. Articles, papers, podcast episodes, posts and videos can join stories;
+photos and comics appear as they are. See *Sources* and *Accounts* below.
+
+**arXiv is one of the main sources.** Readers follow research by typing their area of
+interest in their own words ("retrieval-augmented generation", "exoplanet atmospheres").
+OSMS pulls every new paper that mentions those keywords or is related to them by meaning,
+says why each one matched, and puts a paper into the story when the news covers it. See
+*arXiv: a main source, followed by keywords*.
+
+### Why it matters (the pitch)
+
+Existing AI readers (Feedly, Inoreader, etc.) summarise per item. None deduplicate across
+sources. Reeder puts many source types in one timeline, but every item still stands alone:
+a blog post, a YouTube video and a Mastodon thread about the same launch are three
+separate rows. OSMS treats the *story* as the unit, not the item. The clustering approach
+mirrors multimodal product matching: multilingual dense + sparse embeddings with hybrid
+search in a vector database, plus an LLM judge for borderline cases.
+
+Every judgement call runs on a Meta model, with Muse Spark agents at the centre, and every
+generated output (facts, illustrations, briefing audio) is checked by a second Meta model
+before a reader sees it.
+
+---
+
+## 2. Hackathon context and hard rules
+
+**Event:** Meta Global AI Developer Hackathon — Indie Developer track.
+**Theme:** Build for Your World.
+**Building period:** Oct 27 – Nov 4, 2026.
+**Submission deadline:** Nov 4, 9:00 PM ET = **Nov 5, 03:00 Danish time**.
+
+Judging (equal weight, 0–10 each): **Impact**, **Use of Meta AI tooling**,
+**Technical depth & execution**, **Demo** (3-minute video + live product + code).
+
+Rules we must never break:
+
+1. **Repo is public** from day one. Never commit secrets.
+2. **New work only.** Everything is written during the hackathon. Do not copy code from
+   any other project (including the author's employer). Do not copy code from Reeder or
+   Fluent Reader.
+3. **Non-political sources only.** Anti-projects include "anything political or involving
+   war". Sources of every type are limited to technology, AI research, science,
+   business/product news.
+4. **Not a basic RAG app.** Lead with clustering, diffs, disagreements and the agent. Chat
+   over articles is secondary at most.
+5. **Content rights.** Display headlines, our own summaries and links to the original.
+   Never store or commit full article text, transcripts or media to the repo. Never
+   display full third-party articles as our own content.
+6. **No medical advice, no job screening, no personality analysis** (anti-project list).
+7. **One user's data never reaches another user.** Subscriptions, connected accounts,
+   private items, read state and briefings are visible only to their owner.
+
+---
+
+## 3. Meta models (load-bearing, never decorative)
+
+"Use of Meta AI tooling" is a quarter of the score. **Use a Meta model wherever it does a
+real job; never add one just to list it.** Each row says what the model does and what
+breaks without it. Muse Spark is the centre: its agents make the judgement calls, and its
+editor drives the other models through tools (see *Agents*).
+
+| Model | Runs on | What OSMS uses it for | Without it |
+|---|---|---|---|
+| **Muse Spark 1.3** (`muse-spark-1.3`) | Meta Model API | The interest, claims, verifier, editor and writer agents; whatever the triage agent is unsure about | No claims, no verified facts, no summaries or briefing |
+| **Muse Spark Open** | Open weights, hosted on Baseten (`meta-models/muse-spark-open-1026`; Modal as backup) | The judge agent ("same event or not?"); backup for the claims and verifier agents when Meta Model API is down. Targets the Best Open Weight Build bonus. | Borderline pairs fall back to thresholds alone |
+| **Muse Glimmer 30B** | Open weights (Apache 2.0): Ollama on the author's Mac; when deployed, a GPU on Modal or a hosted provider (Fireworks, Together) | The triage agent: every new item, before any other model sees it | Rule 3 rests on source choice alone, and Muse Spark spends tokens on noise |
+| **Muse Wonder** (`muse-wonder-1.0`) | Meta Model API | Candidate model for the editor, which plans a long run and delegates to sub-agents; the agent task set decides. Harness²'s proposer. | The editor stays on Muse Spark |
+| **Muse Image** | Meta Model API (also fal, Runway, OpenRouter) | One illustration per story, in one house style anchored on OSMS's own reference images | Cards keep the drawn `StoryVisual` |
+| **SAM 3.1** (`sam-3-1`) | Meta Model API | Checks every illustration for people, faces, logos and text before anyone sees it, and finds its subject so each card shape crops around it | Illustrations can't ship: the check is required |
+| **Muse Voice Transcribe** (`muse-voice-transcribe-1.0`) | Meta Model API | Podcast episodes, biased towards the source's and story's names; and a check on every briefing, transcribed back and compared with its script | Podcasts can't join stories; a garbled briefing goes out unnoticed |
+| **Muse Code** | CLI on macOS, powered by Muse Spark | Building parts of OSMS from the specs in `docs/specs/`; the README lists which parts | – |
+
+**Where OSMS deliberately does not use them**
+
+- **Search grounding stays off** (a frozen guardrail, see *Agents*). Muse Spark and Muse
+  Image can pull from the web; OSMS agents know only what the sources delivered (see
+  *Staying up to date*), and web results could carry instructions.
+- **No arXiv PDFs** to Muse Spark's document reading (arXiv's terms), and **no YouTube
+  video** to its video reading (OSMS never downloads YouTube).
+- **No third-party images** to Muse Image, SAM 3.1 or Muse Spark without the author's
+  say. Reading charts in newsletters and cropping source thumbnails around their subject
+  are possible later, but they need a call on rule 5.
+- **Contributor variants** (`-contributor`: about a twelfth of the price, "Used to improve
+  our products") run only on public fixtures: the eval, Harness² and development runs.
+  Never on anything per reader.
+- **Voice input** (speaking a search or research keywords) is post-hackathon.
+
+**Meta Model API facts** (dev.meta.ai, Oct 2026; re-check before relying on them):
+
+- One base URL for hosted models, `https://api.meta.ai/v1`, with OpenAI-compatible
+  (Chat Completions, Responses) and Anthropic-compatible (Messages) surfaces. One API key
+  covers every model, SAM 3.1 included.
+- **Muse Spark 1.3:** 1M-token context, tool calling (parallel calls, streamed
+  arguments), structured JSON output matching a schema, reasoning effort per request up
+  to "max". Reads images, video and documents as well as text.
+- **Muse Wonder 1.0:** 1M-token context, built for long-running agents: plans long
+  tasks, delegates to sub-agents, calls tools in parallel. Muse Wonder Full is only in
+  Muse Code's larger plans.
+- **Muse Image:** generates and edits images, reasons over multi-part instructions, and
+  keeps a series consistent with a few reference images. No sizes, formats or content
+  policy are published: check the docs.
+- **SAM 3.1:** a short noun phrase ("a person", "a logo") returns a box and a mask for
+  every match, in images and video. Docs: dev.meta.ai/docs/media-segmentation/.
+- **Muse Voice Transcribe:** streaming, speaker attribution (20+ speakers), and keyword
+  biasing without fine-tuning. **Supported languages aren't published:** check Danish and
+  Tamil in dev.meta.ai/docs/speech-to-text/ before relying on them.
+- The endpoints for images, transcription and segmentation aren't on the product pages:
+  read dev.meta.ai/docs before writing their clients.
+- Model ids: `muse-spark-1.3` / `1.2` / `1.1`, `muse-spark-1.3-contributor` /
+  `1.2-contributor`, `muse-wonder-1.0`, `muse-voice-transcribe-1.0`, `sam-3-1`, and Muse
+  Image (`muse-image-1.0`; its page also shows `muse-image-1-0`, so take the id from the
+  docs). Pin them in config.
+
+| Model | Price (Oct 2026) |
+|---|---|
+| Muse Spark 1.3 | $1.25 in, $0.15 cached, $4.25 out per million tokens |
+| Muse Spark 1.3 contributor | $0.10 in, $0.002 cached, $0.20 out |
+| Muse Wonder 1.0 | $4.00 in, $0.20 cached, $20.00 out |
+| Muse Image | $0.01 per image |
+| Muse Voice Transcribe | $0.18 per hour of audio |
+| SAM 3.1 | $2.50 per 1,000 images |
+
+**Open weights facts:**
+
+- **Muse Glimmer:** 30B parameters, Apache 2.0 (plus Meta's usage policy), "small enough
+  to run on a single consumer GPU or Mac", with tool calling and image input. Runs with
+  Ollama, llama.cpp, vLLM, LM Studio or transformers; hosted on Fireworks, Together and
+  OpenRouter. Weights: `huggingface.co/meta-models/Muse-Glimmer-30B`. Check its memory
+  needs against the author's Mac before planning on it locally; quantised builds help.
+- **Muse Spark Open:** derived from Muse Spark, with extra safety training to run without
+  system guardrails. Its deployment ids read `816B-A42B` (816B total, 42B active), far
+  too big for our machine, so it runs hosted. A separate commentary channel states its
+  intent before it acts; the judge's commentary goes to the decision log. The page gives
+  no licence: check it before claiming the open-weight bonus.
+
+**Muse Code:** a CLI coding agent powered by Muse Spark, for macOS and Windows, on a
+monthly plan ($5 to $200; Muse Wonder Full from $50). Several agents work on a task and
+every action is traceable. Install it with Meta's script (`curl -fsSL
+https://dev.meta.ai/install.sh | bash`) only after reading the script. Its page doesn't
+say it reads `AGENTS.md`, so point it at this file and the task's spec.
+
+**Audio briefing TTS:** Meta Model API has no text-to-speech ("Muse Voice Transcribe does
+not synthesize speech"), so use an open-source TTS and say which in the README. Pick one
+with Danish and Tamil voices and a licence that allows the demo.
+
+---
+
+## 4. Agents
+
+OSMS is a pipeline of plain code with **agents at the judgement calls**. Fetching,
+parsing, embedding and vector search are code; deciding whether two items are one event,
+what the facts are, whether something is new or a real disagreement, what matters today
+and how to say it are model calls. That keeps runs cheap, testable and explainable, and it
+is what keeps OSMS from being a basic RAG app (rule 4). `docs/architecture.md` has the
+diagrams.
+
+Muse Spark is the centre. Its agents make the judgement calls, and its editor drives the
+other Meta models through tools. Open-weight models take the high-volume work (Muse
+Glimmer) and the second opinion on clustering (Muse Spark Open), and a different model
+checks every generated output before a reader sees it.
+
+### The agents
+
+| Agent | Model | Job | Technique |
+|---|---|---|---|
+| Triage | Muse Glimmer 30B (local) | Every new item: inside rule 3? Noise (ads, giveaways, sponsored posts)? Language and kind right? | Always-on local agent, structured output; Muse Spark decides what it's unsure about |
+| Interest | Muse Spark | A reader's research keywords → related terms, likely arXiv categories and a rule-3 check; later, yes/no on borderline "related by meaning" papers | Structured output; the plan is a suggestion the reader confirms or edits |
+| Judge | Muse Spark Open (Baseten) | Borderline pairs: same event or not? | One call, a structured verdict with a reason; Muse Spark as backup |
+| Claims | Muse Spark | Facts from an article, episode or paper, each with the quote it rests on | Structured output; Muse Spark Open as backup |
+| Verifier | Muse Spark | Re-checks every candidate new fact and disagreement against the quotes; drops false ones | Critic: a second pass checks the first; unsure cases re-run at maximum reasoning |
+| Editor | Muse Spark, or Muse Wonder if the agent task set favours it | The overnight agent: which stories changed meaningfully, ranking per reader, what each briefing covers | Orchestrator: plans, delegates to the verifier and writer, calls tools that make and check the audio |
+| Writer | Muse Spark | A story's title and cited summary when its verified claims change; the briefing script in the reader's language, every fact cited | Draft, editor review, revise (at most twice) |
+
+Single-purpose model steps, called from plain code: **Muse Voice Transcribe** turns podcast
+episodes into text and checks the briefing audio; **Muse Image** draws a story's
+illustration when the story first has three sources (tunable); **SAM 3.1** checks and
+crops each illustration.
+
+The triage, judge, claims and verifier agents run as items arrive, so the app only ever
+shows verified facts; the writer then updates the story's title and summary. The interest
+agent runs when a reader adds or edits research keywords, and on a capped number of
+borderline papers after each arXiv update. The editor and the briefing run overnight,
+and from a Tilt button.
+
+The interest agent's prompt holds only the keywords it is working on, never who typed
+them or their other interests: research keywords count as topics under the guardrails
+below.
+
+### How the models work together
+
+- **Orchestrator and specialists.** The editor plans the overnight run and delegates: the
+  verifier re-checks, the writer drafts, and its tools make the briefing audio and have
+  Muse Voice Transcribe check it.
+- **The cheapest model that can decide, decides.** Muse Glimmer, a small open model,
+  triages every item and hands what it is unsure about to Muse Spark. Clear cluster matches need
+  no model; borderline pairs go to Muse Spark Open. The verifier re-runs its unsure cases
+  at maximum reasoning effort.
+- **Every output gets a second opinion from a different model.** Facts: the verifier
+  checks the claims agent. Illustrations: SAM 3.1 checks Muse Image. Briefing audio: Muse
+  Voice Transcribe checks the TTS. Nothing generated reaches a reader unchecked.
+- **Backups both ways.** The judge falls back to Muse Spark when Baseten is down; the
+  claims and verifier agents fall back to Muse Spark Open when Meta Model API is down.
+  Only agents that see public source text get a backup, so personal data never reaches a
+  second provider. Every fallback is logged and shows in Tilt.
+- **The eval picks the model.** The agent task set (`eval/agents/`) runs each agent on its
+  candidate models (editor: Muse Spark or Muse Wonder; judge: Muse Spark Open or Muse
+  Spark) and records quality, cost and latency. The author picks; the model per agent is
+  one line of config.
+
+### Techniques, concretely
+
+- **Tools, not free text.** Agents act only through typed tools (Muse Spark tool calling,
+  OpenAI-style function definitions). Every tool validates its input and output with
+  Pydantic. Tools are plain code over SQLite and Milvus Lite.
+- **Structured output everywhere.** Every model step returns JSON matching a schema. On a
+  validation error, retry once with the error, then give up and log it.
+- **Critic before publish.** Nothing reaches a reader as "new" or as a disagreement until
+  the verifier has kept it.
+- **State, not chat memory.** Agents read story state (claims, timeline, what was last
+  briefed) from SQLite, with no long conversation histories. About readers they see only
+  language, topics (research keywords included), kinds and read state.
+- **Bounded runs.** Every run has a step limit, a token budget and a time limit; hitting
+  one stops the run and says so in the decision log.
+- **Decision log.** Every run and step (tool, arguments, result summary, reason, model id,
+  prompt version, tokens, latency) goes to `agent_runs` and `agent_steps`, shows in Tilt's
+  logs and feeds a "How OSMS decided" view in the demo. It also records which model
+  decided, any escalation or fallback, and Muse Spark Open's commentary (its stated
+  intent). Targets the Best Agentic Use-Case bonus.
+- **Prompts are files** in `backend/app/agent/prompts/`, versioned with the code.
+
+### Runtime
+
+- **One client for every text model:** the OpenAI Python SDK (ask before adding it),
+  pointed at Meta Model API, Baseten, or the Muse Glimmer server (Ollama serves an
+  OpenAI-compatible API). The Responses API for the editor's multi-step loop, Chat
+  Completions with a JSON schema for single calls. Muse Image, SAM 3.1 and Muse Voice
+  Transcribe use their own endpoints, from the docs.
+- **A routing table in `config.py`:** for each agent, its model id, endpoint and backup.
+  Switching the editor to Muse Wonder, or failing over, is configuration, not code.
+- Write our own small agent loop (`agent/runtime.py`) rather than adopt a framework: it
+  keeps the decision log exact and the dependencies few. Revisit only if it outgrows one
+  file.
+- Each agent has a fake model for tests, so agent code is tested without network calls.
+
+### Guardrails (frozen: change them only with the author)
+
+- Source text is quoted data, never instructions (see *Security and data rules*).
+- Only the fetcher reaches the web; write tools touch only OSMS's own tables.
+- Prompts carry no personal data beyond language, topics and kinds. A reader's research
+  keywords count as topics: the interest agent sees only the keywords it is working on,
+  never who typed them, and the decision log records its steps without them.
+- Briefings stay inside rule 3 and cite every fact; the editor's checklist enforces both.
+- No model call searches the web. Search grounding and web references stay off for every
+  model, so agents know only what the sources delivered.
+- Illustrations, never photos. Muse Image makes no photo-like pictures of real events,
+  people, products or logos, and its prompt comes from OSMS's own summary, never from
+  source text. SAM 3.1 checks every illustration for people, faces, logos and text
+  before anyone sees it; a flagged one is redrawn once, then replaced by the drawn art.
+  Every illustration is labelled as one.
+- Backups never move personal data. Only agents that see public source text (judge,
+  claims, verifier) fail over to a second provider; the interest, editor and writer
+  agents have no backup.
+
+### Improving the agents offline: Harness² (stretch)
+
+[Harness²](https://github.com/google-research/harness2) (Google Research, Apache 2.0, "not an
+officially supported Google product") improves an agent's harness without changing the
+model. The harness is the system prompt, guardrails, memory, tool guidance, subagents,
+skills, scripts and plugins. It proposes edits, probes them on the same task and composes
+what works.
+
+- **Offline only**, on an agent task set in `eval/agents/` built from public fixtures,
+  never user data. It never runs inside the product.
+- **It may propose** changes to prompts, tool guidance and skills. **It may not touch**
+  guardrails, thresholds, the eval or its scoring. Every proposal is a diff the author
+  reviews.
+- **Isolated.** It needs Linux (Python 3.12, uv), and its executors run with unrestricted
+  network (Codex with its sandbox off). Run it in a throwaway Linux container or on Modal,
+  with only a scoped model key, no home directory mounted and no access to the author's
+  cloud or kube credentials.
+- **Backend unverified.** Its docs cover Vertex AI models with OpenCode or Codex
+  executors. Driving it with Meta's models through the OpenAI-compatible endpoint is
+  undocumented: check before planning around it, and budget for API costs.
+- **Models, if it works:** Muse Spark is the agent model being improved, and Muse Wonder
+  (built for long coding and agent tasks) proposes the edits. The task set is public
+  fixtures, so the cheap `-contributor` variants are allowed here. Whether Muse Code can
+  be an executor is unverified.
+- **Stretch:** only once the core works, and first to cut.
+
+**Post-hackathon:** an MCP server exposing read-only story tools, so any agent can query a
+reader's stories; a discovery agent that turns "a name or topic" into suggested feeds;
+voice input with Muse Voice Transcribe.
+
+---
+
+## 5. Sources: many types, one timeline
+
+Like Reeder, OSMS reads far more than RSS. Most platforms already publish a feed, so one
+ingestion pipeline with a small adapter per source type covers them all.
+
+### Adding a source
+
+A single box accepts any of these:
+
+- **A link** to a site or page → feed autodiscovery (`<link rel="alternate">`, then common
+  paths such as `/feed`).
+- **A handle** → resolved per platform: `@user@instance` (Mastodon, Pixelfed),
+  `@name.bsky.social` (Bluesky), `r/name` (Reddit), a YouTube channel link or `@handle`.
+- **A name or topic** ("Flutter", "protein folding") → web search for candidate sites, then
+  autodiscovery on the results. Needs a search API: ask before adding one; its key goes in
+  the secret store.
+- **An OPML file** exported from another reader → preview, de-duplicate against existing
+  sources, keep its folders (stored now; the folders UI is post-hackathon).
+
+Before subscribing, show what was found: source type, title, language and the latest few
+items. Subscribing adds the source to the user's account (see *Accounts*).
+
+### Source types
+
+Prefer each platform's **public feed** over its API: no keys, no sign-in, fewer terms to
+break. The generic feed adapter reads any of these from a feed URL on day one; a
+type-specific adapter adds handle resolution and better media extraction. Feed URLs and
+APIs change, so check the platform's current docs before writing an adapter. Content that
+needs the user's own sign-in is covered in *Accounts*.
+
+| Source type | How OSMS reads it | Items become |
+|---|---|---|
+| **arXiv** (a main source) | Category feeds from `rss.arxiv.org`, plus searches on the arXiv API built from each reader's research keywords | Papers |
+| Feeds: RSS, Atom, JSON Feed (blogs, news sites, micro.blog, GitHub releases, ...) | The feed | Articles; short untitled items become posts |
+| Newsletters | The demo inbox (per-user addresses later, see *Accounts*), or the newsletter's own feed | Articles |
+| Podcasts | Feed enclosures, transcribed with Muse Voice Transcribe, biased towards the source's and story's names | Episodes |
+| SoundCloud | The account's podcast feed, when it has one | Episodes |
+| YouTube | Channel or playlist feed: title, description, thumbnail | Videos |
+| Mastodon | Account or hashtag feed | Posts |
+| Bluesky | Public profile feed, or the unauthenticated public API | Posts |
+| Reddit | Subreddit feed | Posts |
+| Pixelfed, Glass, Flickr | Public profile or photo feeds | Photos |
+| Comic strips | The comic's own feed; never scrape a comics site | Comics |
+
+What an item may do depends on its kind:
+
+- **Facts** (articles, papers, episodes): clusters into stories and feeds claims, what's
+  new, disagreements and the briefing. Papers are a new kind: until the eval has labelled
+  paper examples, they show in Today's research section and under their source but do not
+  feed clustering (see the rule below).
+- **Context** (posts, videos): can join a story and shows in its sources and timeline, but
+  never feeds claims or disagreements. A post or a video description is a reaction, not
+  reporting.
+- **Timeline only** (photos, comics): never clustered; shown as an item card in the
+  timeline and under its source.
+
+These roles are the author's call, like thresholds. Do not change which kinds feed
+clustering or claims, and do not let a new kind feed clustering until the eval has
+labelled examples of it.
+
+### arXiv: a main source, followed by keywords
+
+arXiv is where AI research, and much of science, appears first, often days before the
+news covers it. OSMS treats it as a main source with two ways in.
+
+**1. Categories.** Follow a category like any other source: `cs.CL`, `cs.IR`,
+`astro-ph.EP`, ... Each is a feed at `https://rss.arxiv.org/rss/<category>` (several
+can be combined with `+`). Onboarding suggests the categories for the reader's topics;
+`backend/seed/sources.opml` lists them per topic.
+
+**2. Research interests.** The reader types keywords and phrases from their field, and
+OSMS pulls everything related to them:
+
+- **The interest agent turns keywords into a plan.** It suggests related terms
+  (synonyms, abbreviations, close subfields: "RAG" for "retrieval-augmented
+  generation"), likely categories, and flags any keyword outside rule 3. The reader
+  sees the plan in plain words ("New papers whose title or abstract mentions … in cs.CL,
+  cs.IR, plus papers related to them by meaning") and confirms it. Suggested terms are
+  opt-in; nothing is followed until the reader saves.
+- **Keyword matches.** One arXiv API query per interest
+  (`https://export.arxiv.org/api/query`): the reader's terms and accepted related terms
+  as quoted phrases in title and abstract (`ti:`, `abs:`), joined with `OR`, narrowed
+  with `AND cat:` when the reader picked categories, sorted by `submittedDate` and
+  limited to papers since the last run. Identical queries from different readers run
+  once; the matches are stored per reader.
+- **Related by meaning.** Every new paper in the categories anyone follows is embedded
+  with BGE-M3, the same as articles. A paper whose hybrid similarity to an interest
+  passes a threshold is matched even when none of the keywords appear in it. The
+  threshold is the author's call, set with the eval. Borderline papers (a capped number
+  per interest per day) go to the interest agent for a yes or no.
+- **A full start.** A new interest is backfilled with the last 30 days, so it is never
+  empty, and the editor shows how many papers that was before the reader saves.
+- **Why it's here.** Every match records its reason: the terms it matched, or "related
+  to your interests" with its score. Cards and Today's research section show it.
+
+**How papers fit the rest of OSMS**
+
+- A paper is an item of kind `paper`: title, authors, abstract, categories, arXiv id,
+  version, and links to its abstract page and the PDF **on arXiv**.
+- **Papers join stories** as a primary source once the eval has labelled paper examples
+  (see the roles above): a model launch and its technical report become one story, and
+  the paper is the first source cited.
+- **Claims come from the title and abstract only.** OSMS never downloads, stores or
+  parses PDFs or full text. A new version (v2, v3, ...) re-runs claims, like a corrected
+  article.
+- **Rule 3 still applies.** The categories OSMS offers leave out political and social
+  ones (`cs.CY`, `physics.soc-ph`, ...). A keyword the interest agent flags stays visible,
+  struck through, and is never searched.
+- **Interests are personal data.** They can show what someone works on: stored per
+  reader, never shown to anyone else, never logged. arXiv sees the search text, never
+  who asked.
+
+**arXiv's terms** (info.arxiv.org; re-check before building the adapter)
+
+- **One request every three seconds, one connection at a time, across all of OSMS:** the
+  API, RSS and OAI-PMH share that limit. All arXiv traffic goes through one rate-limited
+  client in the fetcher.
+- Cache API results: they change at most once a day. Use `max_results` up to 2000 per
+  call and page with `start`, never above 30,000 results per query.
+- **Metadata is free to store** (titles, abstracts and authors are CC0). Papers are not:
+  link to the abstract page (`arxiv.org/abs/<id>`) and the PDF on arXiv; never store,
+  cache, re-host or serve PDFs or full text.
+- Never imply that arXiv endorses OSMS, and never use its logo. The name "arXiv" as text
+  on source chips and cards is fine. The README thanks arXiv for its open access
+  interoperability.
+
+### Ingestion rules
+
+- **One pipeline, one item model.** Every adapter produces the same `Item` (source, kind,
+  title, text, link, published time, language, media links). Clustering, claims and the
+  agent see the kind, never the platform.
+- **Polite fetching.** Conditional requests (ETag / Last-Modified), per-host rate limits,
+  back off on HTTP 429 and `Retry-After`, a descriptive User-Agent. Reddit in particular
+  throttles anonymous clients.
+- **Media stays where it is.** Store links to images, thumbnails and videos, not the files.
+  Show them from the original with credit and a link back. Never re-host them, and never
+  pass them to a model (Muse Image, SAM 3.1, Muse Spark's image or video reading) without
+  the author's say. Podcast enclosures are the only media we download, and only to
+  transcribe. Never download YouTube videos or audio.
+- **Newsletter emails are personal.** Before storing, strip tracking pixels, unsubscribe
+  links and the recipient's address; link to the web version, not the email.
+- **Rule 3 covers every type.** Social and photo platforms mix topics, so seed the demo
+  with topic-specific accounts, hashtags and subreddits (e.g. r/MachineLearning,
+  #FlutterDev), and the triage agent checks every item. No editorial cartoons. The demo source list is `backend/seed/sources.opml`,
+  so it can be reviewed.
+- **Posts, not people.** Store only what the timeline shows (handle, display name, text,
+  links). Never analyse or profile the people behind accounts (rule 6).
+
+### Staying up to date
+
+Every source is **checked on its own schedule**, and the ones that can push tell OSMS the
+moment they publish. Either way, a new or changed item **triggers the pipeline at once**
+(clean → triage → embed → cluster → claims → verify → story updated). Nothing waits for the night,
+and the agents never browse the web for "latest news": what they know is what the
+sources delivered, each fact dated.
+
+**Checking on a schedule (every source; hackathon scope)**
+
+- Each source has a `next_fetch_at`. The worker fetches sources that are due, a few at a
+  time, within per-host limits.
+- **Adaptive interval** (defaults, tunable in config): about half the source's usual gap
+  between items, between 5 minutes and 6 hours. A busy source is checked more often, a
+  quiet one less. Add ±10% jitter so sources don't all fire together.
+- **Follow the source's hints:** RSS `<ttl>`, `sy:updatePeriod` / `sy:updateFrequency`,
+  HTTP `Cache-Control` / `Expires` and `Retry-After`. A source with a known rhythm is
+  fetched just after it publishes.
+- **arXiv runs once a day:** its feeds update at midnight US Eastern (around 06:00 Danish
+  time). Category feeds, then interest queries and related-by-meaning matching, run once,
+  just after. A day with no new papers is normal, not an error. A new interest's 30-day
+  backfill runs at once, inside the same rate limit.
+- **Cheap when nothing changed:** conditional requests (ETag / Last-Modified). A `304`
+  costs no parsing and no model calls.
+- **New and changed items:** deduplicate by GUID or link. A known item whose content hash
+  changes (articles get corrected) has its claims re-run.
+- **Errors back off,** doubling up to a day. A source failing for days is flagged to its
+  followers, never silently dropped.
+- **Now, not later:** a new subscription is fetched at once, and **Fetch now** (an API
+  endpoint and a Tilt button) fetches one source or all of them, for testing and the
+  demo.
+- **Durable work:** fetched items become jobs in a `jobs` table in SQLite (status,
+  attempts, run after), so a restart loses nothing and failures retry.
+
+**Push (post-hackathon; needs the deployed, public backend)**
+
+- **WebSub** for feeds that advertise a hub (`<link rel="hub">`), YouTube channel feeds
+  included. Subscribe with a secret, check the hub's HMAC signature on every delivery,
+  and renew leases before they expire. Keep a slow safety-net check (every 12 hours):
+  pushes can be missed.
+- **Bluesky Jetstream** (a public WebSocket), filtered to followed accounts and posts.
+- **Newsletters** arrive by email, so the inbox is a trigger already (an inbound-mail
+  webhook, or IMAP IDLE).
+- **Mastodon streaming** where the instance allows it; it often needs an access token, so
+  it comes with connected accounts. Reddit has no push: checking only.
+- Check each service's current docs before building its push client.
+
+**What a change triggers**
+
+- An updated story writes a `story.updated` event. The app refreshes on focus and every
+  minute (Server-Sent Events post-hackathon).
+- The editor agent runs nightly, before the 07:00 briefing in each reader's time zone,
+  and from Tilt. A mid-day run for a big change (a new disagreement, several new verified
+  facts) is post-hackathon.
+- Alerts for followed stories are post-hackathon: opt-in, and only for verified new facts.
+
+**Hackathon scope:** the generic feed adapter, **arXiv** (category feeds, research
+interests with the interest agent, keyword matches, the 30-day backfill and
+related-by-meaning matches), newsletters, podcasts, adding by link or handle, OPML import,
+and type-specific adapters for YouTube, Mastodon, Bluesky and Reddit.
+**Post-hackathon:** search by name or topic, OPML export, richer cards for photos and
+comics, SoundCloud beyond podcast feeds, connected accounts (see *Accounts*), and syncing
+with other readers' services.
+
+---
+
+## 6. Accounts: sign-in, picked sources, connected accounts
+
+Users sign in, pick what they want to read, and OSMS collects exactly that. Everything
+about a user lives in SQLite (`data/osms.db`); the story pipeline stays shared.
+
+### Sign-in
+
+- **Firebase Authentication, Google first.** Do not build sign-in by hand. GitHub,
+  Microsoft, Apple and email links are switches in the same service (post-hackathon).
+  Ask Google for `openid`, `email` and `profile` only.
+- The app sends its Firebase ID token with every request. The backend verifies it and
+  maps the Firebase user id to a `users` row, created on first sign-in. OSMS never sees
+  or stores a password.
+- **One page signs in and signs up.** The first sign-in creates the account and goes to
+  onboarding; returning readers go to Today. "Create an account" and "Sign in" only
+  change the wording, never the flow.
+- **Use each provider's official button and mark**, following its branding guidelines
+  (Google's sign-in rules in particular). Widgetbook shows a placeholder mark; never
+  draw an imitation of a provider's logo.
+- **Signed-out visitors get the demo account**, read-only: the seed sources and their
+  stories. Judges can try OSMS without an account; signing in is only needed to choose
+  your own sources.
+- Before judging, check that any Google account can sign in: a consent screen left in
+  testing mode admits only listed test users.
+- Before the native builds, check Firebase sign-in support on Windows and macOS, and the
+  App Store rules on offering Sign in with Apple next to Google.
+
+### Picking sources
+
+Onboarding takes under a minute, and every step can be skipped (skipping keeps the demo
+sources):
+
+1. **Language**, pre-filled from the browser.
+2. **Topics**, from a fixed list inside rule 3 (AI research, developer tools, science,
+   space, startups and product, ...). The topics are the folders of
+   `backend/seed/sources.opml`, so onboarding reuses OPML import.
+3. **Kinds** the user wants: articles, research papers, podcasts, videos, social posts,
+   photos, comics.
+4. **Research on arXiv**, only when a research topic is picked (AI research, science,
+   space): type keywords, tap the related terms the interest agent suggests, optionally
+   pick categories. Skippable, and editable later from settings, the sidebar, the
+   add-source sheet or ⌘K.
+5. **Suggested sources** for those topics and kinds, all ticked; untick to drop. arXiv
+   categories for the topics are among them. Add your own with the add-source box or an
+   OPML file.
+
+The first timeline is never empty: suggested sources are already collected for the demo,
+so their stories show at once. Picks can be changed any time in settings.
+
+### Collecting what users pick
+
+- **Sources are shared.** When two users follow the same feed, it is fetched once and its
+  items stored once. A subscription links a user to a source.
+- **Collection follows subscriptions.** A source is fetched while at least one user (or
+  the demo account) follows it. A new subscription is fetched straight away, not at the
+  overnight run; when the last follower leaves, fetching stops.
+- **Shared work runs once.** Fetching, embeddings, clustering and claims run once per item
+  or story, never once per user. Per user: the timeline, read state, what's new and the
+  morning briefing.
+- **Your sources pick the stories; the story shows every source.** A user sees a story
+  when one of its items comes from a source they follow. Inside the story, every shared
+  source covering it is shown, with theirs marked.
+
+### Sources that need the user's own sign-in (post-hackathon)
+
+Some content is only reachable with the user's access: a Mastodon or Bluesky home
+timeline, Reddit or YouTube subscriptions, a paid newsletter's private feed URL.
+
+- **Import first, connect only if needed.** Where a platform shows what someone follows,
+  turn it into ordinary subscriptions: Bluesky follows are public by handle, Mastodon
+  follows usually are, and YouTube subscriptions come out of a Google Takeout export.
+  Keep a connection only when the content itself is private.
+- **Connections** use each platform's OAuth, run by the backend, with read-only scopes.
+  Disconnecting, or deleting the account, revokes the token at the platform.
+- **Private items stay with their owner.** Items from a connection or a private feed URL
+  belong to one user: they appear only in that user's timeline and never feed shared
+  stories, claims, the eval or the demo. Whether they may join the owner's own view of a
+  story is the author's design.
+- **Never ask for a password, never ask for mailbox access.** Gmail scopes are restricted
+  and far too broad. Personal newsletters get a per-user forwarding address instead.
+- **Check platform rules first.** YouTube's account scopes need Google's app verification;
+  Reddit needs a registered app under its Data API terms. Read each platform's current
+  rules before building its connection.
+
+### What the database stores
+
+| Table | Holds |
+|---|---|
+| `users` | Firebase user id, email, display name, language, preferred kinds, theme, view mode, created and last-seen times. Settings live here so they follow the user across devices. No passwords. |
+| `topics`, `user_topics` | Onboarding topics with their suggested sources (loaded from the seed OPML), and each user's picks |
+| `sources` | Type, feed URL, title, language, fetch state (ETag, Last-Modified, last fetched, next fetch, interval, errors; WebSub hub and lease later). Shared, except a private source, which has an owner. An arXiv category feed is a source; so is each distinct arXiv query, shared by the interests that use it and dropped when none do. |
+| `interests` | A reader's research interests: keywords, accepted related terms, categories, flagged keywords, created and updated times. Personal. |
+| `interest_matches` | Interest, paper, why it matched (terms, or related by meaning with its score), when. Per reader. |
+| `jobs` | The work queue: what to process next (a fetched item, a re-run, a briefing), status, attempts, run after |
+| `subscriptions` | User, source, folder, when added. The user's picks, and what drives collection. |
+| `connections` | User, platform, instance, handle, scopes, encrypted tokens, status (post-hackathon) |
+| `items` and the story tables | Content and the story pipeline, as the author designs them. An item from a private source has its owner. A paper adds authors, categories, arXiv id and version; never the PDF. |
+| `agent_runs`, `agent_steps` | The decision log: every agent run and step, with reason, model id, prompt version, tokens and latency. No personal data. |
+| `read_state`, `saved_items`, `briefings` | Per-user reading state, save-for-later and morning briefings |
+
+### Personal data
+
+Emails, names, picks, research interests and reading history are personal data, and GDPR
+applies.
+
+- **Collect the minimum:** what sign-in provides (email, name) and what the user picks.
+  Nothing from contacts, location or device; no ad or tracking scripts.
+- **Say what is stored.** The sign-in screen links to a short page listing what OSMS
+  keeps and why.
+- **Delete means delete.** "Delete my account" revokes connections, then removes the
+  user's row and everything owned by it (subscriptions, research interests and their
+  matches, private sources and items, read state, briefings) and the Firebase account.
+  Shared sources and items stay.
+- **Reading habits are not a profile.** Subscriptions and read state rank the user's own
+  stories and nothing else (rule 6).
+
+**Hackathon scope:** Google sign-in, the signed-out demo view, onboarding, per-user
+subscriptions and research interests, settings and read state, collection driven by subscriptions, account
+deletion and the privacy page.
+**Post-hackathon:** more sign-in providers, connected accounts and private feeds,
+importing follows, personal newsletter addresses, data export (OPML + JSON).
+
+---
+
+## 7. Design references: Reeder and Fluent Reader
+
+Use these as **inspiration only**. Never copy names, icons, logos, colour schemes,
+recognisable screens or code.
+
+**Borrow from Reeder:**
+- One unified timeline across media types (articles, newsletters, podcasts, videos, social
+  posts, photos, comics), each shown in a form that suits it.
+- Adding a source from one box: a link, a handle, a search or an OPML file.
+- Three-pane layout on wide screens: sources/folders | item list | content.
+- Calm, well-spaced typography; content-first reading view.
+- **No unread counts.** Instead of "14 unread", OSMS shows "2 new facts since Tuesday"
+  using the what's-new diff. (Reeder users missed a "something new" signal — our diff is
+  the better signal.)
+- Adjustable reading width on tablet/desktop; folders; save-for-later.
+
+**Borrow from Fluent Reader:**
+- More than one view mode (OSMS has **list** and **cards**). Don't reproduce Fluent
+  Reader's own set of four (cards/magazine/compact/list): it is recognisably theirs.
+- Rules to auto-hide or tag items by keyword/source (post-hackathon).
+- Full-content reader mode, dark mode, keyboard shortcuts, fast search.
+- OPML import and export.
+
+**OSMS-only UI (must be the most visually prominent):**
+- Story card with source count + source chips + Muse Image visual. One story can mix
+  blogs, videos and posts.
+- "What's new" section at the top of a story page.
+- "Where sources disagree" panel with per-claim source links.
+- Story timeline.
+- Morning briefing player.
+
+**Hackathon scope for UI:** three-pane responsive layout, card + list views, dark mode,
+count-free timeline with what's-new signals, add-source sheet, the research interests
+editor, item cards for articles, papers, episodes, posts and videos, sign-in and
+onboarding, and the OSMS-only components.
+**Post-hackathon:** more view modes, rules, keyboard shortcuts, share extension,
+folders, photo and comic cards.
+
+---
+
+## 8. Tech stack
+
+- **Frontend:** Flutter (Dart). **Web & macOS Desktop App first.** Same project later builds iOS, Android
+  (phones + tablets), Windows and macOS desktop.
+  - State management: Riverpod.
+  - Routing: go_router.
+  - Component catalogue: **Widgetbook** (Storybook does not support Flutter).
+- **Backend:** Python 3.12+, FastAPI, Pydantic, SQLAlchemy + Alembic.
+- **Sign-in:** Firebase Authentication in the app (Google first); the backend verifies
+  its ID tokens.
+- **Databases:** both are files under `data/`, so there is no database server to run.
+  - **SQLite** (`data/osms.db`) through SQLAlchemy and Alembic: users, subscriptions,
+    sources, items, stories, claims, read state, briefings, the decision log. Every
+    connection sets WAL mode, `busy_timeout` and `foreign_keys=ON` (off by default in
+    SQLite, and account deletion relies on cascades). Alembic uses `render_as_batch=True`,
+    because SQLite can't alter most columns in place. Keep write transactions short: SQLite
+    has one writer at a time.
+  - **Milvus Lite** (`data/milvus/`) through pymilvus: dense + sparse vectors (BGE-M3),
+    hybrid search with `RRFRanker` or `WeightedRanker`. Only one process may open its data
+    directory, so it runs in server mode (`milvus-lite server`, `127.0.0.1:19530`) and every
+    backend process connects to that. Only the ingestion worker writes vectors. It has no
+    authentication: never expose its port. Tests use embedded mode on a temporary
+    directory.
+  - **Scale path (post-hackathon):** PostgreSQL and Milvus Standalone or Zilliz Cloud
+    through the same SQLAlchemy and pymilvus code, by changing `DATABASE_URL` and
+    `MILVUS_URI`. Keep SQL portable; no SQLite-only tricks outside `db/`.
+- **Embeddings:** BGE-M3 (dense + sparse), multilingual.
+- **Models and agents:** Muse Spark, Muse Wonder, Muse Image, SAM 3.1 and Muse Voice
+  Transcribe through Meta Model API; Muse Spark Open on Baseten; Muse Glimmer through
+  Ollama locally (ask before adding it). One OpenAI-compatible client for every text
+  model, our own small agent loop, Harness² offline as a stretch. See *Meta models* and
+  *Agents*.
+- **Tooling:** ruff + mypy + pytest (Python); `flutter analyze` + `flutter test` (Dart).
+- **Local dev:** [Tilt](https://tilt.dev) runs every service with one `make up`; the Tilt
+  UI (http://localhost:10350) shows status, logs and buttons. No Docker: SQLite is a
+  file and Milvus Lite is a local process. See *Local development with Tilt*.
+- **Deploy:** SQLite and Milvus Lite are files with one writer each, so the backend (API,
+  worker, agents, Milvus Lite server) runs as **one machine with a persistent disk**,
+  next to its data: Modal with a Volume or a small VM. Before relying on Modal, confirm
+  that SQLite's file locking and Volume commits behave on it; otherwise use the VM. Flutter
+  web goes on a static host, built with `--no-web-resources-cdn` so the renderer is served
+  from our host.
+
+---
+
+## 9. Folder structure
+
+```
+osms/
+├── AGENTS.md                  # this file
+├── README.md                  # what it is, what was built during the hackathon, how to run
+├── LICENSE
+├── .gitignore                 # .env, data/, .tilt/, build outputs, *.g.dart where appropriate
+├── .env.example               # variable NAMES only, never real values
+├── Makefile                   # `make help`: app, widgetbook, up (Tilt), check, ...
+├── Tiltfile                   # local dev: every service, one `make up`
+├── data/                      # gitignored: osms.db (SQLite), milvus/ (Milvus Lite), audio/
+│
+├── frontend/                  # ONE Flutter project for all platforms
+│   ├── pubspec.yaml
+│   ├── android/ ios/ macos/ windows/ web/   # generated by Flutter
+│   ├── lib/
+│   │   ├── main.dart
+│   │   ├── app.dart           # theme, routing
+│   │   ├── core/
+│   │   │   ├── api/           # HTTP client for FastAPI; sends the sign-in token
+│   │   │   ├── config/        # base URL, environment
+│   │   │   ├── models/        # User, Source, Item, Story, Briefing, ResearchInterest (research.dart), ...
+│   │   │   ├── theme/         # design tokens: colours, type scale, spacing, radii
+│   │   │   └── layout/        # breakpoints + ThreePaneLayout shell
+│   │   ├── features/
+│   │   │   ├── auth/          # sign-in; signed-out visitors get the demo account
+│   │   │   ├── onboarding/    # language, topics, kinds, research on arXiv, suggested sources
+│   │   │   ├── stories/       # story list (cards / list view)
+│   │   │   ├── story_detail/  # what's new, disagreements, timeline, sources
+│   │   │   ├── briefing/      # audio briefing player
+│   │   │   ├── sources/       # add (link, handle, OPML), manage sources, interests_editor.dart
+│   │   │   └── settings/      # language (EN/DA/TA), theme, view mode, delete account
+│   │   └── shared/widgets/    # StoryCard, ItemCard, SourceChip, WhatsNewSection, ...
+│   ├── test/
+│   │
+│   └── widgetbook/            # component catalogue (separate Flutter project)
+│       ├── pubspec.yaml       # depends on the app via `path: ../`
+│       └── lib/
+│           ├── main.dart      # @widgetbook.App
+│           ├── fixtures/      # FAKE users, stories, items of every kind, sources, claims
+│           └── use_cases/     # one file per component
+│
+├── backend/
+│   ├── pyproject.toml
+│   ├── Dockerfile             # deploy image only; local development needs no Docker
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── config.py          # reads env vars; model routing: agent → model id, endpoint, backup
+│   │   ├── auth/              # verify sign-in tokens, current user, account deletion
+│   │   ├── api/               # routes: me, subscriptions, interests, stories, items, briefing, sources
+│   │   ├── schemas/           # Pydantic models
+│   │   ├── db/
+│   │   │   ├── sqlite.py      # engine and sessions: WAL, busy timeout, foreign keys on
+│   │   │   ├── milvus.py      # collections, hybrid search, via the Milvus Lite server
+│   │   │   └── migrations/
+│   │   ├── services/
+│   │   │   ├── ingestion/     # one pipeline for every source type
+│   │   │   │   ├── scheduler.py   # fetch what someone follows; new subscriptions at once
+│   │   │   │   ├── fetcher.py     # polite HTTP + link safety checks
+│   │   │   │   ├── discovery.py   # link or handle → source type + feed URL
+│   │   │   │   ├── opml.py        # OPML import (also loads onboarding topics)
+│   │   │   │   ├── connections.py # platform OAuth, encrypted tokens (post-hackathon)
+│   │   │   │   └── adapters/      # one file per source type: feed, arxiv, youtube, mastodon, ...
+│   │   │   ├── interests.py   # research interests: arXiv queries, backfill, related-by-meaning matches
+│   │   │   ├── embeddings.py  # BGE-M3 dense + sparse
+│   │   │   ├── clustering.py  # incremental story assignment
+│   │   │   ├── triage.py      # Muse Glimmer: rule 3, noise, language and kind, for every item
+│   │   │   ├── judge.py       # Muse Spark Open: same event or not? (Muse Spark as backup)
+│   │   │   ├── claims.py      # claim extraction (Muse Spark)
+│   │   │   ├── diff.py        # what's new since last read
+│   │   │   ├── disagreements.py
+│   │   │   ├── transcribe.py  # Muse Voice Transcribe, biased towards source and story names
+│   │   │   ├── visuals.py     # Muse Image illustrations in one house style; SAM 3.1 check and crops
+│   │   │   └── briefing.py    # script + audio; Muse Voice Transcribe checks the audio
+│   │   ├── agent/             # the agents (see *Agents*)
+│   │   │   ├── runtime.py     # our agent loop: tools, budgets, structured output, retries
+│   │   │   ├── tools.py       # typed tools over SQLite and Milvus Lite
+│   │   │   ├── interest.py    # the interest agent: keywords → search plan, borderline papers
+│   │   │   ├── editor.py      # the overnight run; verifier and writer are its specialists
+│   │   │   ├── decision_log.py
+│   │   │   ├── guardrails.py  # frozen: change only with the author
+│   │   │   └── prompts/       # one file per agent, versioned
+│   │   └── clients/           # Meta Model API (text, image, transcription, segmentation), Baseten, Glimmer
+│   ├── seed/
+│   │   ├── sources.opml       # one folder per onboarding topic; public feeds and arXiv categories, non-political
+│   │   └── visual-style/      # OSMS's own reference images for Muse Image's house style
+│   └── tests/
+│
+├── eval/
+│   ├── labels/                # hand-labelled story groups: ids + links only, NO full text
+│   ├── run_eval.py            # pairwise precision/recall, B-cubed F1
+│   ├── agents/                # agent task set from public fixtures: compares models per agent; Harness²'s tasks
+│   └── results/
+│
+├── infra/                     # deployment config
+└── docs/
+    ├── architecture.md        # diagrams: data in → processed → stored, agents, models
+    └── specs/                 # one short spec per task, handed to the coding agent
+```
+
+---
+
+## 10. UI design in Widgetbook (web first)
+
+Phase 1, done on Oct 28: every component below is designed in Widgetbook with **fake
+fixture data**, before the backend exists. The backend phase follows the build plan.
+`make widgetbook` or `make up` shows the catalogue.
+
+### Setup
+
+```bash
+cd frontend
+# the project can't be named "widgetbook": a package can't depend on its own name
+flutter create widgetbook --project-name osms_widgetbook --platforms=web --empty
+cd widgetbook
+flutter pub add widgetbook widgetbook_annotation
+flutter pub add dev:widgetbook_generator dev:build_runner
+# add the app as a path dependency in widgetbook/pubspec.yaml:
+#   osms:
+#     path: ../
+dart run build_runner build
+flutter run -d chrome
+```
+
+Widgetbook's addon and knob APIs change between versions. Check the current docs on
+pub.dev / widgetbook.io before writing addon code; do not rely on memory. The generator's
+usage reporting is switched off in `widgetbook/build.yaml`; keep it off.
+
+### Components to build, in order of demo importance
+
+1. `StoryCard` — title, summary, source count, source chips, visual, "N new facts" badge.
+2. `WhatsNewSection` — list of new claims since last read, with timestamps.
+3. `DisagreementPanel` — conflicting claims side by side, each with source link.
+4. `StoryTimeline` — vertical timeline of story events.
+5. `BriefingPlayer` — play/pause, progress, chapter list (one chapter per story).
+6. `SourceChip` — source name, language flag/label, source-type icon (a generic glyph
+   such as video or post, never the platform's logo).
+7. `ThreePaneLayout` — the responsive shell.
+8. `ItemCard` — an item outside a story: article, paper, episode, post and video variants
+   (photo and comic variants are post-hackathon). Videos open on the platform. The paper
+   variant shows authors, abstract, why it matched, categories, the arXiv id and version,
+   and links to the abstract and the PDF on arXiv.
+9. `AddSourceSheet` — one box for a link or handle, OPML import, and a preview of what
+   was found before subscribing.
+10. `Onboarding` — language, topic and kind pickers, research on arXiv (when a research
+    topic is picked), then suggested sources (all ticked; untick to drop).
+11. `SignInPage` — sign in and create account on one page (provider buttons, "Look
+    around the demo first", link to what OSMS keeps); signing-in, error and
+    sign-in-unavailable states.
+12. `WhatWeKeepPage` — the short privacy page linked from sign-in.
+13. `AccountRow` and `DemoBanner` — the account at the foot of the sidebar, and the
+    signed-out banner above the story list.
+14. `SettingsPage` and `ThemePicker` — appearance (mode, theme tiles previewed in their
+    own colours, pure black, floating-bar glass, reading font and size), reading
+    language, default view, account and "Delete my account".
+15. `TodayOverview` — the home view: greeting, lead story, briefing tile, "new since you
+    last read", "new research for you" (papers matched to the reader's interests, each
+    with its reason), then a grid of stories.
+16. `BriefingFloatingBar`, `PillNav` and the story toolbar — the floating glass chrome.
+17. `CommandPalette` — ⌘K search over stories, sources and actions.
+18. `InterestsEditor` — follow research on arXiv: keywords, suggested related terms,
+    categories, the plan in plain words, and the papers it would have pulled in the last
+    30 days. Flagged keywords stay visible, struck through. Also embedded in onboarding.
+
+Every component gets **three use cases**: normal, empty, and extreme content
+(200-character title, 40 sources, 10 disagreements, an untitled 500-character post, a
+missing thumbnail). Add light/dark theme and phone/tablet/desktop viewport addons.
+
+### Responsive breakpoints (`core/layout/`)
+
+- **Phone** < 600 px: single pane, stack navigation.
+- **Tablet** 600–1024 px: list + detail side by side.
+- **Desktop** > 1024 px: three panes (sources | stories | story detail).
+
+### Design tokens (`core/theme/`)
+
+Define colours, type scale, spacing and radii as tokens once; components never use
+hard-coded values. Light and dark themes from day one. Content-first, generous whitespace,
+readable line length (~65–75 characters) in the reading view.
+
+- **Palette: ink on paper.** Interaction is ink (near-black, near-white in dark), violet
+  marks only what is new, and disagreement stays neutral and labelled in words. This keeps
+  clear of other readers' accents (blue, green, red, orange, gold, teal with amber).
+- **Type:** Newsreader for story titles and reading text, Inter for interface, Noto Sans
+  Tamil as fallback. All bundled under `frontend/assets/fonts/` (OFL), never fetched from
+  a font CDN.
+- **Never colour alone:** selection, "new" and disagreement always also show as shape,
+  weight or words (a rail, a tick, "2 new facts", "≠").
+- **Themes** (`core/theme/palettes.dart`): Folio (default), Fjord, Clay, Nordlys and High
+  contrast, each light and dark, plus a pure-black option for dark. The reader also picks
+  mode (system/light/dark), floating-bar glass (frosted/tinted/solid), reading font
+  (serif/sans) and reading text size; all of it is an `Appearance` stored on the account.
+  A new palette must pass `frontend/test/theme_contrast_test.dart` (WCAG 4.5:1 for text).
+  Never reuse another reader's theme names: Paper, Ink, Slate, Night, Midnight, Sepia,
+  Dusk, Ocean, True Black and the rest of Apple Books', Kindle's, Readwise's, Matter's
+  and Current's lists are taken.
+- **Glass only on floating chrome:** the mini player, the story toolbar and the phone tab
+  bar (`GlassSurface`). Cards and reading text are always solid. High contrast forces
+  solid bars.
+- **Shape and motion:** concentric corners (cards 20 with 12 padding hold 8 thumbnails),
+  pill buttons and chips; hover lifts cards 2 px, press settles to 98%; 100–300 ms,
+  nothing animates when the system asks for reduced motion.
+- **Layout:** with no story open, desktop and tablet show the Today overview (lead story,
+  briefing, what's new, then a grid) in place of the list and reading panes; opening a
+  story brings back the three panes. Phones get a floating tab bar (Today, Briefing,
+  Saved, Sources) with the mini player above it. ⌘K / Ctrl+K opens the command palette.
+- **Citations:** each summary sentence ends with publisher-first source chips (name and
+  format glyph), never bare numbers.
+- **Story art:** `StoryVisual` draws one thread per source converging into one story
+  thread. Renders of it are Muse Image's style references, and it stays the fallback
+  whenever an illustration is missing or fails its SAM 3.1 check. Muse Image
+  illustrations carry a small "Illustration" label.
+
+---
+
+## 11. Build plan (dates are Danish time; live sessions 17:00)
+
+| Day | Date | Goal |
+|---|---|---|
+| 0 | Oct 26 | Kickoff, claim credits (Meta, Baseten, Modal), repo + README, pick sources, **Widgetbook UI design** |
+| 1 | Oct 27 | Ingestion: RSS, newsletters (dedicated inbox), article store. Agents 101 |
+| 2 | Oct 28 | SQLite schema + Alembic; BGE-M3 → Milvus Lite (server mode); hand-label 150–200 articles for eval. Agents 102 |
+| 3 | Oct 29 | Incremental clustering + judge agent (Muse Spark Open); agent runtime (tools, structured output, budgets, decision log); model clients, routing table and backups; first eval numbers |
+| 4 | Oct 30 | Triage agent (Muse Glimmer, local); claims and verifier agents; what's-new diff, disagreement detection; agent task set in `eval/agents/`. Fireworks session |
+| 5 | Oct 31 | **arXiv:** category feeds, interest queries, 30-day backfill, related-by-meaning matches, one rate-limited client; Muse Voice Transcribe for podcasts; users + subscriptions in the database; add by link/handle, OPML import, YouTube/Mastodon/Bluesky/Reddit adapters; label paper examples; re-run eval |
+| 6 | Nov 1 | Editor and writer agents (overnight run, decision log, "How OSMS decided" view); editor on Muse Spark vs Muse Wonder (the task set decides); story summaries; briefing script + open-source TTS, checked with Muse Voice Transcribe |
+| 7 | Nov 2 | Google sign-in + onboarding (incl. research interests and the interest agent); wire Flutter screens to API (incl. adding sources); Muse Image illustrations in one house style, checked and cropped with SAM 3.1; language toggle |
+| 8 | Nov 3 | Hardening, deploy (one backend machine with a disk; Muse Glimmer on a GPU or a hosted provider), fallback data, signed-out demo view, check any Google account can sign in; Harness² run if time allows (stretch); **feature freeze** |
+| 9 | Nov 4 | 3-min demo video, submit, post on X |
+
+**If behind, cut in this order:** Harness² (stretch) → the Muse Wonder editor trial (the
+editor stays on Muse Spark) → related-by-meaning arXiv matches (keyword matches stay) →
+the briefing audio check → the triage agent (rule 3 rests on source choice) →
+YouTube/Mastodon/Bluesky/Reddit adapters (their feeds still work through the generic
+adapter) → sign-in and onboarding (everyone uses the demo account) → Muse Image
+illustrations with their SAM 3.1 check (cards keep the drawn art) → Tamil → audio
+briefing. Each cut model use costs "Use of Meta AI tooling" points, so cut late what the
+demo shows.
+**Never cut:** clustering quality, eval numbers, what's-new, disagreements.
+
+---
+
+## 12. How to work in this repo
+
+- **Spec first.** For each task, write a short spec in `docs/specs/` (inputs, outputs,
+  how to test) before coding. Keep changes small and focused.
+- **The author owns the core.** Clustering logic, thresholds and the eval are designed by
+  the author. Agents may implement boilerplate (parsers, API wrappers, UI, tests) but must
+  not silently change thresholds or eval methodology.
+- **New source types stay in `ingestion/`.** One adapter file plus its tests; reuse an
+  existing item kind where one fits. If a type needs a new kind or role, or changes
+  outside ingestion, ask first. Adapter tests use hand-written fake feeds, never saved
+  copies of real ones.
+- **Ask before adding dependencies.** Prefer well-maintained packages; pin versions.
+- **Commit often** with clear messages. The commit history must show the work was done
+  during the hackathon.
+- **Tests:** every backend service gets unit tests with fake data. Run
+  `pytest`, `ruff check`, `flutter analyze` before committing.
+- **Fallback:** the deployed app must show the latest stored stories if live ingestion or
+  sign-in fails; signed-out visitors always get the demo account. Never an empty page
+  during judging (Nov 5–8).
+
+---
+
+## 13. Security and data rules
+
+- **Never paste API keys, tokens or credentials** into chats, code, commits, issues or
+  Discord. Keys live in `.env` (gitignored) or the deploy platform's secret store.
+  `.env.example` lists variable names only.
+- Enable GitHub secret scanning; run a secret scanner before pushing.
+- **No data, code or configuration from the author's employer**, not even as examples.
+- **Fixtures are invented.** Widgetbook and tests use realistic but fake users, stories,
+  handles and feeds. Use the reserved `.example` domain (e.g. `ada@users.example`,
+  `@ada@social.example`), never real people or accounts. Fake papers use invented
+  authors, ids far above arXiv's monthly volume (`2610.9xxxx`) and `arxiv.example` links.
+- Do not commit scraped article text, newsletter contents, transcripts, posts or media.
+  Store data locally under `data/` (gitignored).
+- **A user's OPML file shows what they read.** Parse it, then discard it; never commit
+  one. The seed list is the only OPML in the repo.
+- **Fetching user-supplied links.** Discovery, OPML import and feed fetching follow links
+  that users provide. Allow only http and https; refuse private, loopback, link-local and
+  cloud-metadata addresses, re-checking after every redirect; cap response size and time.
+- **Untrusted XML and HTML.** Parse feeds and OPML with external entities and entity
+  expansion disabled. Sanitise feed HTML on the server before it reaches the app.
+- **Source text is data, not instructions.** Posts, descriptions and transcripts go into
+  Muse Spark prompts and the overnight agent's context, and anyone can write a post that
+  says "ignore your instructions". Mark source text as quoted content in every prompt,
+  and never let it trigger an agent action.
+- **Verify sign-in on the server.** Check the Firebase ID token on every request
+  (signature, audience, issuer, expiry) and take the user id only from the verified
+  token, never from the request.
+- **One user's data stays theirs** (rule 7). Every query on user data filters by the
+  signed-in user. Each endpoint that returns user data gets a test in which a second user
+  sees none of the first user's subscriptions, private items, read state or briefings.
+  The demo account is read-only.
+- **Tokens and private feed URLs are credentials.** Encrypt them at rest with a key from
+  the secret store; never send them to the app, log them or put them in a prompt.
+- **Personal data stays out of prompts and logs.** Prompts may carry a user's language,
+  topics and kinds, never their email, name, handles or reading history. Logs use user
+  ids, not emails. Research keywords count as topics: the interest agent sees the
+  keywords it is working on, never who typed them (see *Agents*); interests are never
+  logged.
+- **Firebase web config is public, not secret.** Restrict its API key to our domains, and
+  expect secret scanners to flag it anyway.
+- **Cap what one account can add.** Limit sources per user, OPML size and the add-source
+  rate, so one account cannot swamp the fetcher.
+- **`data/` holds personal data.** `osms.db` has users and reading state, and `milvus/` and
+  `audio/` hold third-party content. Never commit, copy out or share them. Tests and
+  fixtures use temporary files.
+- **The Milvus Lite server has no authentication or TLS.** It listens on `127.0.0.1` only;
+  never bind it to another interface or open its port.
+- **Agents act only through their tools** (see *Agents*). No tool runs shell commands or
+  reaches the web except the fetcher, and agent budgets cap every run.
+- **arXiv is one shared, slow lane.** One request every three seconds and one connection
+  for all of OSMS; never parallelise arXiv calls. Never download, store or serve PDFs or
+  full text. Queries sent to arXiv carry search text only, never a user id.
+- **Illustrations only, no web search, and backups that never move personal data** are
+  frozen guardrails (see *Agents*); change them only with the author.
+- **Contributor variants only on public fixtures** (the eval, Harness², development
+  runs), never on anything per reader: they are "Used to improve our products".
+- **Local model servers listen on `127.0.0.1` only**, like Milvus Lite: Ollama (Muse
+  Glimmer) included.
+- **Muse Code:** read Meta's install script before running it. Use its non-contributor
+  models while it can see anything not yet public (`AGENTS.md` is gitignored), and never
+  give it `.env` or `data/`.
+- **Harness² runs isolated** (see *Agents*): a throwaway Linux container, a scoped model
+  key, no home directory, no cloud or kube credentials, public fixtures only.
+
+---
+
+## 14. Local development with Tilt
+
+OSMS runs several things at once (vector store, API, ingestion worker, agents, app,
+Widgetbook), so local development goes through **Tilt**. `make up` at the repo root starts
+everything in the `Tiltfile`; the **Tilt UI** at http://localhost:10350 shows each
+service's status and logs, with buttons for the jobs you run by hand. Tilt is local only:
+deploys stay on Modal and the static host. Install with `brew install tilt`.
+
+### Resources
+
+Add each resource when its code lands; never point Tilt at a stub. Today the Tiltfile has
+`app`, `widgetbook-gen`, `widgetbook` and `flutter-checks`; the backend rows arrive with
+the backend code. Each Flutter resource also has a `-reload` companion that hot-reloads
+it whenever a file under its `lib/` is saved, and a **Hot restart** button.
+
+| Resource | Group | Runs | Port | Starts |
+|---|---|---|---|---|
+| `milvus` | data | `milvus-lite server --data-dir data/milvus --port 19530` | 19530 | on `tilt up` |
+| `glimmer` | models | `ollama serve` with Muse Glimmer, for the triage agent (only when it runs locally) | 11434 | on `tilt up` |
+| `api` | backend | `uvicorn app.main:app --reload` | 8000 | when `milvus` is up |
+| `worker` | backend | Scheduled checks, the jobs queue, embeddings, judge, claims and verifier agents, the daily arXiv run; **Fetch now** and **arXiv now** buttons (arXiv now still keeps arXiv's rate limit) | – | after `api` |
+| `overnight-agent` | backend | One run of the editor and writer agents, on the models in the routing table; decision log in Tilt | – | button |
+| `app` | frontend | `flutter run -d web-server` | 8080 | on `tilt up` |
+| `widgetbook-gen` | frontend | `dart run build_runner watch` | – | on `tilt up` |
+| `widgetbook` | frontend | Widgetbook, `flutter run -d web-server` | 8090 | after `widgetbook-gen` |
+| `backend-checks` | checks | `pytest` and `ruff check` | – | button |
+| `flutter-checks` | checks | `make check` (analyze and test, both projects) | – | button |
+| `eval` | checks | `python run_eval.py` and the agent task set, with the model comparison | – | button |
+
+SQLite needs no resource: it is a file (`data/osms.db`), migrated by Alembic when the API
+starts. Milvus Lite allows one process per data directory, so it gets its own resource in
+server mode and every backend process connects to it.
+
+### Rules
+
+- **Everything on the host, no Docker.** Python, Flutter and the Milvus Lite server run as
+  `local_resource(serve_cmd=...)`, so reloads stay fast and nothing needs a container.
+- **Same commands as *Common commands*.** The Tiltfile and the `Makefile` only wrap them.
+  Everything must still run without Tilt or make. One-shot jobs in Tilt call their make
+  target (`make check`); long-running ones call the tool directly, so Tilt can stop them.
+- **Flutter reloads from Tilt.** Run Flutter with `--pid-file .tilt/tilt-<name>.pid`. Buttons
+  from the `uibutton` extension (`load('ext://uibutton', 'cmd_button')`) send `SIGUSR1`
+  for hot reload and `SIGUSR2` for hot restart.
+- **Stopping.** `make stop-<service>` stops one service wherever it runs: on its own
+  (via its pid file in `.tilt/`) or in Tilt (`tilt disable`; turn it back on from the
+  Tilt UI or with `tilt enable`). `make stop` stops everything at once, including the
+  Tilt session that `make up` started. Every new service gets its own `stop-` target.
+- **Manual jobs are buttons.** Checks, eval and the overnight agent use
+  `trigger_mode=TRIGGER_MODE_MANUAL` and `auto_init=False`, so `tilt up` never spends
+  model credits or CPU without being asked.
+- **Tidy UI.** `labels` group resources as `data`, `models`, `backend`, `frontend`, `checks`. Every
+  long-running resource gets a `link()` to its URL and a `readiness_probe` (the API's
+  `/health`); `resource_deps` set the start order.
+- **Fixed ports** as above, all on localhost. Milvus Lite (`127.0.0.1:19530`) and Ollama
+  (`127.0.0.1:11434`) have no authentication: never expose them.
+- **No secrets in the Tiltfile.** Services read `.env` at run time, as they would without
+  Tilt.
+- **Tilt never sees a Kubernetes cluster.** OSMS doesn't use Kubernetes, and the author's
+  machine has work clusters in `~/.kube/config`. Start Tilt with `make up` / `make ci`,
+  which hand it an empty kubeconfig; the Tiltfile refuses to load if a kube context is
+  visible. Never add `allow_k8s_contexts()` and never switch the author's kube context.
+- **Privacy.** Tilt sends no usage data unless you opt in, and this project keeps it off
+  (`analytics_settings(False)` in the Tiltfile, `TILT_DISABLE_ANALYTICS` in the
+  Makefile). Keep the UI on localhost (Tilt's default), because its logs can contain
+  personal data.
+
+### For coding agents
+
+- If Tilt is running, never start a second copy of a service on the same port.
+- Read logs with `tilt logs <resource>` and status with `tilt get uiresources`.
+- Run checks with `tilt trigger backend-checks` or `tilt trigger flutter-checks`, then
+  read the result with `tilt logs`.
+- `tilt ci` starts everything, waits until it is healthy and exits non-zero on failure;
+  use it to check that the whole stack still starts.
+
+---
+
+## 15. Common commands
+
+```bash
+# the usual entry points (make help lists them all)
+make setup                                 # packages + Widgetbook navigation
+make app                                   # the app alone, in Chrome (DEVICE=macos for desktop)
+make widgetbook                            # Widgetbook alone, in Chrome
+make up                                    # everything at once with Tilt (http://localhost:10350)
+make ci                                    # start everything, wait until healthy, exit
+make status                                # what is running, on its own and in Tilt
+make stop-app                              # stop one thing, on its own or in Tilt
+make stop-widgetbook
+make stop                                  # stop everything at once
+make check                                 # analyze + test the app and Widgetbook
+
+# local services without Tilt
+milvus-lite server --data-dir data/milvus --port 19530   # vectors (localhost only)
+ollama serve                               # Muse Glimmer for triage (localhost only; model tag from its docs)
+sqlite3 data/osms.db                       # look inside the database
+
+# backend
+cd backend && uvicorn app.main:app --reload
+cd backend && pytest && ruff check .
+
+# frontend (web first)
+cd frontend && flutter run -d chrome
+cd frontend && flutter analyze && flutter test
+
+# widgetbook
+cd frontend/widgetbook && dart run build_runner build
+cd frontend/widgetbook && flutter run -d chrome
+cd frontend/widgetbook && flutter test     # every component, 3 sizes x 2 themes
+
+# eval
+cd eval && python run_eval.py
+```
