@@ -16,6 +16,7 @@ import 'package:osms/core/theme/appearance.dart';
 import 'package:osms/core/theme/palettes.dart';
 import 'package:osms/features/onboarding/onboarding_flow.dart';
 import 'package:osms/features/search/command_palette.dart';
+import 'package:osms/features/stories/sample_banner.dart';
 import 'package:osms/features/stories/today_overview.dart';
 import 'package:osms/shared/widgets/pill_nav.dart';
 import 'package:osms/features/settings/settings_page.dart';
@@ -75,7 +76,7 @@ final Map<String, Widget Function()> _sections = {
     initialCategories: fx.interests.first.categories.toSet(),
     preview: fx.research.take(3).toList(),
     previewCount: 46,
-    onSave: () {},
+    onSave: (_) {},
     onClose: () {},
   ),
   'Interests empty': () => const InterestsEditor(),
@@ -86,7 +87,7 @@ final Map<String, Widget Function()> _sections = {
     flagged: fx.flaggedKeywords,
     preview: [fx.extremePaper, ...fx.research],
     previewCount: 2000,
-    onSave: () {},
+    onSave: (_) {},
     onClose: () {},
   ),
   'Interests embedded': () => InterestsEditor(embedded: true, suggestedTerms: fx.researchSuggestions),
@@ -138,6 +139,8 @@ final Map<String, Widget Function()> _sections = {
   'Account signed out': () => const AccountRow(),
   'Account long name': () => const AccountRow(user: fx.longUser),
   'Demo banner': () => const DemoBanner(),
+  'Sample banner': () => const SampleBanner(sourceCount: 4),
+  'Sample banner, no sources': () => const SampleBanner(),
   'Demo banner, sign-in down': () => const DemoBanner(signInAvailable: false),
   'Onboarding empty': () => const Onboarding(
     languages: fx.languages,
@@ -205,6 +208,10 @@ final Map<String, Widget Function()> _screens = {
   'Today overview with research': () => Material(
     child: TodayOverview(stories: fx.stories, briefing: fx.briefing, user: fx.user, research: fx.research),
   ),
+  'Today overview with a banner': () => Material(
+    child: TodayOverview(stories: fx.stories, briefing: fx.briefing, user: fx.user, banner: const SampleBanner()),
+  ),
+  'Today overview empty with a banner': () => const Material(child: TodayOverview(stories: [], banner: DemoBanner())),
   'Today overview empty': () => const Material(child: TodayOverview(stories: [])),
   'Today overview extreme': () => Material(
     child: TodayOverview(

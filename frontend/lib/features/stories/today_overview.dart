@@ -23,6 +23,7 @@ class TodayOverview extends StatelessWidget {
     this.onOpenPaper,
     this.onPlayBriefing,
     this.onAddSource,
+    this.banner,
   });
 
   /// Ranked: the first is the lead.
@@ -37,6 +38,9 @@ class TodayOverview extends StatelessWidget {
   final VoidCallback? onPlayBriefing;
   final VoidCallback? onAddSource;
 
+  /// Above the greeting: the demo notice, or that these are sample stories.
+  final Widget? banner;
+
   static const _maxWidth = 1200.0;
   static const _sideBySideMin = 900.0;
   static const _threeColumnsMin = 1100.0;
@@ -47,7 +51,7 @@ class TodayOverview extends StatelessWidget {
     final c = context.colors;
     final t = context.text;
     final now = DateTime.now();
-    final firstName = user?.displayName.split(' ').first;
+    final firstName = user?.shownName.split(' ').first;
     final withNews = stories.where((s) => s.newFactCount > 0).toList();
     final items = stories.fold(0, (sum, s) => sum + s.itemCount);
 
@@ -83,6 +87,7 @@ class TodayOverview extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (banner case final banner?) ...[banner, const SizedBox(height: Space.xl)],
                     header,
                     const SizedBox(height: Space.xl),
                     Container(
@@ -166,6 +171,7 @@ class TodayOverview extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (banner case final banner?) ...[banner, const SizedBox(height: Space.xl)],
                   header,
                   const SizedBox(height: Space.xl),
                   top,

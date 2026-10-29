@@ -18,6 +18,7 @@ class InterestsEditor extends StatefulWidget {
     this.preview = const [],
     this.previewCount,
     this.embedded = false,
+    this.onChanged,
     this.onSave,
     this.onClose,
   });
@@ -41,7 +42,10 @@ class InterestsEditor extends StatefulWidget {
 
   /// Inside onboarding: no title, close or save button.
   final bool embedded;
-  final VoidCallback? onSave;
+
+  /// Every edit, for a parent that saves later (onboarding).
+  final ValueChanged<InterestDraft>? onChanged;
+  final ValueChanged<InterestDraft>? onSave;
   final VoidCallback? onClose;
 
   @override
@@ -60,10 +64,22 @@ class _InterestsEditorState extends State<InterestsEditor> {
     super.dispose();
   }
 
+  /// Flagged keywords stay on screen but are never searched, so they aren't saved.
+  InterestDraft get _draft => InterestDraft(
+    keywords: [for (final k in _keywords) if (!widget.flagged.contains(k)) k],
+    relatedTerms: [..._related],
+    categories: [..._categories],
+  );
+
+  void _change(VoidCallback change) {
+    setState(change);
+    widget.onChanged?.call(_draft);
+  }
+
   void _add() {
     final term = _input.text.trim();
     if (term.isEmpty) return;
-    setState(() {
+    _change(() {
       if (!_keywords.contains(term)) _keywords.add(term);
       _input.clear();
     });
@@ -135,7 +151,7 @@ class _InterestsEditorState extends State<InterestsEditor> {
                 _KeywordChip(
                   term: k,
                   flagged: widget.flagged.contains(k),
-                  onRemove: () => setState(() => _keywords.remove(k)),
+                  onRemove: () => _change(() => _keywords.remove(k)),
                 ),
             ],
           ),
@@ -168,7 +184,7 @@ class _InterestsEditorState extends State<InterestsEditor> {
                 _ToggleChip(
                   label: s,
                   selected: _related.contains(s),
-                  onTap: () => setState(() => _related.contains(s) ? _related.remove(s) : _related.add(s)),
+                  onTap: () => _change(() => _related.contains(s) ? _related.remove(s) : _related.add(s)),
                 ),
             ],
           ),
@@ -186,7 +202,7 @@ class _InterestsEditorState extends State<InterestsEditor> {
                 child: _ToggleChip(
                   label: cat.code,
                   selected: _categories.contains(cat.code),
-                  onTap: () => setState(
+                  onTap: () => _change(
                     () => _categories.contains(cat.code) ? _categories.remove(cat.code) : _categories.add(cat.code),
                   ),
                 ),
@@ -222,7 +238,7 @@ class _InterestsEditorState extends State<InterestsEditor> {
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton(
-              onPressed: _keywords.isEmpty ? null : (widget.onSave ?? () {}),
+              onPressed: _draft.isEmpty ? null : () => widget.onSave?.call(_draft),
               child: const Text('Follow these interests'),
             ),
           ),

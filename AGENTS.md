@@ -535,16 +535,36 @@ with other readers' services.
 ## 6. Accounts: sign-in, picked sources, connected accounts
 
 Users sign in, pick what they want to read, and OSMS collects exactly that. Everything
-about a user lives in SQLite (`data/osms.db`); the story pipeline stays shared.
+OSMS knows about a reader lives in SQLite (`data/osms.db`); sign-in itself (accounts,
+sessions, linked Google accounts) lives in the auth service's own SQLite
+(`data/auth.db`). The story pipeline stays shared.
 
 ### Sign-in
 
-- **Firebase Authentication, Google first.** Do not build sign-in by hand. GitHub,
-  Microsoft, Apple and email links are switches in the same service (post-hackathon).
-  Ask Google for `openid`, `email` and `profile` only.
-- The app sends its Firebase ID token with every request. The backend verifies it and
-  maps the Firebase user id to a `users` row, created on first sign-in. OSMS never sees
-  or stores a password.
+OSMS runs its own open-source sign-in service: **[Better Auth](https://better-auth.com)**
+(MIT), a small Node service in `auth/` next to the Python API. NextAuth (Auth.js) was the
+first choice; its maintainers joined Better Auth in Sept 2025 and recommend it for new
+projects, and it can hand a session to a native app, which NextAuth can't.
+
+- **Google first, nothing by hand.** Better Auth runs Google's OAuth flow (`openid`,
+  `email`, `profile` only) and keeps users and sessions. GitHub, Microsoft, Apple and
+  email links are switches in the same service (post-hackathon). OSMS never sees or
+  stores a password.
+- **The API trusts only short-lived tokens.** The app asks the auth service for a JWT
+  (EdDSA, 15 minutes, audience `osms-api`) and sends it to the API, which checks it
+  against the auth service's published keys (`/api/auth/jwks`) and takes the reader's id
+  from `sub`. The first request creates the reader's `users` row.
+- **Web:** the session is an HttpOnly cookie on the auth service, on the same site as
+  the app; the app never reads it.
+- **macOS:** the app opens Google in a system sign-in window (ASWebAuthenticationSession).
+  The auth service then hands the app a one-time token through `osms://auth`; the app
+  trades it for a session token, keeps it in the Keychain and sends it as a bearer token.
+- **Development sign-in:** with `OSMS_DEV_SIGN_IN=1` (local only; refused in
+  production), the sign-in page also offers an email link, printed in the auth log
+  instead of emailed, so the whole flow runs without Google keys.
+- **Google keys:** an OAuth client from Google Cloud with redirect URI
+  `<BETTER_AUTH_URL>/api/auth/callback/google`. Its id and secret go in `.env` (the secret
+  store when deployed). Without them Google sign-in is off and the page says so.
 - **One page signs in and signs up.** The first sign-in creates the account and goes to
   onboarding; returning readers go to Today. "Create an account" and "Sign in" only
   change the wording, never the flow.
@@ -556,8 +576,9 @@ about a user lives in SQLite (`data/osms.db`); the story pipeline stays shared.
   your own sources.
 - Before judging, check that any Google account can sign in: a consent screen left in
   testing mode admits only listed test users.
-- Before the native builds, check Firebase sign-in support on Windows and macOS, and the
-  App Store rules on offering Sign in with Apple next to Google.
+- **Before the native builds:** macOS 14.4 or later (the sign-in window needs it), a
+  sandboxed app with outgoing connections on, and the App Store rules on offering Sign in
+  with Apple next to Google. Windows sign-in is untested.
 
 ### Picking sources
 
@@ -620,7 +641,7 @@ timeline, Reddit or YouTube subscriptions, a paid newsletter's private feed URL.
 
 | Table | Holds |
 |---|---|
-| `users` | Firebase user id, email, display name, language, preferred kinds, theme, view mode, created and last-seen times. Settings live here so they follow the user across devices. No passwords. |
+| `users` | Better Auth user id, email, display name, language, preferred kinds, appearance, default view, onboarded, created and last-seen times. Settings live here so they follow the user across devices. No passwords. |
 | `topics`, `user_topics` | Onboarding topics with their suggested sources (loaded from the seed OPML), and each user's picks |
 | `sources` | Type, feed URL, title, language, fetch state (ETag, Last-Modified, last fetched, next fetch, interval, errors; WebSub hub and lease later). Shared, except a private source, which has an owner. An arXiv category feed is a source; so is each distinct arXiv query, shared by the interests that use it and dropped when none do. |
 | `interests` | A reader's research interests: keywords, accepted related terms, categories, flagged keywords, created and updated times. Personal. |
@@ -631,6 +652,9 @@ timeline, Reddit or YouTube subscriptions, a paid newsletter's private feed URL.
 | `items` and the story tables | Content and the story pipeline, as the author designs them. An item from a private source has its owner. A paper adds authors, categories, arXiv id and version; never the PDF. |
 | `agent_runs`, `agent_steps` | The decision log: every agent run and step, with reason, model id, prompt version, tokens and latency. No personal data. |
 | `read_state`, `saved_items`, `briefings` | Per-user reading state, save-for-later and morning briefings |
+
+Sign-in's own tables (`user`, `session`, `account`, `verification`, `jwks`) are Better
+Auth's, in `data/auth.db`; only the auth service touches them.
 
 ### Personal data
 
@@ -643,14 +667,17 @@ applies.
   keeps and why.
 - **Delete means delete.** "Delete my account" revokes connections, then removes the
   user's row and everything owned by it (subscriptions, research interests and their
-  matches, private sources and items, read state, briefings) and the Firebase account.
+  matches, private sources and items, read state, briefings) through the API, and then
+  the sign-in account (Better Auth deletes the user, sessions and linked accounts).
   Shared sources and items stay.
 - **Reading habits are not a profile.** Subscriptions and read state rank the user's own
   stories and nothing else (rule 6).
 
 **Hackathon scope:** Google sign-in, the signed-out demo view, onboarding, per-user
-subscriptions and research interests, settings and read state, collection driven by subscriptions, account
-deletion and the privacy page.
+subscriptions and research interests, settings and read state, collection driven by
+subscriptions, account deletion and the privacy page. **Built Oct 29** (web; macOS
+written, not yet built): sign-up and sign-in, onboarding, settings, interests and
+deletion end to end, with sample stories until real ones exist.
 **Post-hackathon:** more sign-in providers, connected accounts and private feeds,
 importing follows, personal newsletter addresses, data export (OPML + JSON).
 
@@ -700,13 +727,16 @@ folders, photo and comic cards.
 
 - **Frontend:** Flutter (Dart). **Web & macOS Desktop App first.** Same project later builds iOS, Android
   (phones + tablets), Windows and macOS desktop.
-  - State management: Riverpod.
-  - Routing: go_router.
+  - State management: Riverpod. Routing: go_router. HTTP: `http`.
+  - macOS sign-in: `flutter_web_auth_2` (system sign-in window) and
+    `flutter_secure_storage` (Keychain, without Keychain Sharing).
   - Component catalogue: **Widgetbook** (Storybook does not support Flutter).
-- **Backend:** Python 3.12+, FastAPI, Pydantic, SQLAlchemy + Alembic.
-- **Sign-in:** Firebase Authentication in the app (Google first); the backend verifies
-  its ID tokens.
-- **Databases:** both are files under `data/`, so there is no database server to run.
+- **Backend:** Python 3.12+ with uv, FastAPI, Pydantic, SQLAlchemy + Alembic, PyJWT.
+- **Sign-in:** Better Auth (Node 24+, TypeScript run directly by Node) in `auth/`,
+  Google first; the API verifies its JWTs against its JWKS. See *Sign-in*.
+- **Databases:** all files under `data/`, so there is no database server to run.
+  - **`data/auth.db`** (SQLite through Node's built-in driver): Better Auth's users and
+    sessions. Only the auth service opens it.
   - **SQLite** (`data/osms.db`) through SQLAlchemy and Alembic: users, subscriptions,
     sources, items, stories, claims, read state, briefings, the decision log. Every
     connection sets WAL mode, `busy_timeout` and `foreign_keys=ON` (off by default in
@@ -752,21 +782,32 @@ osms/
 ├── .env.example               # variable NAMES only, never real values
 ├── Makefile                   # `make help`: app, widgetbook, up (Tilt), check, ...
 ├── Tiltfile                   # local dev: every service, one `make up`
-├── data/                      # gitignored: osms.db (SQLite), milvus/ (Milvus Lite), audio/
+├── data/                      # gitignored: osms.db, auth.db (SQLite), milvus/ (Milvus Lite), audio/
+│
+├── auth/                      # sign-in: Better Auth (Node, TypeScript), http://localhost:3000
+│   ├── package.json           # `npm start`, `npm test`, `npm run typecheck`
+│   ├── src/
+│   │   ├── config.ts          # settings from .env; refuses dev sign-in in production
+│   │   ├── auth.ts            # Google, sessions in data/auth.db, API tokens (JWT + JWKS)
+│   │   ├── server.ts          # /api/auth/*, /providers, the desktop hand-off (/native/*)
+│   │   └── main.ts
+│   └── test/                  # the real server on an in-memory database
 │
 ├── frontend/                  # ONE Flutter project for all platforms
 │   ├── pubspec.yaml
 │   ├── android/ ios/ macos/ windows/ web/   # generated by Flutter
 │   ├── lib/
 │   │   ├── main.dart
-│   │   ├── app.dart           # theme, routing
+│   │   ├── app.dart           # theme, routing (go_router), where a reader may go
 │   │   ├── core/
-│   │   │   ├── api/           # HTTP client for FastAPI; sends the sign-in token
-│   │   │   ├── config/        # base URL, environment
+│   │   │   ├── api/           # auth_client (web: cookie; macOS: Keychain), api_client, json
+│   │   │   ├── session/       # Session and Account (Riverpod): who is reading, their picks
+│   │   │   ├── config/        # service URLs (--dart-define), languages
 │   │   │   ├── models/        # User, Source, Item, Story, Briefing, ResearchInterest (research.dart), ...
 │   │   │   ├── theme/         # design tokens: colours, type scale, spacing, radii
 │   │   │   └── layout/        # breakpoints + ThreePaneLayout shell
 │   │   ├── features/
+│   │   │   ├── home/          # Today: the shell around stories (samples until real ones exist)
 │   │   │   ├── auth/          # sign-in; signed-out visitors get the demo account
 │   │   │   ├── onboarding/    # language, topics, kinds, research on arXiv, suggested sources
 │   │   │   ├── stories/       # story list (cards / list view)
@@ -774,30 +815,35 @@ osms/
 │   │   │   ├── briefing/      # audio briefing player
 │   │   │   ├── sources/       # add (link, handle, OPML), manage sources, interests_editor.dart
 │   │   │   └── settings/      # language (EN/DA/TA), theme, view mode, delete account
-│   │   └── shared/widgets/    # StoryCard, ItemCard, SourceChip, WhatsNewSection, ...
-│   ├── test/
+│   │   ├── shared/widgets/    # StoryCard, ItemCard, SourceChip, WhatsNewSection, ...
+│   │   └── sample/            # FAKE stories, sources, people (invented, .example), for
+│   │                          # Widgetbook, tests, and the app's labelled sample stories
+│   ├── test/                  # palettes' contrast, the sign-in and onboarding flows
 │   │
 │   └── widgetbook/            # component catalogue (separate Flutter project)
 │       ├── pubspec.yaml       # depends on the app via `path: ../`
 │       └── lib/
 │           ├── main.dart      # @widgetbook.App
-│           ├── fixtures/      # FAKE users, stories, items of every kind, sources, claims
+│           ├── fixtures/      # re-exports lib/sample/ (the fake data)
 │           └── use_cases/     # one file per component
 │
 ├── backend/
-│   ├── pyproject.toml
+│   ├── pyproject.toml         # uv; `uv run pytest`, `uv run ruff check .`
+│   ├── alembic.ini
 │   ├── Dockerfile             # deploy image only; local development needs no Docker
 │   ├── app/
 │   │   ├── main.py
 │   │   ├── config.py          # reads env vars; model routing: agent → model id, endpoint, backup
-│   │   ├── auth/              # verify sign-in tokens, current user, account deletion
-│   │   ├── api/               # routes: me, subscriptions, interests, stories, items, briefing, sources
-│   │   ├── schemas/           # Pydantic models
+│   │   ├── auth/              # tokens.py: verify Better Auth's JWTs against its JWKS
+│   │   ├── api/               # routes: me, onboarding, interests, settings (+ stories, items, briefing, sources)
+│   │   ├── schemas/           # Pydantic models: strict inputs, capped sizes
 │   │   ├── db/
+│   │   │   ├── models.py      # readers and their picks (users, topics, sources, subscriptions, interests)
 │   │   │   ├── sqlite.py      # engine and sessions: WAL, busy timeout, foreign keys on
 │   │   │   ├── milvus.py      # collections, hybrid search, via the Milvus Lite server
 │   │   │   └── migrations/
 │   │   ├── services/
+│   │   │   ├── accounts.py    # readers: first sign-in, onboarding, settings, deletion
 │   │   │   ├── ingestion/     # one pipeline for every source type
 │   │   │   │   ├── scheduler.py   # fetch what someone follows; new subscriptions at once
 │   │   │   │   ├── fetcher.py     # polite HTTP + link safety checks
@@ -905,6 +951,12 @@ usage reporting is switched off in `widgetbook/build.yaml`; keep it off.
 18. `InterestsEditor` — follow research on arXiv: keywords, suggested related terms,
     categories, the plan in plain words, and the papers it would have pulled in the last
     30 days. Flagged keywords stay visible, struck through. Also embedded in onboarding.
+19. `SampleBanner` — above the stories while they are samples: signed in, but no real
+    stories collected yet. `TodayOverview` and `StoryList` take it (or `DemoBanner`) in
+    their `banner` slot. Invented stories never pass for real ones.
+
+The real app (`frontend/lib/features/*/…_screen.dart`, `home/`) wires these components to
+the session and the API; Widgetbook keeps showing them with fake data.
 
 Every component gets **three use cases**: normal, empty, and extreme content
 (200-character title, 40 sources, 10 disagreements, an untitled 500-character post, a
@@ -964,11 +1016,11 @@ readable line length (~65–75 characters) in the reading view.
 | 0 | Oct 26 | Kickoff, claim credits (Meta, Baseten, Modal), repo + README, pick sources, **Widgetbook UI design** |
 | 1 | Oct 27 | Ingestion: RSS, newsletters (dedicated inbox), article store. Agents 101 |
 | 2 | Oct 28 | SQLite schema + Alembic; BGE-M3 → Milvus Lite (server mode); hand-label 150–200 articles for eval. Agents 102 |
-| 3 | Oct 29 | Incremental clustering + judge agent (Muse Spark Open); agent runtime (tools, structured output, budgets, decision log); model clients, routing table and backups; first eval numbers |
+| 3 | Oct 29 | **Done:** sign-in (Better Auth: Google + dev links), accounts API, the web app wired end to end (sign-up, onboarding, settings, interests, deletion), macOS sign-in written. **Next:** incremental clustering + judge agent (Muse Spark Open); agent runtime (tools, structured output, budgets, decision log); model clients, routing table and backups; first eval numbers |
 | 4 | Oct 30 | Triage agent (Muse Glimmer, local); claims and verifier agents; what's-new diff, disagreement detection; agent task set in `eval/agents/`. Fireworks session |
 | 5 | Oct 31 | **arXiv:** category feeds, interest queries, 30-day backfill, related-by-meaning matches, one rate-limited client; Muse Voice Transcribe for podcasts; users + subscriptions in the database; add by link/handle, OPML import, YouTube/Mastodon/Bluesky/Reddit adapters; label paper examples; re-run eval |
 | 6 | Nov 1 | Editor and writer agents (overnight run, decision log, "How OSMS decided" view); editor on Muse Spark vs Muse Wonder (the task set decides); story summaries; briefing script + open-source TTS, checked with Muse Voice Transcribe |
-| 7 | Nov 2 | Google sign-in + onboarding (incl. research interests and the interest agent); wire Flutter screens to API (incl. adding sources); Muse Image illustrations in one house style, checked and cropped with SAM 3.1; language toggle |
+| 7 | Nov 2 | Google OAuth client + consent screen (any Google account); macOS build and sign-in check (needs Xcode); the interest agent; real stories in place of the samples; adding sources from the app; Muse Image illustrations in one house style, checked and cropped with SAM 3.1; language toggle |
 | 8 | Nov 3 | Hardening, deploy (one backend machine with a disk; Muse Glimmer on a GPU or a hosted provider), fallback data, signed-out demo view, check any Google account can sign in; Harness² run if time allows (stretch); **feature freeze** |
 | 9 | Nov 4 | 3-min demo video, submit, post on X |
 
@@ -998,8 +1050,8 @@ demo shows.
 - **Ask before adding dependencies.** Prefer well-maintained packages; pin versions.
 - **Commit often** with clear messages. The commit history must show the work was done
   during the hackathon.
-- **Tests:** every backend service gets unit tests with fake data. Run
-  `pytest`, `ruff check`, `flutter analyze` before committing.
+- **Tests:** every backend service gets unit tests with fake data. Run `make check`
+  (Flutter, the API and the auth service) before committing.
 - **Fallback:** the deployed app must show the latest stored stories if live ingestion or
   sign-in fails; signed-out visitors always get the demo account. Never an empty page
   during judging (Nov 5–8).
@@ -1017,6 +1069,8 @@ demo shows.
   handles and feeds. Use the reserved `.example` domain (e.g. `ada@users.example`,
   `@ada@social.example`), never real people or accounts. Fake papers use invented
   authors, ids far above arXiv's monthly volume (`2610.9xxxx`) and `arxiv.example` links.
+  The fake data lives in `frontend/lib/sample/`; the app shows its stories only under a
+  "These are sample stories" banner, never as real news.
 - Do not commit scraped article text, newsletter contents, transcripts, posts or media.
   Store data locally under `data/` (gitignored).
 - **A user's OPML file shows what they read.** Parse it, then discard it; never commit
@@ -1030,9 +1084,9 @@ demo shows.
   Muse Spark prompts and the overnight agent's context, and anyone can write a post that
   says "ignore your instructions". Mark source text as quoted content in every prompt,
   and never let it trigger an agent action.
-- **Verify sign-in on the server.** Check the Firebase ID token on every request
-  (signature, audience, issuer, expiry) and take the user id only from the verified
-  token, never from the request.
+- **Verify sign-in on the server.** The API checks every token: an EdDSA signature
+  against the auth service's JWKS (no other algorithm, never `none`), audience,
+  issuer and expiry. The reader's id comes only from `sub`, never from the request.
 - **One user's data stays theirs** (rule 7). Every query on user data filters by the
   signed-in user. Each endpoint that returns user data gets a test in which a second user
   sees none of the first user's subscriptions, private items, read state or briefings.
@@ -1044,8 +1098,15 @@ demo shows.
   ids, not emails. Research keywords count as topics: the interest agent sees the
   keywords it is working on, never who typed them (see *Agents*); interests are never
   logged.
-- **Firebase web config is public, not secret.** Restrict its API key to our domains, and
-  expect secret scanners to flag it anyway.
+- **`BETTER_AUTH_SECRET` signs every session.** `make env` generates one into `.env`;
+  production gets its own from the secret store. Google's client secret is a secret too.
+  Neither goes in the repo, a log or a chat.
+- **Development sign-in never ships.** The auth service refuses to start with
+  `OSMS_DEV_SIGN_IN=1` and `NODE_ENV=production`. Its links go only to the local log,
+  and the address never does.
+- **Only our origins.** The auth service and the API answer CORS only for
+  `OSMS_APP_ORIGINS`, and Better Auth redirects only to those. The desktop hand-off token
+  is one-time, three minutes, stored hashed, and minted only by the server.
 - **Cap what one account can add.** Limit sources per user, OPML size and the add-source
   rate, so one account cannot swamp the fetcher.
 - **`data/` holds personal data.** `osms.db` has users and reading state, and `milvus/` and
@@ -1083,22 +1144,24 @@ deploys stay on Modal and the static host. Install with `brew install tilt`.
 ### Resources
 
 Add each resource when its code lands; never point Tilt at a stub. Today the Tiltfile has
-`app`, `widgetbook-gen`, `widgetbook` and `flutter-checks`; the backend rows arrive with
-the backend code. Each Flutter resource also has a `-reload` companion that hot-reloads
+`auth`, `api`, `app`, `widgetbook-gen`, `widgetbook` and the three check buttons; the
+other backend rows arrive with their code. Each Flutter resource also has a `-reload` companion that hot-reloads
 it whenever a file under its `lib/` is saved, and a **Hot restart** button.
 
 | Resource | Group | Runs | Port | Starts |
 |---|---|---|---|---|
 | `milvus` | data | `milvus-lite server --data-dir data/milvus --port 19530` | 19530 | on `tilt up` |
 | `glimmer` | models | `ollama serve` with Muse Glimmer, for the triage agent (only when it runs locally) | 11434 | on `tilt up` |
-| `api` | backend | `uvicorn app.main:app --reload` | 8000 | when `milvus` is up |
+| `auth` | backend | Better Auth, `npm start` in `auth/` (restarts when its code or `.env` changes) | 3000 | on `tilt up` |
+| `api` | backend | `uv run uvicorn app.main:app --reload` | 8000 | after `auth` (and `milvus`, once it exists) |
 | `worker` | backend | Scheduled checks, the jobs queue, embeddings, judge, claims and verifier agents, the daily arXiv run; **Fetch now** and **arXiv now** buttons (arXiv now still keeps arXiv's rate limit) | – | after `api` |
 | `overnight-agent` | backend | One run of the editor and writer agents, on the models in the routing table; decision log in Tilt | – | button |
 | `app` | frontend | `flutter run -d web-server` | 8080 | on `tilt up` |
 | `widgetbook-gen` | frontend | `dart run build_runner watch` | – | on `tilt up` |
 | `widgetbook` | frontend | Widgetbook, `flutter run -d web-server` | 8090 | after `widgetbook-gen` |
-| `backend-checks` | checks | `pytest` and `ruff check` | – | button |
-| `flutter-checks` | checks | `make check` (analyze and test, both projects) | – | button |
+| `backend-checks` | checks | `make check-backend` (ruff and pytest) | – | button |
+| `auth-checks` | checks | `make check-auth` (type-check and tests) | – | button |
+| `flutter-checks` | checks | `make check-flutter` (analyze and test, both projects) | – | button |
 | `eval` | checks | `python run_eval.py` and the agent task set, with the model comparison | – | button |
 
 SQLite needs no resource: it is a file (`data/osms.db`), migrated by Alembic when the API
@@ -1153,25 +1216,34 @@ server mode and every backend process connects to it.
 
 ```bash
 # the usual entry points (make help lists them all)
-make setup                                 # packages + Widgetbook navigation
+make env                                   # .env from .env.example, with a fresh sign-in secret
+make setup                                 # .env, every package, Widgetbook navigation
 make app                                   # the app alone, in Chrome (DEVICE=macos for desktop)
 make widgetbook                            # Widgetbook alone, in Chrome
+make auth                                  # sign-in (Better Auth) alone: http://localhost:3000
+make api                                   # the API alone: http://localhost:8000
 make up                                    # everything at once with Tilt (http://localhost:10350)
 make ci                                    # start everything, wait until healthy, exit
 make status                                # what is running, on its own and in Tilt
 make stop-app                              # stop one thing, on its own or in Tilt
 make stop-widgetbook
+make stop-auth
+make stop-api
 make stop                                  # stop everything at once
-make check                                 # analyze + test the app and Widgetbook
+make check                                 # analyze + test everything (check-flutter, -backend, -auth)
 
 # local services without Tilt
 milvus-lite server --data-dir data/milvus --port 19530   # vectors (localhost only)
 ollama serve                               # Muse Glimmer for triage (localhost only; model tag from its docs)
-sqlite3 data/osms.db                       # look inside the database
+sqlite3 data/osms.db                       # look inside the database (data/auth.db: sign-in)
+
+# sign-in
+cd auth && npm start
+cd auth && npm run typecheck && npm test
 
 # backend
-cd backend && uvicorn app.main:app --reload
-cd backend && pytest && ruff check .
+cd backend && uv run uvicorn app.main:app --reload
+cd backend && uv run pytest && uv run ruff check .
 
 # frontend (web first)
 cd frontend && flutter run -d chrome

@@ -1,1 +1,1 @@
-"""Sign-in: verify Firebase ID tokens, resolve the current user, delete accounts."""
+"""Sign-in: verify the API tokens Better Auth signs, resolve the current reader."""

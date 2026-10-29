@@ -34,7 +34,11 @@ class WhatWeKeepPage extends StatelessWidget {
     (
       'Who else handles it',
       [
-        (Icons.lock_outline_rounded, 'Google (Firebase Authentication)', 'Runs sign-in and stores your email and account id.'),
+        (
+          Icons.lock_outline_rounded,
+          'Google',
+          'Confirms it’s you when you sign in. OSMS’s own sign-in service keeps your email, name and sessions.',
+        ),
         (
           Icons.memory_rounded,
           'Meta’s AI models',

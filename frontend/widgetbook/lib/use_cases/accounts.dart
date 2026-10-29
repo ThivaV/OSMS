@@ -5,6 +5,7 @@ import 'package:osms/features/auth/account_row.dart';
 import 'package:osms/features/auth/demo_banner.dart';
 import 'package:osms/features/auth/sign_in_page.dart';
 import 'package:osms/features/auth/what_we_keep_page.dart';
+import 'package:osms/features/stories/sample_banner.dart';
 import 'package:widgetbook/widgetbook.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart' as widgetbook;
 
@@ -107,3 +108,14 @@ Widget demoBannerEmpty(BuildContext context) => const Frame(child: DemoBanner(si
 @widgetbook.UseCase(name: 'Extreme content', type: DemoBanner, path: '[Accounts]')
 Widget demoBannerExtreme(BuildContext context) =>
     _largeText(Frame(child: DemoBanner(onCreateAccount: () {}, onSignIn: () {})));
+
+// ── Sample stories banner ────────────────────────────────────────────────────
+
+@widgetbook.UseCase(name: 'Normal', type: SampleBanner, path: '[Accounts]')
+Widget sampleBannerNormal(BuildContext context) => const Frame(child: SampleBanner(sourceCount: 4));
+
+@widgetbook.UseCase(name: 'Empty', type: SampleBanner, path: '[Accounts]')
+Widget sampleBannerEmpty(BuildContext context) => const Frame(child: SampleBanner());
+
+@widgetbook.UseCase(name: 'Extreme content', type: SampleBanner, path: '[Accounts]')
+Widget sampleBannerExtreme(BuildContext context) => _largeText(const Frame(child: SampleBanner(sourceCount: 500)));

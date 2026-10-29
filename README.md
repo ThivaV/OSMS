@@ -20,8 +20,15 @@ Oct 27 – Nov 4, 2026.
   overview, floating bars, ⌘K palette, research interests editor. Each with
   Normal / Empty / Extreme use cases, light + dark, phone / tablet / desktop.
   Open it with `make widgetbook` (http://localhost:8090).
-- [ ] Ingestion, clustering + judge, agents, arXiv interests, briefing audio,
-  sign-in wiring, illustrations — in build-plan order (see AGENTS.md).
+- [x] **Sign-up and sign-in, end to end (Oct 29):** an open-source sign-in service
+  ([Better Auth](https://better-auth.com), in `auth/`) with Google and, in local
+  development, email links; the API (`backend/`) checks its short-lived tokens and keeps
+  each reader's onboarding picks, research interests and settings; the web app is wired
+  through sign-up, onboarding, Today, Settings and "Delete my account". Stories are still
+  invented samples, labelled as such. The macOS app's sign-in is written but not yet
+  built (it needs Xcode).
+- [ ] Ingestion, clustering + judge, agents, arXiv matching, briefing audio,
+  illustrations — in build-plan order (see AGENTS.md).
 
 ## How judging maps to the repo
 
@@ -62,14 +69,16 @@ metadata and links to each paper on arXiv; it is not endorsed by arXiv.
 ## How to run
 
 Everything runs through `make` from the repo root. `make` on its own lists every command.
-The backend arrives during the hackathon; today you can run the app and the Widgetbook
-component catalogue.
+Today that is the app (web; macOS with Xcode), sign-in, the API and the Widgetbook
+component catalogue. The story pipeline arrives during the hackathon.
 
 ### What you need
 
 | Tool | For | Install |
 |---|---|---|
 | [Flutter](https://flutter.dev) (stable; built with 3.47) | the app and Widgetbook | `brew install --cask flutter` |
+| [Node](https://nodejs.org) 24 or newer | sign-in (Better Auth) | `brew install node` |
+| [uv](https://docs.astral.sh/uv/) | the API (Python 3.12+) | `brew install uv` |
 | Google Chrome | running in the browser | |
 | [Tilt](https://tilt.dev) | running everything at once | `brew install tilt` |
 | XCode | only for the macOS desktop app | App Store |
@@ -79,17 +88,26 @@ component catalogue.
 ### First run
 
 ```bash
-make setup      # fetch packages, generate Widgetbook's navigation
+make setup      # create .env (with a fresh sign-in secret), fetch every package,
+                # generate Widgetbook's navigation
 ```
+
+`.env` holds your local settings and secrets; git ignores it. `make env` creates it on
+its own, and never overwrites a value you set.
 
 ### Run one thing on its own
 
 ```bash
-make app                    # the app in Chrome
-make app DEVICE=macos       # the macOS desktop app (needs XCode)
+make auth                   # sign-in (Better Auth) on http://localhost:3000
+make api                    # the API on http://localhost:8000 (docs at /docs)
+make app                    # the app in Chrome, on http://localhost:8080
+make app DEVICE=macos       # the macOS desktop app (needs XCode; macOS 14.4 or later)
 make app DEVICE=web-server  # the app as a local web server, no browser opened
 make widgetbook             # the component catalogue in Chrome
 ```
+
+The app needs `auth` and `api` running to sign in; without them it shows the demo and
+says sign-in is unavailable.
 
 These run in the foreground: press `r` to hot reload, `R` to hot restart, `q` to quit.
 
@@ -106,11 +124,26 @@ its terminal to open it):
 |---|---|
 | Tilt dashboard: status, logs, buttons | http://localhost:10350 |
 | The app | http://localhost:8080 |
+| Sign-in (Better Auth) | http://localhost:3000 |
+| The API, with its docs | http://localhost:8000/docs |
 | Widgetbook | http://localhost:8090 |
 
-Saving a file hot-reloads whatever it belongs to. Each part also has a **Hot restart**
-button, and **flutter-checks** runs the analyzer and tests on demand. The first start
-takes a minute or two while Flutter compiles.
+Saving a file hot-reloads whatever it belongs to. Each Flutter part also has a **Hot
+restart** button, and **flutter-checks**, **backend-checks** and **auth-checks** run the
+tests on demand. The first start takes a minute or two while Flutter compiles.
+
+### Signing in locally
+
+- **Without any keys:** `make env` turns on development sign-in, so the sign-in page
+  offers **Email me a sign-in link**. Nothing is emailed: the link appears in the
+  sign-in log (the `auth` resource in Tilt, or the terminal running `make auth`). Open
+  it in the same browser and you're signed in. It works once, for five minutes.
+- **With Google:** create an OAuth client (type *Web application*) in Google Cloud,
+  with the redirect URI `http://localhost:3000/api/auth/callback/google`. Put its id and
+  secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then restart
+  sign-in. **Continue with Google** appears on its own.
+- The first sign-in creates your account and goes to onboarding; afterwards you land on
+  Today. Stories are labelled samples until OSMS starts collecting real ones.
 
 ### Stop and check what's running
 
@@ -118,6 +151,8 @@ takes a minute or two while Flutter compiles.
 make status           # what is running, on its own and in Tilt
 make stop-app         # stop the app, wherever it runs
 make stop-widgetbook  # stop Widgetbook, wherever it runs
+make stop-auth        # stop sign-in, wherever it runs
+make stop-api         # stop the API, wherever it runs
 make stop             # stop everything at once, including Tilt
 ```
 
@@ -126,8 +161,11 @@ A part stopped inside Tilt can be turned back on from the dashboard.
 ### Checks
 
 ```bash
-make check   # analyze and test the app and Widgetbook
-make ci      # start everything with Tilt, wait until it is healthy, then exit
+make check           # everything: the next three in a row
+make check-flutter   # analyze and test the app and Widgetbook
+make check-backend   # lint and test the API
+make check-auth      # type-check and test sign-in
+make ci              # start everything with Tilt, wait until it is healthy, then exit
 ```
 
 ### Other commands
@@ -143,7 +181,9 @@ make clean             # stop everything, remove build output and run files
 Every target wraps a plain command, for example:
 
 ```bash
-cd frontend && flutter run -d chrome
+cd auth && npm start
+cd backend && uv run uvicorn app.main:app --reload
+cd frontend && flutter run -d chrome --web-port=8080
 cd frontend/widgetbook && dart run build_runner build && flutter run -d chrome
 cd frontend && flutter analyze && flutter test
 ```
@@ -157,4 +197,6 @@ cd frontend && flutter analyze && flutter test
   off in this repo. Flutter's own analytics are a per-machine setting; turn them off
   with `flutter --disable-analytics`.
 - **"Port already in use"?** Run `make status`, then `make stop`.
+- **Run the web app on port 8080.** Sign-in only trusts the app origins it knows
+  (`OSMS_APP_ORIGINS`, default `http://localhost:8080`); `make app` uses that port.
 - Run files (process ids, Tilt's empty kube config) live in `.tilt/`, which git ignores.

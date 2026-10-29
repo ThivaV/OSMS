@@ -157,14 +157,14 @@ Widget interestsNormal(BuildContext context) => Frame(
     initialCategories: fx.interests.first.categories.toSet(),
     preview: fx.research.take(3).toList(),
     previewCount: 46,
-    onSave: () {},
+    onSave: (_) {},
     onClose: () {},
   ),
 );
 
 @widgetbook.UseCase(name: 'Empty', type: InterestsEditor, path: '[Sources]')
 Widget interestsEmpty(BuildContext context) =>
-    Frame(maxWidth: _sheetWidth, child: InterestsEditor(onSave: () {}, onClose: () {}));
+    Frame(maxWidth: _sheetWidth, child: InterestsEditor(onSave: (_) {}, onClose: () {}));
 
 @widgetbook.UseCase(name: 'Extreme content', type: InterestsEditor, path: '[Sources]')
 Widget interestsExtreme(BuildContext context) => Frame(
@@ -176,7 +176,7 @@ Widget interestsExtreme(BuildContext context) => Frame(
     flagged: fx.flaggedKeywords,
     preview: [fx.extremePaper, ...fx.research],
     previewCount: 2000,
-    onSave: () {},
+    onSave: (_) {},
     onClose: () {},
   ),
 );

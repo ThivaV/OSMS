@@ -1,9 +1,10 @@
 # OSMS local development: `make up` (or `tilt up`) at the repo root.
 # Tilt UI: http://localhost:10350. Rules: AGENTS.md, "Local development with Tilt".
 #
-# A resource joins when its code exists. The backend ones (milvus, glimmer, api,
-# worker, overnight-agent, backend-checks, eval) arrive with the backend code. SQLite
-# needs none: it is a file in data/.
+# A resource joins when its code exists. Running today: auth (Better Auth), api, app,
+# Widgetbook and the check buttons. Still to come with their code: milvus, glimmer,
+# worker, overnight-agent, eval. SQLite needs no resource: data/osms.db and
+# data/auth.db are files.
 
 load('ext://uibutton', 'cmd_button')
 
@@ -61,6 +62,31 @@ def flutter_web(name, project_dir, port, watch, resource_deps=[]):
         icon_name='restart_alt',
     )
 
+# ── Backend ──────────────────────────────────────────────────────────────────
+
+# Sign-in: Better Auth (Node). Restarts when its code or .env changes.
+local_resource(
+    'auth',
+    serve_cmd='npm start',
+    serve_dir='auth',
+    deps=['auth/src', '.env'],
+    labels=['backend'],
+    links=[link('http://localhost:3000/providers', 'Sign-in methods')],
+    readiness_probe=probe(http_get=http_get_action(port=3000, path='/health'), period_secs=5),
+)
+
+# The API. Uvicorn reloads on code changes; Tilt restarts it when .env changes.
+local_resource(
+    'api',
+    serve_cmd='uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000',
+    serve_dir='backend',
+    deps=['.env'],
+    resource_deps=['auth'],
+    labels=['backend'],
+    links=[link('http://localhost:8000/docs', 'API docs')],
+    readiness_probe=probe(http_get=http_get_action(port=8000, path='/health'), period_secs=5),
+)
+
 # ── Frontend ─────────────────────────────────────────────────────────────────
 
 flutter_web('app', 'frontend', 8080, watch=['frontend/lib'])
@@ -82,11 +108,12 @@ flutter_web(
 
 # ── Checks (buttons) ─────────────────────────────────────────────────────────
 
-local_resource(
-    'flutter-checks',
-    cmd='make check',
-    trigger_mode=TRIGGER_MODE_MANUAL,
-    auto_init=False,
-    allow_parallel=True,
-    labels=['checks'],
-)
+for name, target in [('flutter-checks', 'check-flutter'), ('backend-checks', 'check-backend'), ('auth-checks', 'check-auth')]:
+    local_resource(
+        name,
+        cmd='make ' + target,
+        trigger_mode=TRIGGER_MODE_MANUAL,
+        auto_init=False,
+        allow_parallel=True,
+        labels=['checks'],
+    )

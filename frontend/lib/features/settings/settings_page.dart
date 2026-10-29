@@ -231,13 +231,13 @@ class SettingsPage extends StatelessWidget {
                         padding: const EdgeInsets.all(Space.lg),
                         child: Row(
                           children: [
-                            MonogramAvatar(id: user!.id, name: user!.displayName, size: Sizes.avatarLg),
+                            MonogramAvatar(id: user!.id, name: user!.shownName, size: Sizes.avatarLg),
                             const SizedBox(width: Space.md),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(user!.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.subhead),
+                                  Text(user!.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.subhead),
                                   Text(
                                     'Signed in with Google · ${user!.email}',
                                     maxLines: 2,

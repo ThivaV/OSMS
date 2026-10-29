@@ -227,3 +227,6 @@ data/
 
 # Tilt run files (pid files for Flutter reloads)
 .tilt/
+
+# Node (auth/)
+node_modules/

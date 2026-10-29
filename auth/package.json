@@ -1,0 +1,23 @@
+{
+  "name": "osms-auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OSMS sign-in: Better Auth (Google), sessions and the tokens the Python API checks.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=../.env src/main.ts",
+    "dev": "node --disable-warning=ExperimentalWarning --env-file-if-exists=../.env --watch src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "better-auth": "1.7.14"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2"
+  }
+}

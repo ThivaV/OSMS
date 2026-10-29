@@ -42,13 +42,13 @@ class AccountRow extends StatelessWidget {
 
     return Row(
       children: [
-        MonogramAvatar(id: user.id, name: user.displayName),
+        MonogramAvatar(id: user.id, name: user.shownName),
         const SizedBox(width: Space.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(user.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.label),
+              Text(user.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.label),
               Text(
                 user.email,
                 maxLines: 1,

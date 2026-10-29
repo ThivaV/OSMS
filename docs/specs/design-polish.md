@@ -36,7 +36,8 @@ New palettes, new view modes, real images/audio, API wiring, translations.
 ## Project outputs
 
 - `.env.example`: add the names AGENTS.md already implies (Firebase web
-  config, TTS pick, search API placeholder, arXiv contact) — names only.
+  config at the time, replaced by Better Auth's names later on Oct 29, see
+  `sign-in.md`; TTS pick, search API placeholder, arXiv contact) — names only.
 - `/.github/workflows/check.yml`: `flutter analyze` + `flutter test` (app +
   Widgetbook) and backend `ruff` + `pytest`. What judging calls technical
   depth starts with a green main.

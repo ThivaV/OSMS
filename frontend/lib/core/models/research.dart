@@ -27,6 +27,17 @@ const arxivCategories = [
   ArxivCategory(code: 'astro-ph.IM', name: 'Astrophysics Instrumentation'),
 ];
 
+/// What the reader typed and picked in the interests editor, before it is saved.
+class InterestDraft {
+  const InterestDraft({required this.keywords, this.relatedTerms = const [], this.categories = const []});
+
+  final List<String> keywords;
+  final List<String> relatedTerms;
+  final List<String> categories;
+
+  bool get isEmpty => keywords.isEmpty;
+}
+
 /// A reader's research interest on arXiv: keywords, the related terms they
 /// accepted from the interest agent, and optional categories.
 class ResearchInterest {

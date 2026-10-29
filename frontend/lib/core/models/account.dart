@@ -1,8 +1,10 @@
 import 'item.dart';
+import 'research.dart';
 import 'source.dart';
 
-/// Ways to sign in. All go through Firebase Authentication; OSMS never sees a
-/// password. Hackathon scope is Google only.
+/// Ways to sign in. All go through OSMS's sign-in service (Better Auth); OSMS
+/// never sees a password. Hackathon scope is Google, plus email links in local
+/// development only.
 enum SignInProvider {
   google('Google'),
   apple('Apple'),
@@ -21,6 +23,27 @@ class User {
   final String displayName;
   final String email;
   final String language;
+
+  /// The name to show. Accounts made with an email link have none: use the start
+  /// of the address instead.
+  String get shownName => displayName.trim().isEmpty ? email.split('@').first : displayName;
+}
+
+/// What onboarding collected. Skipping keeps whatever was picked so far.
+class OnboardingPicks {
+  const OnboardingPicks({
+    required this.language,
+    required this.topics,
+    required this.kinds,
+    required this.sourceIds,
+    this.interest,
+  });
+
+  final String language;
+  final Set<String> topics;
+  final Set<ItemKind> kinds;
+  final Set<String> sourceIds;
+  final InterestDraft? interest;
 }
 
 /// An interface language OSMS can summarise in.

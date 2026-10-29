@@ -5,7 +5,8 @@ exists, so the look can be reviewed and changed cheaply.
 
 ## Inputs
 
-Invented fixtures only, in `frontend/widgetbook/lib/fixtures/`: users, sources of every
+Invented fixtures only, in `frontend/lib/sample/` (re-exported by
+`frontend/widgetbook/lib/fixtures/`): users, sources of every
 type, items of every kind (papers included), stories, claims, disagreements, timeline
 events, briefings, topics, onboarding suggestions, research interests and suggested
 terms. Reserved `.example` domains, non-political topics, no real people, accounts or

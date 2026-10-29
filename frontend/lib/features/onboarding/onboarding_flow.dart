@@ -36,7 +36,9 @@ class Onboarding extends StatefulWidget {
   final OnboardingStep initialStep;
   final String initialLanguage;
   final Set<String> initialTopics;
-  final VoidCallback? onDone;
+
+  /// Called with the picks when the reader finishes, or skips the rest.
+  final ValueChanged<OnboardingPicks>? onDone;
 
   @override
   State<Onboarding> createState() => _OnboardingState();
@@ -48,6 +50,7 @@ class _OnboardingState extends State<Onboarding> {
   late final Set<String> _topics = {...widget.initialTopics};
   final Set<ItemKind> _kinds = {ItemKind.article, ItemKind.paper, ItemKind.episode, ItemKind.video, ItemKind.post};
   final Set<String> _unticked = {};
+  InterestDraft? _interest;
 
   List<OnboardingStep> get _steps => [
     OnboardingStep.language,
@@ -57,11 +60,27 @@ class _OnboardingState extends State<Onboarding> {
     OnboardingStep.sources,
   ];
 
+  void _finish() {
+    final research = _topics.any(_researchTopics.contains);
+    widget.onDone?.call(
+      OnboardingPicks(
+        language: _language,
+        topics: {..._topics},
+        kinds: {..._kinds},
+        sourceIds: {
+          for (final s in widget.suggestions)
+            if (_topics.contains(s.topicId) && _kinds.contains(s.kind) && !_unticked.contains(s.source.id)) s.source.id,
+        },
+        interest: research && !(_interest?.isEmpty ?? true) ? _interest : null,
+      ),
+    );
+  }
+
   void _go(int delta) {
     final steps = _steps;
     final next = steps.indexOf(_step).clamp(0, steps.length - 1) + delta;
     if (next >= steps.length) {
-      widget.onDone?.call();
+      _finish();
       return;
     }
     setState(() => _step = steps[next.clamp(0, steps.length - 1)]);
@@ -98,7 +117,7 @@ class _OnboardingState extends State<Onboarding> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Progress(index: index, total: steps.length, onSkip: widget.onDone),
+          _Progress(index: index, total: steps.length, onSkip: widget.onDone == null ? null : _finish),
           const SizedBox(height: Space.xl),
           Text(title, style: t.title),
           const SizedBox(height: Space.sm),
@@ -119,7 +138,14 @@ class _OnboardingState extends State<Onboarding> {
               selected: _kinds,
               onToggle: (k) => setState(() => _kinds.contains(k) ? _kinds.remove(k) : _kinds.add(k)),
             ),
-            OnboardingStep.research => InterestsEditor(embedded: true, suggestedTerms: widget.researchSuggestions),
+            OnboardingStep.research => InterestsEditor(
+              embedded: true,
+              suggestedTerms: widget.researchSuggestions,
+              initialKeywords: _interest?.keywords ?? const [],
+              initialRelated: {...?_interest?.relatedTerms},
+              initialCategories: {...?_interest?.categories},
+              onChanged: (draft) => _interest = draft,
+            ),
             OnboardingStep.sources => _SourceStep(
               topics: widget.topics.where((topic) => _topics.contains(topic.id)).toList(),
               suggestions: widget.suggestions.where((s) => _topics.contains(s.topicId) && _kinds.contains(s.kind)).toList(),

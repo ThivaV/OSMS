@@ -72,6 +72,23 @@ final directories = <_widgetbook.WidgetbookNode>[
         ],
       ),
       _widgetbook.WidgetbookComponent(
+        name: 'SampleBanner',
+        useCases: [
+          _widgetbook.WidgetbookUseCase(
+            name: 'Empty',
+            builder: _osms_widgetbook_use_cases_accounts.sampleBannerEmpty,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Extreme content',
+            builder: _osms_widgetbook_use_cases_accounts.sampleBannerExtreme,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Normal',
+            builder: _osms_widgetbook_use_cases_accounts.sampleBannerNormal,
+          ),
+        ],
+      ),
+      _widgetbook.WidgetbookComponent(
         name: 'SettingsPage',
         useCases: [
           _widgetbook.WidgetbookUseCase(

@@ -1,22 +1,30 @@
 # OSMS developer commands. `make` (or `make help`) lists them.
 # Every target wraps a plain command; see AGENTS.md, "Common commands".
-# Backend targets (api, worker, ...) arrive with the backend code.
+# More backend targets (worker, ...) arrive with their code.
 
 FLUTTER ?= flutter
 DART ?= dart
 TILT ?= tilt
+NPM ?= npm
+UV ?= uv
 
 APP_DIR := frontend
 WIDGETBOOK_DIR := frontend/widgetbook
+AUTH_DIR := auth
+BACKEND_DIR := backend
 
 # Where `make app` runs: chrome (default), macos (needs Xcode) or web-server (no browser).
 DEVICE ?= chrome
+# On the web the app always uses port 8080: sign-in only trusts the origins it knows.
+WEB_PORT := $(if $(filter macos,$(DEVICE)),,--web-port=8080)
 
 # Run files (gitignored): pid files, so `make stop...` can stop what make started,
 # and Tilt's empty kubeconfig.
 RUN_DIR := $(CURDIR)/.tilt
 APP_PID := $(RUN_DIR)/app.pid
 WIDGETBOOK_PID := $(RUN_DIR)/widgetbook.pid
+AUTH_PID := $(RUN_DIR)/auth.pid
+API_PID := $(RUN_DIR)/api.pid
 TILT_PID := $(RUN_DIR)/tilt.pid
 
 # Tilt never sends usage data from this project.
@@ -50,8 +58,9 @@ tilt_disable = if $(tilt_up); then \
   else echo "$(1) (in Tilt): Tilt isn't running"; fi
 
 .DEFAULT_GOAL := help
-.PHONY: help tools setup app widgetbook up ci stop-app stop-widgetbook stop down status \
-  widgetbook-gen widgetbook-build check clean _run-dir _need-tilt
+.PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
+  stop-api stop down status widgetbook-gen widgetbook-build check check-flutter check-backend \
+  check-auth clean _run-dir _need-tilt
 
 help: ## List the commands
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -60,22 +69,41 @@ help: ## List the commands
 
 ##@ Set up
 
-tools: ## Check that Flutter, Tilt and (for DEVICE=macos) Xcode are installed
+tools: ## Check that Flutter, Node, uv, Tilt and (for DEVICE=macos) Xcode are installed
 	@command -v $(FLUTTER) >/dev/null && echo "ok      flutter" || echo "missing flutter: brew install --cask flutter"
+	@command -v node >/dev/null && echo "ok      node" || echo "missing node (24 or newer): brew install node"
+	@command -v $(UV) >/dev/null && echo "ok      uv" || echo "missing uv: brew install uv"
 	@command -v $(TILT) >/dev/null && echo "ok      tilt" || echo "missing tilt: brew install tilt"
 	@xcodebuild -version >/dev/null 2>&1 && echo "ok      Xcode" || echo "missing Xcode: only for DEVICE=macos, from the App Store"
 
-setup: ## Fetch packages for the app and Widgetbook, generate Widgetbook's navigation
+env: ## Create .env from .env.example with a fresh sign-in secret (never overwrites a value)
+	@if [ -f .env ]; then echo ".env: exists, values kept"; else cp .env.example .env && echo ".env: created"; fi
+	@if grep -q '^BETTER_AUTH_SECRET=$$' .env; then \
+	  secret=$$(openssl rand -hex 32) && sed -i.bak "s/^BETTER_AUTH_SECRET=$$/BETTER_AUTH_SECRET=$$secret/" .env && \
+	  rm -f .env.bak && echo ".env: set BETTER_AUTH_SECRET to a new random value (it stays in .env)"; fi
+	@if grep -q '^OSMS_DEV_SIGN_IN=$$' .env; then sed -i.bak 's/^OSMS_DEV_SIGN_IN=$$/OSMS_DEV_SIGN_IN=1/' .env && \
+	  rm -f .env.bak && echo ".env: development sign-in links on (local only)"; fi
+
+setup: env ## Create .env if needed, fetch every package, generate Widgetbook's navigation
 	cd $(APP_DIR) && $(FLUTTER) pub get
 	cd $(WIDGETBOOK_DIR) && $(FLUTTER) pub get && $(DART) run build_runner build
+	cd $(AUTH_DIR) && $(NPM) ci
+	cd $(BACKEND_DIR) && $(UV) sync
 
 ##@ Run one thing on its own
 
 app: _run-dir ## Run the app (DEVICE=chrome, macos or web-server); stop with q or make stop-app
-	cd $(APP_DIR) && $(FLUTTER) run -d $(DEVICE) --pid-file="$(APP_PID)"
+	cd $(APP_DIR) && $(FLUTTER) run -d $(DEVICE) $(WEB_PORT) --pid-file="$(APP_PID)"
 
 widgetbook: _run-dir widgetbook-gen ## Run Widgetbook in Chrome; stop with q or make stop-widgetbook
 	cd $(WIDGETBOOK_DIR) && $(FLUTTER) run -d chrome --pid-file="$(WIDGETBOOK_PID)"
+
+auth: _run-dir ## Run sign-in (Better Auth) on http://localhost:3000; stop with Ctrl+C or make stop-auth
+	@cd $(AUTH_DIR) && sh -c 'echo $$$$ > "$(AUTH_PID)"; exec $(NPM) start'
+
+api: _run-dir ## Run the API on http://localhost:8000, reloading on save; stop with Ctrl+C or make stop-api
+	@cd $(BACKEND_DIR) && sh -c 'echo $$$$ > "$(API_PID)"; \
+	  exec $(UV) run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000'
 
 ##@ Run everything at once (Tilt)
 
@@ -95,9 +123,19 @@ stop-widgetbook: ## Stop Widgetbook, whether it runs on its own or in Tilt
 	@$(call stop_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
 	@$(call tilt_disable,widgetbook,widgetbook widgetbook-reload widgetbook-gen)
 
-stop: ## Stop everything at once: the app, Widgetbook and the whole Tilt session
+stop-auth: ## Stop sign-in, whether it runs on its own or in Tilt
+	@$(call stop_pid,auth (on its own),$(AUTH_PID),npm)
+	@$(call tilt_disable,auth,auth)
+
+stop-api: ## Stop the API, whether it runs on its own or in Tilt
+	@$(call stop_pid,api (on its own),$(API_PID),uvicorn)
+	@$(call tilt_disable,api,api)
+
+stop: ## Stop everything at once: the app, Widgetbook, sign-in, the API and the whole Tilt session
 	@$(call stop_pid,app (on its own),$(APP_PID),flutter)
 	@$(call stop_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
+	@$(call stop_pid,auth (on its own),$(AUTH_PID),npm)
+	@$(call stop_pid,api (on its own),$(API_PID),uvicorn)
 	@$(call stop_pid,Tilt and everything in it,$(TILT_PID),tilt)
 	@rm -f "$(RUN_DIR)"/tilt-*.pid
 	@if command -v $(TILT) >/dev/null; then mkdir -p "$(RUN_DIR)" && : > "$(TILT_KUBECONFIG)" && \
@@ -108,6 +146,8 @@ down: stop
 status: ## Show what is running
 	@$(call show_pid,app (on its own),$(APP_PID),flutter)
 	@$(call show_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
+	@$(call show_pid,auth (on its own),$(AUTH_PID),npm)
+	@$(call show_pid,api (on its own),$(API_PID),uvicorn)
 	@if $(tilt_up); then \
 	  echo "Tilt: running at http://localhost:10350"; \
 	  $(TILT_RUN) get uiresources -o \
@@ -123,9 +163,17 @@ widgetbook-gen: ## Regenerate Widgetbook's navigation after adding or renaming u
 widgetbook-build: widgetbook-gen ## Build Widgetbook as a static site in frontend/widgetbook/build/web
 	cd $(WIDGETBOOK_DIR) && $(FLUTTER) build web --release --no-web-resources-cdn
 
-check: ## Analyze and test the app and Widgetbook (the Tilt "flutter-checks" button runs this)
+check: check-flutter check-backend check-auth ## Analyze and test everything
+
+check-flutter: ## Analyze and test the app and Widgetbook (Tilt's "flutter-checks" button)
 	cd $(APP_DIR) && $(FLUTTER) analyze && $(FLUTTER) test
 	cd $(WIDGETBOOK_DIR) && $(FLUTTER) analyze && $(FLUTTER) test
+
+check-backend: ## Lint and test the API (Tilt's "backend-checks" button)
+	cd $(BACKEND_DIR) && $(UV) run ruff check . && $(UV) run pytest -q
+
+check-auth: ## Type-check and test the sign-in service (Tilt's "auth-checks" button)
+	cd $(AUTH_DIR) && $(NPM) run typecheck && $(NPM) test
 
 clean: stop ## Stop everything, then remove Flutter build output and run files
 	cd $(APP_DIR) && $(FLUTTER) clean

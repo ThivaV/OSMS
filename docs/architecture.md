@@ -30,12 +30,14 @@ flowchart LR
 
     subgraph stores["Storage: files on one disk"]
         sqlite[("SQLite: osms.db")]
+        authdb[("SQLite: auth.db")]
         milvus[("Milvus Lite: vectors")]
         files[("Audio files")]
     end
 
     app["Flutter app: web and macOS"]
-    auth["Firebase Authentication"]
+    auth["Sign-in: Better Auth"]
+    google["Google"]
 
     sources --> worker
     worker --> pipeline
@@ -47,8 +49,11 @@ flowchart LR
     pipeline --> sqlite
     agents --> sqlite
     agents --> files
-    app -->|"HTTPS with sign-in token"| api
-    app --> auth
+    app -->|"HTTPS with a 15-minute token"| api
+    app -->|"sign in, get tokens"| auth
+    auth --> google
+    auth --> authdb
+    api -->|"checks tokens with its public keys"| auth
     api --> sqlite
     api --> milvus
 ```
@@ -57,6 +62,50 @@ Plain code does the heavy, predictable work: fetching, parsing, embedding, vecto
 Meta models make the judgement calls: is this item in scope, is this the same event, what
 are the facts, is this new, is this a real disagreement, what matters today and how to
 say it. A different model checks everything generated before a reader sees it.
+
+## Signing in
+
+Sign-in is OSMS's own open-source service, [Better Auth](https://better-auth.com), in
+`auth/`. It talks to Google, keeps accounts and sessions in `data/auth.db`, and signs
+short-lived tokens. The API never sees a password or a session: only those tokens.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant R as Reader's browser
+    participant A as App, Flutter web
+    participant S as Sign-in, Better Auth
+    participant G as Google
+    participant P as OSMS API
+
+    R->>A: Continue with Google
+    A->>S: start Google sign-in
+    S-->>R: go to Google
+    R->>G: sign in, share email and profile
+    G-->>S: back with a code
+    S->>S: find or create the account, start a session
+    S-->>R: session cookie, HttpOnly, then back to the app
+    A->>S: a token for the API, the cookie goes along
+    S-->>A: JWT, 15 minutes, signed with EdDSA
+    A->>P: GET /me with the token
+    P->>S: public keys, cached
+    P->>P: check signature, issuer, audience, expiry
+    P-->>A: the reader, created on first sign-in
+    A->>A: new reader to onboarding, returning reader to Today
+```
+
+- **Web:** the session cookie belongs to the sign-in service, on the same site as the
+  app; the app never reads it, it only asks for API tokens.
+- **macOS:** the app opens Google in a system sign-in window. When it finishes, the
+  sign-in service sends the window to `osms://auth` with a one-time token (three
+  minutes, used once); the app trades it for a session token, keeps it in the Keychain
+  and sends it as a bearer token.
+- **Local development:** with `OSMS_DEV_SIGN_IN=1`, the sign-in page also offers an
+  email link, printed in the sign-in log instead of emailed. Refused in production.
+- **The API** takes the reader's id only from the token's `sub`, and every query on a
+  reader's data filters by it (rule 7).
+- **Deleting an account:** the API deletes everything OSMS keeps about the reader, then
+  the sign-in service deletes the account and its sessions.
 
 ## How data comes in, is processed and stored
 
@@ -281,6 +330,7 @@ flowchart TB
 | Store | Where | What it holds |
 |---|---|---|
 | SQLite | `data/osms.db` | Users, topics, sources (with their check schedule), subscriptions, research interests and their matches, items, the jobs queue, stories, claims, disagreements, timeline, read state, saved items, briefings, the agents' decision log |
+| SQLite | `data/auth.db` | Sign-in only: Better Auth's accounts, sessions, linked Google accounts and signing keys. Only the sign-in service opens it. |
 | Milvus Lite | `data/milvus/` | One vector record per item, papers included (dense + sparse, with story, language, kind and time), one per story, and one per research interest, for hybrid search |
 | Audio files | `data/audio/` | Briefing audio; podcast audio only until it is transcribed |
 
@@ -473,22 +523,27 @@ yet: check Danish and Tamil before relying on it for those podcasts and briefing
 flowchart LR
     subgraph laptop["Local: make up starts it all in Tilt"]
         l_app["Flutter app: 8080"]
+        l_auth["Sign-in, Better Auth: 3000"]
         l_wb["Widgetbook: 8090"]
         l_api["API: 8000"]
         l_worker["Worker"]
         l_milvus["Milvus Lite server: 19530"]
         l_glimmer["Ollama with Muse Glimmer: 11434"]
-        l_data[("data/: osms.db, milvus, audio")]
+        l_data[("data/: osms.db, auth.db, milvus, audio")]
     end
 
     subgraph cloud["Deployed"]
         web["Flutter web on a static host"]
-        box["One backend machine with a disk: API, worker, agents, Milvus Lite"]
+        box["One backend machine with a disk: sign-in, API, worker, agents, Milvus Lite"]
         meta["Meta Model API: Muse Spark, Muse Wonder, Muse Image, SAM 3.1, Muse Voice Transcribe"]
         baseten["Baseten: Muse Spark Open"]
         glimmer["Muse Glimmer: a GPU on Modal or a hosted provider"]
     end
 
+    l_app --> l_auth
+    l_app --> l_api
+    l_auth --> l_data
+    l_api --> l_auth
     l_api --> l_data
     l_worker --> l_data
     l_api --> l_milvus
