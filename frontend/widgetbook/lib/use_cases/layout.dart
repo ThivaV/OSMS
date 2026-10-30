@@ -214,6 +214,8 @@ class _ShellState extends State<_Shell> {
     final briefing = widget.briefing;
     // Research interests are the signed-in reader's own; the demo has none.
     final interests = _user == null ? const <ResearchInterest>[] : fx.interests;
+    // A reader without sources picks them in onboarding, as in the app.
+    final chooseSources = _user != null && widget.sources.isEmpty ? () => _go(_Screen.onboarding) : null;
     return ThreePaneLayout(
       sidebar: SourcesSidebar(
         topics: fx.topics,
@@ -234,9 +236,12 @@ class _ShellState extends State<_Shell> {
         banner: _user != null
             ? null
             : DemoBanner(
+                samples: true,
                 onCreateAccount: () => _openSignIn(SignInIntent.createAccount),
                 onSignIn: () => _openSignIn(SignInIntent.signIn),
               ),
+        sourceCount: widget.sources.length,
+        onChooseSources: chooseSources,
         onSelect: (s) => setState(() => _selected = s.id),
         onLayoutChanged: (l) => setState(() => _layout = l),
       ),
@@ -245,6 +250,8 @@ class _ShellState extends State<_Shell> {
         briefing: briefing,
         user: _user,
         research: interests.isEmpty ? const [] : fx.research,
+        sourceCount: widget.sources.length,
+        onChooseSources: chooseSources,
         onOpen: (s) => setState(() => _selected = s.id),
         onOpenPaper: (_) {},
       ),

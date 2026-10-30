@@ -69,22 +69,9 @@ final directories = <_widgetbook.WidgetbookNode>[
             name: 'Normal',
             builder: _osms_widgetbook_use_cases_accounts.demoBannerNormal,
           ),
-        ],
-      ),
-      _widgetbook.WidgetbookComponent(
-        name: 'SampleBanner',
-        useCases: [
           _widgetbook.WidgetbookUseCase(
-            name: 'Empty',
-            builder: _osms_widgetbook_use_cases_accounts.sampleBannerEmpty,
-          ),
-          _widgetbook.WidgetbookUseCase(
-            name: 'Extreme content',
-            builder: _osms_widgetbook_use_cases_accounts.sampleBannerExtreme,
-          ),
-          _widgetbook.WidgetbookUseCase(
-            name: 'Normal',
-            builder: _osms_widgetbook_use_cases_accounts.sampleBannerNormal,
+            name: 'Real stories',
+            builder: _osms_widgetbook_use_cases_accounts.demoBannerReal,
           ),
         ],
       ),
@@ -437,6 +424,10 @@ final directories = <_widgetbook.WidgetbookNode>[
           _widgetbook.WidgetbookUseCase(
             name: 'Empty',
             builder: _osms_widgetbook_use_cases_modern.todayEmpty,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Empty, sources followed',
+            builder: _osms_widgetbook_use_cases_modern.todayWaiting,
           ),
           _widgetbook.WidgetbookUseCase(
             name: 'Extreme content',

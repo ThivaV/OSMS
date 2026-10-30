@@ -15,8 +15,6 @@ export type Config = {
   appOrigins: string[];
   /** The `aud` of the tokens the Python API accepts. */
   apiAudience: string;
-  /** Where the browser hands a signed-in session back to the desktop app. */
-  nativeCallback: string;
   google: { clientId: string; clientSecret: string } | null;
   /** Development only: sign in with an emailed link that is printed to the log. */
   devSignIn: boolean;
@@ -49,7 +47,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .map((origin) => origin.trim())
       .filter(Boolean),
     apiAudience: env.OSMS_API_AUDIENCE || "osms-api",
-    nativeCallback: "osms://auth",
     google: clientId && clientSecret ? { clientId, clientSecret } : null,
     devSignIn,
   };

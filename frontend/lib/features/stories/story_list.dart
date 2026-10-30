@@ -5,6 +5,7 @@ import '../../core/theme/tokens.dart';
 import '../../shared/formatting.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/story_card.dart';
+import 'no_stories.dart';
 
 /// Today's stories. The header says how many items they came from, in place
 /// of an unread count.
@@ -17,6 +18,8 @@ class StoryList extends StatelessWidget {
     this.layout = StoryCardLayout.row,
     this.onSelect,
     this.onLayoutChanged,
+    this.sourceCount = 0,
+    this.onChooseSources,
     this.onAddSource,
     this.banner,
     this.bottomInset = Space.xl,
@@ -34,6 +37,12 @@ class StoryList extends StatelessWidget {
   final StoryCardLayout layout;
   final ValueChanged<Story>? onSelect;
   final ValueChanged<StoryCardLayout>? onLayoutChanged;
+
+  /// How many sources the reader follows: what an empty list says.
+  final int sourceCount;
+
+  /// The empty state's buttons; each is hidden without its callback.
+  final VoidCallback? onChooseSources;
   final VoidCallback? onAddSource;
 
   @override
@@ -42,6 +51,7 @@ class StoryList extends StatelessWidget {
     final t = context.text;
     final items = stories.fold(0, (sum, s) => sum + s.itemCount);
     final gap = layout == StoryCardLayout.card ? Space.lg : Space.xxs;
+    final actions = NoStoriesActions(onChooseSources: onChooseSources, onAddSource: onAddSource);
 
     return CustomScrollView(
       slivers: [
@@ -91,13 +101,9 @@ class StoryList extends StatelessWidget {
             sliver: SliverToBoxAdapter(
               child: QuietNote(
                 icon: Icons.inbox_outlined,
-                title: 'Your stories will appear here',
-                body: 'Add a few sources and OSMS groups everything they publish about the same event into one story.',
-                action: FilledButton.icon(
-                  onPressed: onAddSource ?? () {},
-                  icon: const Icon(Icons.add_rounded, size: Sizes.iconMd),
-                  label: const Text('Add a source'),
-                ),
+                title: NoStories.title,
+                body: NoStories.body(sourceCount),
+                action: actions.hasActions ? actions : null,
               ),
             ),
           )

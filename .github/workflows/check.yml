@@ -26,6 +26,17 @@ jobs:
       - run: flutter test
         working-directory: frontend/widgetbook
 
+  # The macOS desktop app compiles (debug, signed to run locally).
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter build macos --debug
+        working-directory: frontend
+
   backend:
     runs-on: ubuntu-latest
     steps:

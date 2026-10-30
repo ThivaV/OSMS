@@ -15,7 +15,7 @@ different model before a reader sees it. AGENTS.md (*Meta models*, *Agents*) has
 ## Outputs
 
 - **A routing table** in `config.py`: for each agent (triage, interest, judge, claims,
-  verifier, editor, writer), its model id, endpoint, reasoning effort and backup.
+  verifier, editor, writer, ask), its model id, endpoint, reasoning effort and backup.
 - **One text client** (OpenAI Python SDK; ask before adding it) for Meta Model API,
   Baseten and the Muse Glimmer server, all OpenAI-compatible.
 - **Media clients** in `backend/app/clients/`: Muse Image (generate with reference
@@ -29,7 +29,7 @@ different model before a reader sees it. AGENTS.md (*Meta models*, *Agents*) has
 - **Escalation:** triage (Muse Glimmer) hands unsure items to Muse Spark; the verifier
   re-runs unsure cases at maximum reasoning effort.
 - **Backups:** judge → Muse Spark; claims and verifier → Muse Spark Open. No backup for
-  agents that see reader data (interest, editor, writer). Every fallback is logged.
+  agents that see reader data (interest, ask, editor, writer). Every fallback is logged.
 - **Illustrations:** prompt from OSMS's own summary, house-style references from
   `backend/seed/visual-style/`, no web references. SAM 3.1 prompts: "a person", "a face",
   "a logo", "text". Flagged → redraw once → drawn art. Labelled "Illustration".
@@ -56,7 +56,7 @@ different model before a reader sees it. AGENTS.md (*Meta models*, *Agents*) has
 
 - Routing: each agent resolves to its configured model; switching one is a config change.
 - Backups: a fake outage on each provider moves only the allowed agents, logs it, and
-  never sends an interest, editor or writer prompt to the backup.
+  never sends an interest, ask, editor or writer prompt to the backup.
 - Escalation: an unsure fake triage verdict reaches the fake Muse Spark.
 - Illustration check: fake SAM results that flag a face → one redraw → drawn art; a clean
   result → crops for every card shape.

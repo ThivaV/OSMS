@@ -9,6 +9,7 @@ import '../../shared/widgets/new_facts_badge.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/story_card.dart';
 import '../../shared/widgets/story_visual.dart';
+import 'no_stories.dart';
 
 /// Today at a glance: a lead story, the briefing and what's new beside it,
 /// then the rest as a grid. Fills the reading pane until a story is opened.
@@ -22,6 +23,8 @@ class TodayOverview extends StatelessWidget {
     this.onOpen,
     this.onOpenPaper,
     this.onPlayBriefing,
+    this.sourceCount = 0,
+    this.onChooseSources,
     this.onAddSource,
     this.banner,
   });
@@ -36,9 +39,15 @@ class TodayOverview extends StatelessWidget {
   final ValueChanged<Story>? onOpen;
   final ValueChanged<Item>? onOpenPaper;
   final VoidCallback? onPlayBriefing;
+
+  /// How many sources the reader follows: what an empty Today says.
+  final int sourceCount;
+
+  /// The empty state's buttons; each is hidden without its callback.
+  final VoidCallback? onChooseSources;
   final VoidCallback? onAddSource;
 
-  /// Above the greeting: the demo notice, or that these are sample stories.
+  /// Above the greeting, e.g. the demo notice while signed out.
   final Widget? banner;
 
   static const _maxWidth = 1200.0;
@@ -70,7 +79,7 @@ class TodayOverview extends StatelessWidget {
             const SizedBox(height: Space.xs),
             Text(
               stories.isEmpty
-                  ? 'No stories yet. Add a few sources to begin.'
+                  ? NoStories.summary(sourceCount)
                   : '${plural(stories.length, 'story', 'stories')} from ${plural(items, 'item')}'
                         '${withNews.isEmpty ? '' : '  ·  ${withNews.length} with new facts'}',
               style: t.body.copyWith(color: c.textSecondary),
@@ -79,6 +88,7 @@ class TodayOverview extends StatelessWidget {
         );
 
         if (stories.isEmpty) {
+          final actions = NoStoriesActions(onChooseSources: onChooseSources, onAddSource: onAddSource);
           return SingleChildScrollView(
             padding: const EdgeInsets.all(Space.xl),
             child: Center(
@@ -100,18 +110,10 @@ class TodayOverview extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Your stories will appear here', style: t.subhead),
+                          Text(NoStories.title, style: t.subhead),
                           const SizedBox(height: Space.xs),
-                          Text(
-                            'Add a few sources and OSMS groups everything they publish about the same event into one story.',
-                            style: t.bodySmall.copyWith(color: c.textSecondary),
-                          ),
-                          const SizedBox(height: Space.lg),
-                          FilledButton.icon(
-                            onPressed: onAddSource ?? () {},
-                            icon: const Icon(Icons.add_rounded, size: Sizes.iconMd),
-                            label: const Text('Add a source'),
-                          ),
+                          Text(NoStories.body(sourceCount), style: t.bodySmall.copyWith(color: c.textSecondary)),
+                          if (actions.hasActions) ...[const SizedBox(height: Space.lg), actions],
                         ],
                       ),
                     ),

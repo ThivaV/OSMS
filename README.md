@@ -24,9 +24,12 @@ Oct 27 – Nov 4, 2026.
   ([Better Auth](https://better-auth.com), in `auth/`) with Google and, in local
   development, email links; the API (`backend/`) checks its short-lived tokens and keeps
   each reader's onboarding picks, research interests and settings; the web app is wired
-  through sign-up, onboarding, Today, Settings and "Delete my account". Stories are still
-  invented samples, labelled as such. The macOS app's sign-in is written but not yet
-  built (it needs Xcode).
+  through sign-up, onboarding, Today, Settings and "Delete my account". Signed in, Today
+  stays empty until OSMS collects your sources' stories; signed out, the demo shows
+  invented sample stories, labelled as such.
+- [x] **The macOS desktop app (Oct 30):** everything the web app has, built and tested in
+  its sandbox against the real sign-in service and API. Sign-in opens your own browser
+  and hands the session back to the app; a native menu bar; a desktop-sized window.
 - [ ] Ingestion, clustering + judge, agents, arXiv matching, briefing audio,
   illustrations — in build-plan order (see AGENTS.md).
 
@@ -101,13 +104,33 @@ its own, and never overwrites a value you set.
 make auth                   # sign-in (Better Auth) on http://localhost:3000
 make api                    # the API on http://localhost:8000 (docs at /docs)
 make app                    # the app in Chrome, on http://localhost:8080
-make app DEVICE=macos       # the macOS desktop app (needs XCode; macOS 14.4 or later)
+make app DEVICE=macos       # the macOS desktop app (needs XCode)
 make app DEVICE=web-server  # the app as a local web server, no browser opened
 make widgetbook             # the component catalogue in Chrome
 ```
 
 The app needs `auth` and `api` running to sign in; without them it shows the demo and
 says sign-in is unavailable.
+
+### The macOS app
+
+It needs [Xcode](https://apps.apple.com/app/xcode/id497799835) (the full app, not only
+the command line tools) and runs on macOS 12 or later.
+
+```bash
+make up                     # sign-in and the API (and the web app)
+make app DEVICE=macos       # then the desktop app; or the app-macos button in Tilt
+make build-macos            # a release build: frontend/build/macos/Build/Products/Release/OSMS.app
+make test-macos             # with make up running: the real app, end to end (opens a window)
+```
+
+On the desktop, sign in with **Continue with Google**: it opens your default browser,
+and when you're done the browser tab says so and OSMS comes back with you signed in.
+Email links work in the web app only. If Google says the app is blocked, add your Google
+account as a test user on the OAuth consent screen.
+
+Builds are signed to run on this Mac. Sharing the app with others needs an Apple
+Developer ID and notarisation.
 
 These run in the foreground: press `r` to hot reload, `R` to hot restart, `q` to quit.
 
@@ -143,7 +166,9 @@ tests on demand. The first start takes a minute or two while Flutter compiles.
   secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then restart
   sign-in. **Continue with Google** appears on its own.
 - The first sign-in creates your account and goes to onboarding; afterwards you land on
-  Today. Stories are labelled samples until OSMS starts collecting real ones.
+  Today. It stays empty until OSMS has collected stories from your sources; with no
+  sources, it offers **Choose topics and sources**. Signed out, the demo's stories are
+  labelled samples until OSMS starts collecting real ones.
 
 ### Stop and check what's running
 

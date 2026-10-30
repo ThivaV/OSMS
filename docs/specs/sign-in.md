@@ -23,8 +23,10 @@ research interests. "Delete my account" removes everything. Open source througho
   `PUT /me/interests`, `PATCH /me/settings`, `DELETE /me`, `GET /health`. Readers and
   their picks in `data/osms.db` (Alembic migration `0001`).
 - **`frontend/`**: the real app. Session and routing (Riverpod, go_router), sign-in,
-  onboarding, Today, Settings, research interests, "What OSMS keeps". Sample stories
-  under a `SampleBanner` until real stories exist.
+  onboarding, Today, Settings, research interests, "What OSMS keeps". Signed in, only
+  the reader's own stories: an empty Today until OSMS collects them, which with no
+  sources offers onboarding again to choose some. Signed out, the demo's invented sample
+  stories, under a banner that says so.
 
 ## Rules
 
@@ -33,8 +35,11 @@ research interests. "Delete my account" removes everything. Open source througho
 - Web sessions are HttpOnly cookies on the auth service; the app never reads them. The
   macOS session token lives in the Keychain (legacy keychain, so no Keychain Sharing
   entitlement or provisioning profile).
-- The macOS hand-off token is one-time, three minutes, stored hashed, and minted only by
-  the server after a real sign-in.
+- macOS signs in in the reader's default browser and listens on the loopback interface
+  for the answer (RFC 8252). The hand-off token is one-time, three minutes, stored
+  hashed, minted only by the server after a real sign-in, sent only to
+  `http://127.0.0.1:<port>/callback?state=<random>` (that exact shape), and only for a
+  sign-in the same browser started (flow cookie). The app accepts only its own state.
 - Development sign-in (`OSMS_DEV_SIGN_IN=1`) is refused in production; its links go to
   the local log, and the address never does.
 - CORS and redirects only for `OSMS_APP_ORIGINS`. Inputs are strict: known values,
@@ -46,19 +51,32 @@ research interests. "Delete my account" removes everything. Open source througho
 
 - `make check-auth`: the real auth server on an in-memory database. It covers which
   methods are on, CORS, API tokens verified against the published keys, signed bearer
-  tokens only, the one-time desktop hand-off, no client-minted hand-off tokens, and
-  unsafe settings refused.
+  tokens only, the desktop hand-off (only to the app's loopback address, only for a
+  sign-in the browser started, once), no client-minted hand-off tokens, and unsafe
+  settings refused.
 - `make check-backend`: any token that isn't valid is refused (wrong audience, issuer,
   key or algorithm, expired, `none`); first sign-in creates the reader; onboarding,
   settings and interests saved and validated; one reader never sees another's data;
   deletion removes everything the reader owns and keeps shared sources.
 - `make check-flutter`: the app's flows against fake clients. They cover the demo
-  signed out, first sign-in to onboarding to Today, skipping onboarding, a returning
-  reader, the dev email link, sign-in down, and "Delete my account".
+  signed out (labelled samples), first sign-in to onboarding to an empty Today with no
+  samples, skipping onboarding and choosing sources again from the empty Today, a
+  returning reader, the dev email link, sign-in down, and "Delete my account". The macOS sign-in
+  client against a real loopback listener and a fake browser: success, a stranger's
+  answer refused, cancelled, a forged token, no answer, no browser, sign-out. The macOS
+  menu bar through its platform channel.
+- `make test-macos` (with `make up` running): the real macOS app in its sandbox reaches
+  sign-in and the API, keeps a session in the Keychain, listens on 127.0.0.1, signs in
+  through the real desktop hand-off (a development session stands in for Google), then
+  onboards, reaches an empty Today and Settings, and deletes its account. Saves
+  screenshots.
 - By hand: `make up`, open http://localhost:8080, **Create an account**, then
-  **Email me a sign-in link** and open the link from the `auth` log.
+  **Email me a sign-in link** and open the link from the `auth` log. On macOS, **Continue
+  with Google** in the app.
 
 ## Not yet
 
-- Building and checking the macOS app (needs Xcode). Google keys and a consent screen
-  that admits any Google account. Real stories in place of the samples.
+- Google's own page in the macOS round trip, checked by hand. Developer ID signing and
+  notarisation, to share the app. A consent screen that admits any Google account. Real
+  stories, in the empty Today and in place of the demo's samples. Editing picks from
+  settings (onboarding again for now).

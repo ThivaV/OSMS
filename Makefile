@@ -59,8 +59,8 @@ tilt_disable = if $(tilt_up); then \
 
 .DEFAULT_GOAL := help
 .PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
-  stop-api stop down status widgetbook-gen widgetbook-build check check-flutter check-backend \
-  check-auth clean _run-dir _need-tilt
+  stop-api stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
+  check-flutter check-backend check-auth clean _run-dir _need-tilt
 
 help: ## List the commands
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -115,9 +115,9 @@ ci: _need-tilt ## Start everything with Tilt, wait until it is all healthy, then
 
 ##@ Stop and status
 
-stop-app: ## Stop the app, whether it runs on its own or in Tilt
+stop-app: ## Stop the app (web or macOS), whether it runs on its own or in Tilt
 	@$(call stop_pid,app (on its own),$(APP_PID),flutter)
-	@$(call tilt_disable,app,app app-reload)
+	@$(call tilt_disable,app,app app-reload app-macos app-macos-reload)
 
 stop-widgetbook: ## Stop Widgetbook, whether it runs on its own or in Tilt
 	@$(call stop_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
@@ -162,6 +162,16 @@ widgetbook-gen: ## Regenerate Widgetbook's navigation after adding or renaming u
 
 widgetbook-build: widgetbook-gen ## Build Widgetbook as a static site in frontend/widgetbook/build/web
 	cd $(WIDGETBOOK_DIR) && $(FLUTTER) build web --release --no-web-resources-cdn
+
+build-macos: ## Build the macOS app (needs Xcode): frontend/build/macos/Build/Products/Release/OSMS.app
+	cd $(APP_DIR) && $(FLUTTER) build macos --release
+
+# How test-macos reads the sign-in log: Tilt's by default.
+AUTH_LOG ?= env KUBECONFIG=$(TILT_KUBECONFIG) $(TILT) logs auth
+
+test-macos: ## With `make up` running: the real macOS app against sign-in and the API (opens a window)
+	@cookie=$$(AUTH_LOG="$(AUTH_LOG)" sh $(AUTH_DIR)/scripts/dev-session.sh macos-test@users.example) && \
+	  cd $(APP_DIR) && $(FLUTTER) test integration_test -d macos --dart-define=OSMS_TEST_SESSION_COOKIE="$$cookie"
 
 check: check-flutter check-backend check-auth ## Analyze and test everything
 

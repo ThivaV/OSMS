@@ -99,16 +99,65 @@ describe("auth service", () => {
     assert.equal(await unsigned.json(), null);
   });
 
-  it("hands a signed-in browser session to the desktop app once", async () => {
-    const out = await fetch(`${base}/native/done`, { redirect: "manual" });
-    assert.equal(out.headers.get("location"), "osms://auth?error=not_signed_in");
+  // The desktop app waits on the loopback interface (RFC 8252); this is the address it sends.
+  const APP_RETURN = "http://127.0.0.1:53682/callback?state=Zm9vYmFyYmF6cXV4cXV1eA";
+  const q = (returnTo: string) => `return_to=${encodeURIComponent(returnTo)}`;
+  const cookiesFrom = (res: Response) => res.headers.getSetCookie().map((c) => c.split(";")[0]);
 
+  it("sends the desktop app's sign-in only back to its loopback address", async () => {
+    for (const address of [
+      "https://evil.example/callback?state=Zm9vYmFyYmF6cXV4cXV1eA",
+      "http://127.0.0.1.evil.example:53682/callback?state=Zm9vYmFyYmF6cXV4cXV1eA",
+      "http://localhost:53682/callback?state=Zm9vYmFyYmF6cXV4cXV1eA",
+      "http://127.0.0.1:53682/elsewhere?state=Zm9vYmFyYmF6cXV4cXV1eA",
+      "http://127.0.0.1:53682/callback?state=short",
+      "http://127.0.0.1:80/callback?state=Zm9vYmFyYmF6cXV4cXV1eA",
+      `${APP_RETURN}&next=https://evil.example`,
+    ]) {
+      for (const route of ["/native/sign-in?provider=google&", "/native/done?", "/native/error?error=x&"]) {
+        const res = await fetch(`${base}${route}${q(address)}`, { redirect: "manual" });
+        assert.equal(res.status, 400, `${route} ${address}`);
+      }
+    }
+  });
+
+  it("starts Google sign-in for the desktop app in the reader's browser", async () => {
+    const res = await fetch(`${base}/native/sign-in?provider=google&${q(APP_RETURN)}`, { redirect: "manual" });
+    assert.equal(res.status, 302);
+    const google = new URL(res.headers.get("location") ?? "");
+    assert.equal(google.host, "accounts.google.com");
+    assert.equal(google.searchParams.get("redirect_uri"), "http://localhost:3000/api/auth/callback/google");
+    assert.ok(cookiesFrom(res).some((c) => c.startsWith("osms_native_flow=")), "the flow is tied to this browser");
+  });
+
+  it("never hands a session to a sign-in this browser didn't start", async () => {
+    const { cookie } = await signIn("mallory@users.example");
+    // Signed in, but no flow cookie: as if another site sent the browser here.
+    const res = await fetch(`${base}/native/done?${q(APP_RETURN)}`, { headers: { Cookie: cookie }, redirect: "manual" });
+    const back = new URL(res.headers.get("location") ?? "");
+    assert.equal(back.searchParams.get("error"), "expired");
+    assert.equal(back.searchParams.get("token"), null);
+  });
+
+  it("hands a signed-in browser session to the desktop app once", async () => {
+    const started = await fetch(`${base}/native/sign-in?provider=google&${q(APP_RETURN)}`, { redirect: "manual" });
+    const flow = cookiesFrom(started).find((c) => c.startsWith("osms_native_flow="))!;
+
+    const notYet = await fetch(`${base}/native/done?${q(APP_RETURN)}`, { headers: { Cookie: flow }, redirect: "manual" });
+    assert.equal(new URL(notYet.headers.get("location") ?? "").searchParams.get("error"), "not_signed_in");
+
+    // Google would sign the browser in here; the development link does the same.
     const { cookie } = await signIn("linus@users.example");
-    const done = await fetch(`${base}/native/done`, { headers: { Cookie: cookie }, redirect: "manual" });
-    const location = new URL(done.headers.get("location") ?? "");
-    assert.equal(`${location.protocol}//${location.host}`, "osms://auth");
-    const token = location.searchParams.get("token");
+    const done = await fetch(`${base}/native/done?${q(APP_RETURN)}`, {
+      headers: { Cookie: `${cookie}; ${flow}` },
+      redirect: "manual",
+    });
+    const back = new URL(done.headers.get("location") ?? "");
+    assert.equal(`${back.origin}${back.pathname}`, "http://127.0.0.1:53682/callback");
+    assert.equal(back.searchParams.get("state"), "Zm9vYmFyYmF6cXV4cXV1eA", "the app's state comes back untouched");
+    const token = back.searchParams.get("token");
     assert.ok(token);
+    assert.ok(cookiesFrom(done).includes("osms_native_flow="), "the flow cookie is cleared");
 
     const trade = () =>
       fetch(`${base}/api/auth/one-time-token/verify`, {
@@ -120,6 +169,11 @@ describe("auth service", () => {
     assert.equal(first.status, 200);
     assert.ok(first.headers.get("set-auth-token"));
     assert.notEqual((await trade()).status, 200, "a one-time token works once");
+  });
+
+  it("passes a failed Google sign-in back to the desktop app", async () => {
+    const res = await fetch(`${base}/native/error?error=access_denied&${q(APP_RETURN)}`, { redirect: "manual" });
+    assert.equal(new URL(res.headers.get("location") ?? "").searchParams.get("error"), "access_denied");
   });
 
   it("never mints a hand-off token for a client request", async () => {

@@ -97,7 +97,7 @@ class SourcesSidebar extends StatelessWidget {
             children: [
               _NavRow(icon: Icons.wb_sunny_outlined, label: 'Today', selected: selected == 'today'),
               _NavRow(icon: Icons.bookmark_outline_rounded, label: 'Saved', selected: selected == 'saved'),
-              _Heading('Topics'),
+              if (topics.isNotEmpty) _Heading('Topics'),
               for (final topic in topics)
                 _NavRow(icon: Icons.tag_rounded, label: topic.name, selected: selected == topic.id),
               if (interests.isNotEmpty) ...[

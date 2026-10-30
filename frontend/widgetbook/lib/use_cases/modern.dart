@@ -27,8 +27,15 @@ Widget todayNormal(BuildContext context) =>
       ),
     );
 
+/// A new reader with no sources yet: how to choose some.
 @widgetbook.UseCase(name: 'Empty', type: TodayOverview, path: '[Story]')
-Widget todayEmpty(BuildContext context) => const Material(child: TodayOverview(stories: []));
+Widget todayEmpty(BuildContext context) =>
+    Material(child: TodayOverview(stories: const [], user: fx.user, onChooseSources: () {}, onAddSource: () {}));
+
+/// A new reader whose sources haven't been collected yet.
+@widgetbook.UseCase(name: 'Empty, sources followed', type: TodayOverview, path: '[Story]')
+Widget todayWaiting(BuildContext context) =>
+    Material(child: TodayOverview(stories: const [], user: fx.user, sourceCount: fx.followedSources.length));
 
 @widgetbook.UseCase(name: 'Extreme content', type: TodayOverview, path: '[Story]')
 Widget todayExtreme(BuildContext context) => Material(

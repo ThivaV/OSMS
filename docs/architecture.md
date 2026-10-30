@@ -96,10 +96,11 @@ sequenceDiagram
 
 - **Web:** the session cookie belongs to the sign-in service, on the same site as the
   app; the app never reads it, it only asks for API tokens.
-- **macOS:** the app opens Google in a system sign-in window. When it finishes, the
-  sign-in service sends the window to `osms://auth` with a one-time token (three
-  minutes, used once); the app trades it for a session token, keeps it in the Keychain
-  and sends it as a bearer token.
+- **macOS:** the app opens Google in the reader's default browser and listens on
+  `127.0.0.1` for the answer (the loopback redirect of RFC 8252). The sign-in service
+  sends the browser back there with a one-time token (three minutes, used once, only for
+  a sign-in that browser started); the app checks its random state, trades the token
+  for a session token, keeps it in the Keychain and sends it as a bearer token.
 - **Local development:** with `OSMS_DEV_SIGN_IN=1`, the sign-in page also offers an
   email link, printed in the sign-in log instead of emailed. Refused in production.
 - **The API** takes the reader's id only from the token's `sub`, and every query on a
@@ -124,7 +125,7 @@ flowchart TB
 
     subgraph processing["2. Processing"]
         clean["Clean: strip trackers, sanitise HTML, detect language"]
-        triage["Triage agent, Muse Glimmer: in scope? noise? language and kind"]
+        triage["Triage agent, Muse Glimmer: in scope? noise? language, kind, names"]
         dropped["Out of scope or noise: dropped, reason logged"]
         embed["Embed: BGE-M3, dense and sparse"]
         search["Hybrid search for candidate stories"]
@@ -132,14 +133,14 @@ flowchart TB
         assign["Join a story or start one"]
         claims["Claims agent: facts with quotes (Muse Spark)"]
         verify["Verifier agent: new? real disagreement?"]
-        update["Update the story: what's new, disagreements, timeline"]
+        update["Update the story's dated history: what's new, disagreements, corrections"]
     end
 
     subgraph stored["3. Stored"]
         db_sources[("SQLite: sources, subscriptions")]
         db_interests[("SQLite: research interests, matches")]
         db_items[("SQLite: items")]
-        db_stories[("SQLite: stories, claims, disagreements, timeline")]
+        db_stories[("SQLite: stories, claims and their history, disagreements, timeline")]
         vec[("Milvus Lite: item and story vectors")]
         tmp[("Temporary audio, deleted after transcription")]
     end
@@ -163,8 +164,8 @@ flowchart TB
     embed --> vec
     embed --> search
     search --> vec
-    search -->|"clear match or clear miss"| assign
-    search -->|"borderline"| judge
+    search -->|"close in meaning, time and names, or a clear miss"| assign
+    search -->|"similar, not clearly the same"| judge
     judge --> assign
     assign --> claims
     claims --> verify
@@ -305,23 +306,37 @@ flowchart TB
 - **Clean:** strip tracking pixels and unsubscribe links, sanitise HTML, detect language.
 - **Triage:** the triage agent (Muse Glimmer, a small open model) checks every item: is it
   inside rule 3, is it noise (ads, giveaways, sponsored posts), are its language and kind
-  right? What it is unsure about goes to Muse Spark. Dropped items keep their reason in
-  the decision log.
+  right, and which names does it mention (companies, products, places)? What it is
+  unsure about goes to Muse Spark. Dropped items keep their reason in the decision log.
+- **Save first:** an item is stored before it is embedded, and indexing is a job that
+  retries, so a Milvus Lite outage never loses an item.
 - **Embed** each item with BGE-M3, which gives a dense and a sparse vector, so a Danish
   and an English article about the same event land close together.
 - **Find candidates** with a hybrid (dense + sparse) search in Milvus Lite.
-- **Decide:** clear matches join the story, clear misses start a new one, and borderline
-  pairs go to the **judge agent** (Muse Spark Open). The author sets the thresholds,
-  using the eval.
+- **Decide:** an item joins a story with no model only when it is close in meaning, close
+  in time and names the same things (from triage). Clear misses start a new story. Any
+  other similar pair goes to the **judge agent** (Muse Spark Open), and when the judge is
+  unsure they stay apart: an unneeded split is easier to repair than a wrong merge.
+  Without names (triage unsure or cut), the pair goes to the judge. The author sets the
+  thresholds and the time window, using the eval.
 - **Extract claims** from articles and episodes, and from papers' titles and abstracts
   once the eval has paper labels (posts and videos join stories as context, never as
-  facts). Each claim keeps the quote it rests on, which is what the
-  app's source chips cite.
+  facts). Each claim keeps the quote it rests on, in the source's own language, which is
+  what the app's source chips cite; in a story written in another language, the app
+  shows a translation under the quote, labelled "Translated by OSMS". Each claim also
+  records the model and prompt version that produced it.
 - **Verify:** the verifier agent re-checks every candidate "new fact" and disagreement
   against the quotes, and drops the ones that don't hold.
-- **Update the story:** what's new since each reader last looked, where sources
-  disagree, and the timeline. The writer agent rewrites the story's title and cited
-  summary when its verified claims change.
+- **Update the story:** nothing is overwritten. Each change to a claim or summary is a
+  dated entry in the story's history (added, corrected, withdrawn) that keeps the old
+  value, and what's new since each reader last looked, where sources disagree and the
+  timeline are all read from it. A corrected article shows in the timeline as
+  "Corrected", the old fact struck through. The writer agent rewrites the story's title
+  and cited summary when its verified claims change.
+- **Ask this story:** a reader's typed question goes to the ask agent with that story's
+  verified claims and nothing else. The answer cites them, or says "Not reported yet";
+  code drops any sentence that doesn't cite one. The question and the answer are never
+  stored or logged.
 - **Illustrate:** when a story first has three sources, Muse Image draws its
   illustration, and SAM 3.1 checks and crops it (see *Meta models*).
 
@@ -329,7 +344,7 @@ flowchart TB
 
 | Store | Where | What it holds |
 |---|---|---|
-| SQLite | `data/osms.db` | Users, topics, sources (with their check schedule), subscriptions, research interests and their matches, items, the jobs queue, stories, claims, disagreements, timeline, read state, saved items, briefings, the agents' decision log |
+| SQLite | `data/osms.db` | Users, topics, sources (with their check schedule), subscriptions, research interests and their matches, items, the jobs queue, stories, claims and their dated history, disagreements, timeline, read state, saved items, briefings, the agents' decision log |
 | SQLite | `data/auth.db` | Sign-in only: Better Auth's accounts, sessions, linked Google accounts and signing keys. Only the sign-in service opens it. |
 | Milvus Lite | `data/milvus/` | One vector record per item, papers included (dense + sparse, with story, language, kind and time), one per story, and one per research interest, for hybrid search |
 | Audio files | `data/audio/` | Briefing audio; podcast audio only until it is transcribed |
@@ -380,18 +395,19 @@ sequenceDiagram
 
 | Agent | Model | Job | Technique |
 |---|---|---|---|
-| Triage | Muse Glimmer 30B, local | Every new item: in scope, noise, language and kind | Always-on local agent; Muse Spark decides what it's unsure about |
+| Triage | Muse Glimmer 30B, local | Every new item: in scope, noise, language, kind and the names it mentions | Always-on local agent; Muse Spark decides what it's unsure about |
 | Interest | Muse Spark | Research keywords → related terms, categories and a rule-3 check; yes or no on borderline papers | Structured output; the reader confirms the plan |
 | Judge | Muse Spark Open, on Baseten | Same event or not, for borderline pairs | One call, a structured verdict with a reason; Muse Spark as backup |
 | Claims | Muse Spark | Facts from an article, episode or paper, each with its quote | Structured output; Muse Spark Open as backup |
 | Verifier | Muse Spark | Keeps only real new facts and real disagreements | Critic: a second model pass checks the first; unsure cases at maximum reasoning |
 | Editor | Muse Spark, or Muse Wonder if the task set favours it | The overnight agent: what changed meaningfully, ranking per reader, what each briefing covers | Orchestrator: plans, delegates, calls tools |
 | Writer | Muse Spark | Story titles and cited summaries; the briefing script in English, Danish or Tamil | Draft, editor review, revise |
+| Ask | Muse Spark | A reader's typed question about one story, answered from its verified claims only, or "Not reported yet" | Structured output citing claim ids; no tools, no web, no backup |
 
 The triage, judge, claims and verifier agents run as items arrive, so the app always
 shows verified facts. The interest agent runs when a reader edits their research
 interests, and on a few borderline papers after each arXiv update. The editor and the
-briefing run overnight.
+briefing run overnight. The ask agent runs when a reader asks a story a question.
 
 ### How they work
 
@@ -402,13 +418,16 @@ briefing run overnight.
 - **Bounded.** Each run has a step limit, a token budget and a time limit.
 - **State, not chat history.** Agents read a story's claims and timeline from SQLite.
   About readers they see only language, topics, kinds and what they've read; the interest
-  agent sees only the keywords being edited, never who typed them.
+  agent sees only the keywords being edited, never who typed them, and the ask agent
+  only the question and the story's verified claims, never who asked.
 - **Guardrails** (frozen; only the author changes them):
   - Text from sources is quoted data, never instructions: anyone can write a post saying
     "ignore your instructions".
   - Only the fetcher reaches the web, and write tools only touch OSMS's own tables.
   - Prompts carry no personal data beyond a reader's language, topics and kinds.
-    Research keywords count as topics, and are sent without saying whose they are.
+    Research keywords count as topics, and are sent without saying whose they are. So
+    does a typed question to a story, and neither the question nor its answer is stored
+    or logged.
   - Briefings stay inside rule 3 and cite every fact.
   - No model call searches the web: Muse Spark and Muse Image could, but OSMS never
     turns it on, so agents know only what the sources delivered.
@@ -485,7 +504,7 @@ flowchart LR
 
 | Model | Runs on | What OSMS uses it for |
 |---|---|---|
-| **Muse Spark 1.3** | Meta Model API | The interest, claims, verifier, editor and writer agents; what triage is unsure about |
+| **Muse Spark 1.3** | Meta Model API | The interest, claims, verifier, editor, writer and ask agents; what triage is unsure about |
 | **Muse Spark Open** | Open weights on Baseten | The judge: same event or not? Backup for claims and verifier |
 | **Muse Glimmer 30B** | Open weights: Ollama locally; a GPU or hosted provider when deployed | The triage agent, on every item |
 | **Muse Wonder** | Meta Model API | The editor, if the agent task set favours it; Harness²'s proposer |

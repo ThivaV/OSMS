@@ -2,137 +2,39 @@
 // sign-in and API clients (no network). The real services have their own tests.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
 import 'package:osms/app.dart';
-import 'package:osms/core/api/api_client.dart';
-import 'package:osms/core/api/auth_client.dart';
 import 'package:osms/core/api/json.dart';
 import 'package:osms/core/models/models.dart';
 import 'package:osms/core/session/account.dart';
 import 'package:osms/core/session/session.dart';
 import 'package:osms/core/theme/appearance.dart';
+import 'package:osms/features/briefing/briefing_player.dart';
+import 'package:osms/sample/sample_content.dart' as sample;
 
-class FakeAuth implements AuthClient {
-  FakeAuth({this.available = true, this.signedIn = false});
+import 'support/fakes.dart';
 
-  bool available;
-  bool signedIn;
-  bool deleted = false;
-  String? linkSentTo;
-
-  @override
-  Future<AuthProviders> providers() async =>
-      available ? const AuthProviders(google: true, emailLink: true) : throw const AuthException('Sign-in is down.');
-
-  @override
-  Future<AuthUser?> currentUser() async =>
-      signedIn ? const AuthUser(id: 'ada', email: 'ada@users.example', name: 'Ada Rowan') : null;
-
-  @override
-  Future<String?> apiToken({bool refresh = false}) async => signedIn ? 'token' : null;
-
-  @override
-  Future<bool> signInWithGoogle() async => signedIn = true; // Like the desktop: back signed in.
-
-  @override
-  Future<void> sendEmailLink(String email) async => linkSentTo = email;
-
-  @override
-  Future<void> signOut() async => signedIn = false;
-
-  @override
-  Future<void> deleteAccount() async {
-    deleted = true;
-    signedIn = false;
+/// Signed in, OSMS shows only the reader's own stories: no invented ones, no sample briefing.
+void expectNoSamples() {
+  for (final story in sample.stories) {
+    expect(find.text(story.title), findsNothing, reason: 'sample story "${story.title}"');
   }
+  expect(find.byType(BriefingFloatingBar), findsNothing);
+  expect(find.byType(BriefingMiniPlayer), findsNothing);
 }
-
-class FakeApi extends ApiClient {
-  FakeApi(this.fakeAuth, {this.onboarded = false}) : super(Uri.parse('http://api.test'), fakeAuth);
-
-  final FakeAuth fakeAuth;
-  bool onboarded;
-  bool deleted = false;
-  OnboardingPicks? picks;
-  Appearance? appearance;
-
-  static const topics = [
-    Topic(id: 'ai-research', name: 'AI research', description: 'Models, papers, open weights'),
-    Topic(id: 'startups', name: 'Startups and product', description: 'Funding, launches'),
-  ];
-  static const arxiv = Source(id: '1', name: 'arXiv cs.CL', type: SourceType.arxiv, language: 'en');
-
-  Account get _account => Account(
-    user: const User(id: 'ada', displayName: 'Ada Rowan', email: 'ada@users.example', language: 'en'),
-    topics: onboarded ? [topics.first] : const [],
-    subscriptions: onboarded ? const [arxiv] : const [],
-    appearance: appearance,
-    onboarded: onboarded,
-  );
-
-  @override
-  Future<OnboardingOptions> onboardingOptions() async => const OnboardingOptions(
-    languages: [AppLanguage(code: 'en', nativeName: 'English', englishName: 'English')],
-    topics: topics,
-    suggestions: [SourceSuggestion(source: arxiv, topicId: 'ai-research', kind: ItemKind.paper)],
-  );
-
-  @override
-  Future<Account> me() async => _account;
-
-  @override
-  Future<Account> completeOnboarding(OnboardingPicks picks) async {
-    this.picks = picks;
-    onboarded = true;
-    return _account;
-  }
-
-  @override
-  Future<Account> saveSettings({appearance, language, defaultLayout}) async {
-    this.appearance = appearance ?? this.appearance;
-    return _account;
-  }
-
-  @override
-  Future<void> deleteMe() async => deleted = true;
-}
-
-Future<(FakeAuth, FakeApi)> start(WidgetTester tester, {FakeAuth? auth, bool onboarded = false}) async {
-  tester.view.physicalSize = const Size(1440, 900);
-  tester.view.devicePixelRatio = 1;
-  addTearDown(tester.view.reset);
-  final fakeAuth = auth ?? FakeAuth();
-  final fakeApi = FakeApi(fakeAuth, onboarded: onboarded);
-  await tester.pumpWidget(
-    ProviderScope(
-      overrides: [authClientProvider.overrideWithValue(fakeAuth), apiClientProvider.overrideWithValue(fakeApi)],
-      child: const OsmsApp(),
-    ),
-  );
-  await tester.pumpAndSettle();
-  return (fakeAuth, fakeApi);
-}
-
-Future<void> tapText(WidgetTester tester, String text) async {
-  await tester.tap(find.text(text).first);
-  await tester.pumpAndSettle();
-}
-
-void go(WidgetTester tester, String path) =>
-    GoRouter.of(tester.element(find.byType(Navigator).first)).go(path);
 
 void main() {
   testWidgets('signed out: the demo, labelled, with a way to sign in', (tester) async {
     await start(tester);
     expect(find.text('You’re reading the demo'), findsWidgets);
+    expect(find.textContaining('Its stories are invented samples'), findsWidgets);
+    expect(find.text(sample.stories.first.title), findsWidgets);
     await tapText(tester, 'Create an account');
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Email me a sign-in link'), findsOneWidget);
   });
 
-  testWidgets('first sign-in goes to onboarding, then Today with sample stories', (tester) async {
+  testWidgets('first sign-in goes to onboarding, then an empty Today waiting for its sources', (tester) async {
     final (auth, api) = await start(tester);
     await tapText(tester, 'Create an account');
     await tapText(tester, 'Continue with Google');
@@ -152,22 +54,39 @@ void main() {
     expect(api.picks!.topics, {'ai-research'});
     expect(api.picks!.sourceIds, {'1'});
     expect(api.picks!.interest!.keywords, ['retrieval-augmented generation']);
-    expect(find.text('These are sample stories'), findsWidgets);
+    expect(find.text('Your stories will appear here'), findsWidgets);
+    expect(find.text('The first stories from your source appear here once OSMS has collected them.'), findsWidgets);
     expect(find.text('You’re reading the demo'), findsNothing);
+    expectNoSamples();
   });
 
-  testWidgets('skipping onboarding still saves the picks so far', (tester) async {
+  testWidgets('skipping onboarding saves the picks so far; with no sources, Today offers them again', (tester) async {
     final (_, api) = await start(tester, auth: FakeAuth(signedIn: true));
     expect(find.text('Which language should OSMS write in?'), findsOneWidget);
     await tapText(tester, 'Skip');
     expect(api.onboarded, isTrue);
     expect(api.picks!.topics, isEmpty);
-    expect(find.text('These are sample stories'), findsWidgets);
+    expect(api.subscriptions, isEmpty);
+    expect(find.text('No stories yet. Choose a few topics or sources to begin.'), findsOneWidget);
+    expectNoSamples();
+
+    await tapText(tester, 'Choose topics and sources');
+    expect(find.text('Which language should OSMS write in?'), findsOneWidget);
+    await tapText(tester, 'Continue'); // language
+    await tapText(tester, 'AI research');
+    await tapText(tester, 'Continue'); // topics
+    await tapText(tester, 'Continue'); // kinds
+    await tapText(tester, 'Continue'); // research
+    await tapText(tester, 'Start reading');
+    expect(api.subscriptions, [FakeApi.arxiv]);
+    expect(find.text('The first stories from your source appear here once OSMS has collected them.'), findsWidgets);
+    expect(find.text('Choose topics and sources'), findsNothing);
   });
 
   testWidgets('a returning reader lands on Today and never sees sign-in', (tester) async {
     await start(tester, auth: FakeAuth(signedIn: true), onboarded: true);
-    expect(find.text('These are sample stories'), findsWidgets);
+    expect(find.text('Your stories will appear here'), findsWidgets);
+    expectNoSamples();
     go(tester, '/sign-in');
     await tester.pumpAndSettle();
     expect(find.text('Continue with Google'), findsNothing);
@@ -220,7 +139,7 @@ void main() {
     expect(redirectFor(fresh, '/'), '/onboarding');
     expect(redirectFor(fresh, '/what-we-keep'), isNull);
     expect(redirectFor(back, '/sign-in'), '/');
-    expect(redirectFor(back, '/onboarding'), '/');
+    expect(redirectFor(back, '/onboarding'), isNull, reason: 'to choose topics and sources again');
     expect(redirectFor(back, '/settings'), isNull);
   });
 

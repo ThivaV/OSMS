@@ -1,5 +1,23 @@
 # OSMS: One Story, Many Sources
 
+
+```
+> What do you want to build for this hackathon?
+
+I want to build a news and newsletter reader that solves the real overload problem: when ten feeds cover the same event, today’s AI readers give you ten separate summaries. 
+Storyline groups articles from RSS feeds and newsletters into stories, so 60 unread items become 7 stories.
+
+For each story it shows what’s actually new since you last read about it, where sources disagree on facts or numbers (with links to each source), and a timeline of how the story developed. 
+It works across languages: I moved to Denmark last year and follow both Danish and English news, so a Danish and an English article about the same event land in one story, summarized in the language I choose. 
+Each morning it produces a short audio briefing built from stories rather than individual articles.
+
+Technically, I’ll cluster articles using multilingual dense and sparse embeddings with hybrid search in a vector database, the same approach I use for product matching in my work as a data scientist. 
+Muse Spark will handle claim extraction, disagreement detection, “what’s new” diffs and the briefing script; Muse Image will generate story cards and timeline visuals. 
+I’ll measure clustering quality on a hand-labelled set of articles.
+
+Muse Spark & SAM 3.1 to generate interactive podcasts.
+```
+
 ## 1. What we are building
 
 **OSMS (One Story, Many Sources)** is a news and newsletter reader that solves the real
@@ -12,11 +30,16 @@ For each story, OSMS shows:
 
 - **What's new** since the user last read about it (new facts only, not a re-summary).
 - **Where sources disagree** on facts or numbers, each claim linked to its source.
-- **A timeline** of how the story developed.
+- **A timeline** of how the story developed, corrections included: when a source
+  corrects itself, the old fact stays visible, struck through.
 - **Source chips** showing how many sources fed into the story.
+- **Ask this story** (secondary, rule 4): a typed question, answered only from the
+  story's checked facts, or "Not reported yet".
 
 It works **across languages**: a Danish and an English article about the same event land
-in one story, summarised in the language the user chooses (English, Danish, Tamil).
+in one story, summarised in the language the user chooses (English, Danish, Tamil). A
+source's own words appear in its language, with a translation labelled "Translated by
+OSMS".
 Each morning an editor agent, working with specialist Muse Spark agents, produces a short
 **audio briefing** built from stories rather than individual articles (see *Agents*).
 
@@ -188,13 +211,14 @@ checks every generated output before a reader sees it.
 
 | Agent | Model | Job | Technique |
 |---|---|---|---|
-| Triage | Muse Glimmer 30B (local) | Every new item: inside rule 3? Noise (ads, giveaways, sponsored posts)? Language and kind right? | Always-on local agent, structured output; Muse Spark decides what it's unsure about |
+| Triage | Muse Glimmer 30B (local) | Every new item: inside rule 3? Noise (ads, giveaways, sponsored posts)? Language and kind right? Which names does it mention (companies, products, places), for clustering? | Always-on local agent, structured output; Muse Spark decides what it's unsure about |
 | Interest | Muse Spark | A reader's research keywords → related terms, likely arXiv categories and a rule-3 check; later, yes/no on borderline "related by meaning" papers | Structured output; the plan is a suggestion the reader confirms or edits |
 | Judge | Muse Spark Open (Baseten) | Borderline pairs: same event or not? | One call, a structured verdict with a reason; Muse Spark as backup |
 | Claims | Muse Spark | Facts from an article, episode or paper, each with the quote it rests on | Structured output; Muse Spark Open as backup |
 | Verifier | Muse Spark | Re-checks every candidate new fact and disagreement against the quotes; drops false ones | Critic: a second pass checks the first; unsure cases re-run at maximum reasoning |
 | Editor | Muse Spark, or Muse Wonder if the agent task set favours it | The overnight agent: which stories changed meaningfully, ranking per reader, what each briefing covers | Orchestrator: plans, delegates to the verifier and writer, calls tools that make and check the audio |
 | Writer | Muse Spark | A story's title and cited summary when its verified claims change; the briefing script in the reader's language, every fact cited | Draft, editor review, revise (at most twice) |
+| Ask | Muse Spark | A reader's typed question about one story → an answer from that story's verified claims only, every sentence cited, or "Not reported yet" | Structured output citing claim ids; code keeps a sentence only if it cites one of the story's verified claims; no tools, no web, no backup |
 
 Single-purpose model steps, called from plain code: **Muse Voice Transcribe** turns podcast
 episodes into text and checks the briefing audio; **Muse Image** draws a story's
@@ -205,11 +229,12 @@ The triage, judge, claims and verifier agents run as items arrive, so the app on
 shows verified facts; the writer then updates the story's title and summary. The interest
 agent runs when a reader adds or edits research keywords, and on a capped number of
 borderline papers after each arXiv update. The editor and the briefing run overnight,
-and from a Tilt button.
+and from a Tilt button. The ask agent runs when a reader asks a story a question.
 
 The interest agent's prompt holds only the keywords it is working on, never who typed
 them or their other interests: research keywords count as topics under the guardrails
-below.
+below. So does a typed question: the ask agent's prompt holds only the question and the
+story's verified claims, never who asked.
 
 ### How the models work together
 
@@ -217,9 +242,11 @@ below.
   verifier re-checks, the writer drafts, and its tools make the briefing audio and have
   Muse Voice Transcribe check it.
 - **The cheapest model that can decide, decides.** Muse Glimmer, a small open model,
-  triages every item and hands what it is unsure about to Muse Spark. Clear cluster matches need
-  no model; borderline pairs go to Muse Spark Open. The verifier re-runs its unsure cases
-  at maximum reasoning effort.
+  triages every item and hands what it is unsure about to Muse Spark. Two items join one
+  story with no model only when they are close in meaning, close in time and name the same
+  things; any other similar pair goes to Muse Spark Open, and when it is unsure they stay
+  apart (an unneeded split is easier to repair than a wrong merge). The verifier re-runs
+  its unsure cases at maximum reasoning effort.
 - **Every output gets a second opinion from a different model.** Facts: the verifier
   checks the claims agent. Illustrations: SAM 3.1 checks Muse Image. Briefing audio: Muse
   Voice Transcribe checks the TTS. Nothing generated reaches a reader unchecked.
@@ -243,7 +270,8 @@ below.
   the verifier has kept it.
 - **State, not chat memory.** Agents read story state (claims, timeline, what was last
   briefed) from SQLite, with no long conversation histories. About readers they see only
-  language, topics (research keywords included), kinds and read state.
+  language, topics (research keywords and typed questions included), kinds and read
+  state.
 - **Bounded runs.** Every run has a step limit, a token budget and a time limit; hitting
   one stops the run and says so in the decision log.
 - **Decision log.** Every run and step (tool, arguments, result summary, reason, model id,
@@ -273,7 +301,10 @@ below.
 - Only the fetcher reaches the web; write tools touch only OSMS's own tables.
 - Prompts carry no personal data beyond language, topics and kinds. A reader's research
   keywords count as topics: the interest agent sees only the keywords it is working on,
-  never who typed them, and the decision log records its steps without them.
+  never who typed them, and the decision log records its steps without them. A reader's
+  typed question to a story counts the same way: the ask agent sees only the question
+  and that story's verified claims, never who asked; the question and its answer are
+  never stored, and the decision log records the step without them.
 - Briefings stay inside rule 3 and cite every fact; the editor's checklist enforces both.
 - No model call searches the web. Search grounding and web references stay off for every
   model, so agents know only what the sources delivered.
@@ -283,7 +314,7 @@ below.
   before anyone sees it; a flagged one is redrawn once, then replaced by the drawn art.
   Every illustration is labelled as one.
 - Backups never move personal data. Only agents that see public source text (judge,
-  claims, verifier) fail over to a second provider; the interest, editor and writer
+  claims, verifier) fail over to a second provider; the interest, ask, editor and writer
   agents have no backup.
 
 ### Improving the agents offline: Harness² (stretch)
@@ -491,7 +522,11 @@ sources delivered, each fact dated.
 - **Cheap when nothing changed:** conditional requests (ETag / Last-Modified). A `304`
   costs no parsing and no model calls.
 - **New and changed items:** deduplicate by GUID or link. A known item whose content hash
-  changes (articles get corrected) has its claims re-run.
+  changes (articles get corrected) has its claims re-run. The old claims stay in the
+  story's history, and the timeline shows the correction with the old fact struck
+  through.
+- **Save first, index after:** an item is stored before its vectors exist, and indexing
+  is a job that retries, so a Milvus Lite outage never loses an item.
 - **Errors back off,** doubling up to a day. A source failing for days is flagged to its
   followers, never silently dropped.
 - **Now, not later:** a new subscription is fetched at once, and **Fetch now** (an API
@@ -556,9 +591,13 @@ projects, and it can hand a session to a native app, which NextAuth can't.
   from `sub`. The first request creates the reader's `users` row.
 - **Web:** the session is an HttpOnly cookie on the auth service, on the same site as
   the app; the app never reads it.
-- **macOS:** the app opens Google in a system sign-in window (ASWebAuthenticationSession).
-  The auth service then hands the app a one-time token through `osms://auth`; the app
-  trades it for a session token, keeps it in the Keychain and sends it as a bearer token.
+- **macOS:** the app opens Google in the reader's own default browser, where they may
+  already be signed in, and listens on the loopback interface for the answer (RFC 8252):
+  `http://127.0.0.1:<port>/callback?state=<random>`. The auth service sends the browser
+  there with a one-time token; the app checks the state, trades the token for a session
+  token, keeps that in the Keychain and sends it as a bearer token. (Apple's sign-in
+  window, ASWebAuthenticationSession, was dropped: it has an open, unfixed failure when
+  Chrome is the default browser.)
 - **Development sign-in:** with `OSMS_DEV_SIGN_IN=1` (local only; refused in
   production), the sign-in page also offers an email link, printed in the auth log
   instead of emailed, so the whole flow runs without Google keys.
@@ -576,14 +615,17 @@ projects, and it can hand a session to a native app, which NextAuth can't.
   your own sources.
 - Before judging, check that any Google account can sign in: a consent screen left in
   testing mode admits only listed test users.
-- **Before the native builds:** macOS 14.4 or later (the sign-in window needs it), a
-  sandboxed app with outgoing connections on, and the App Store rules on offering Sign in
-  with Apple next to Google. Windows sign-in is untested.
+- **The macOS app:** macOS 12 or later; sandboxed, allowed outgoing connections and a
+  listener on the loopback interface (the sign-in answer). It opens at desktop size, has
+  a native menu bar (OSMS → Settings… ⌘,), and comes back to the front after sign-in.
+  Builds sign it to run on this Mac only; giving it to anyone else needs a Developer ID
+  and notarisation. Before the App Store: its rules on offering Sign in with Apple next
+  to Google. Windows sign-in is untested.
 
 ### Picking sources
 
-Onboarding takes under a minute, and every step can be skipped (skipping keeps the demo
-sources):
+Onboarding takes under a minute, and every step can be skipped (skipping saves the picks
+made so far):
 
 1. **Language**, pre-filled from the browser.
 2. **Topics**, from a fixed list inside rule 3 (AI research, developer tools, science,
@@ -599,8 +641,12 @@ sources):
    categories for the topics are among them. Add your own with the add-source box or an
    OPML file.
 
-The first timeline is never empty: suggested sources are already collected for the demo,
-so their stories show at once. Picks can be changed any time in settings.
+Suggested sources are already collected for the demo, so a reader who keeps them sees
+stories at once. **Signed in, OSMS shows only the reader's own stories, never samples:**
+a new reader, or one with no sources, gets an empty Today that says so. With no sources
+it offers **Choose topics and sources**, which opens onboarding again; with sources, it
+says their first stories appear once OSMS has collected them. Until settings can edit
+picks, onboarding again is how a reader changes them.
 
 ### Collecting what users pick
 
@@ -649,7 +695,7 @@ timeline, Reddit or YouTube subscriptions, a paid newsletter's private feed URL.
 | `jobs` | The work queue: what to process next (a fetched item, a re-run, a briefing), status, attempts, run after |
 | `subscriptions` | User, source, folder, when added. The user's picks, and what drives collection. |
 | `connections` | User, platform, instance, handle, scopes, encrypted tokens, status (post-hackathon) |
-| `items` and the story tables | Content and the story pipeline, as the author designs them. An item from a private source has its owner. A paper adds authors, categories, arXiv id and version; never the PDF. |
+| `items` and the story tables | Content and the story pipeline, as the author designs them. An item from a private source has its owner. A paper adds authors, categories, arXiv id and version; never the PDF. Stories keep a dated history: a claim or summary is never overwritten; a change adds a dated entry (added, corrected, withdrawn) that keeps the old value, and what's new, corrections and the timeline are read from it. Every claim records the model and prompt version that produced it, and the quote it rests on in the source's language. |
 | `agent_runs`, `agent_steps` | The decision log: every agent run and step, with reason, model id, prompt version, tokens and latency. No personal data. |
 | `read_state`, `saved_items`, `briefings` | Per-user reading state, save-for-later and morning briefings |
 
@@ -675,9 +721,10 @@ applies.
 
 **Hackathon scope:** Google sign-in, the signed-out demo view, onboarding, per-user
 subscriptions and research interests, settings and read state, collection driven by
-subscriptions, account deletion and the privacy page. **Built Oct 29** (web; macOS
-written, not yet built): sign-up and sign-in, onboarding, settings, interests and
-deletion end to end, with sample stories until real ones exist.
+subscriptions, account deletion and the privacy page. **Built Oct 29–30** (web and
+macOS): sign-up and sign-in, onboarding, settings, interests and deletion end to end.
+Signed-in readers get an empty Today until real stories exist; the signed-out demo shows
+invented sample stories, and its banner says so.
 **Post-hackathon:** more sign-in providers, connected accounts and private feeds,
 importing follows, personal newsletter addresses, data export (OPML + JSON).
 
@@ -711,7 +758,7 @@ recognisable screens or code.
   blogs, videos and posts.
 - "What's new" section at the top of a story page.
 - "Where sources disagree" panel with per-claim source links.
-- Story timeline.
+- Story timeline, with corrections.
 - Morning briefing player.
 
 **Hackathon scope for UI:** three-pane responsive layout, card + list views, dark mode,
@@ -728,8 +775,9 @@ folders, photo and comic cards.
 - **Frontend:** Flutter (Dart). **Web & macOS Desktop App first.** Same project later builds iOS, Android
   (phones + tablets), Windows and macOS desktop.
   - State management: Riverpod. Routing: go_router. HTTP: `http`.
-  - macOS sign-in: `flutter_web_auth_2` (system sign-in window) and
-    `flutter_secure_storage` (Keychain, without Keychain Sharing).
+  - macOS: `url_launcher` (sign-in in the reader's browser), `flutter_secure_storage`
+    (Keychain, without Keychain Sharing), `PlatformMenuBar` for the menu bar. Swift
+    Package Manager builds the plugins; no CocoaPods.
   - Component catalogue: **Widgetbook** (Storybook does not support Flutter).
 - **Backend:** Python 3.12+ with uv, FastAPI, Pydantic, SQLAlchemy + Alembic, PyJWT.
 - **Sign-in:** Better Auth (Node 24+, TypeScript run directly by Node) in `auth/`,
@@ -791,6 +839,7 @@ osms/
 │   │   ├── auth.ts            # Google, sessions in data/auth.db, API tokens (JWT + JWKS)
 │   │   ├── server.ts          # /api/auth/*, /providers, the desktop hand-off (/native/*)
 │   │   └── main.ts
+│   ├── scripts/dev-session.sh # development only: a test reader's session, for make test-macos
 │   └── test/                  # the real server on an in-memory database
 │
 ├── frontend/                  # ONE Flutter project for all platforms
@@ -807,18 +856,19 @@ osms/
 │   │   │   ├── theme/         # design tokens: colours, type scale, spacing, radii
 │   │   │   └── layout/        # breakpoints + ThreePaneLayout shell
 │   │   ├── features/
-│   │   │   ├── home/          # Today: the shell around stories (samples until real ones exist)
+│   │   │   ├── home/          # Today: the demo signed out; signed in, the reader's own stories or an empty Today
 │   │   │   ├── auth/          # sign-in; signed-out visitors get the demo account
 │   │   │   ├── onboarding/    # language, topics, kinds, research on arXiv, suggested sources
 │   │   │   ├── stories/       # story list (cards / list view)
-│   │   │   ├── story_detail/  # what's new, disagreements, timeline, sources
+│   │   │   ├── story_detail/  # what's new, disagreements, timeline, sources, ask this story
 │   │   │   ├── briefing/      # audio briefing player
 │   │   │   ├── sources/       # add (link, handle, OPML), manage sources, interests_editor.dart
 │   │   │   └── settings/      # language (EN/DA/TA), theme, view mode, delete account
 │   │   ├── shared/widgets/    # StoryCard, ItemCard, SourceChip, WhatsNewSection, ...
 │   │   └── sample/            # FAKE stories, sources, people (invented, .example), for
-│   │                          # Widgetbook, tests, and the app's labelled sample stories
+│   │                          # Widgetbook, tests, and the signed-out demo's labelled samples
 │   ├── test/                  # palettes' contrast, the sign-in and onboarding flows
+│   ├── integration_test/      # the real macOS app in its sandbox, against sign-in and the API
 │   │
 │   └── widgetbook/            # component catalogue (separate Flutter project)
 │       ├── pubspec.yaml       # depends on the app via `path: ../`
@@ -867,6 +917,7 @@ osms/
 │   │   │   ├── tools.py       # typed tools over SQLite and Milvus Lite
 │   │   │   ├── interest.py    # the interest agent: keywords → search plan, borderline papers
 │   │   │   ├── editor.py      # the overnight run; verifier and writer are its specialists
+│   │   │   ├── ask.py         # ask this story: a typed question → an answer from verified claims
 │   │   │   ├── decision_log.py
 │   │   │   ├── guardrails.py  # frozen: change only with the author
 │   │   │   └── prompts/       # one file per agent, versioned
@@ -918,10 +969,13 @@ usage reporting is switched off in `widgetbook/build.yaml`; keep it off.
 
 ### Components to build, in order of demo importance
 
-1. `StoryCard` — title, summary, source count, source chips, visual, "N new facts" badge.
-2. `WhatsNewSection` — list of new claims since last read, with timestamps.
+1. `StoryCard` — title, summary, source count, source chips, visual, "N new facts" badge,
+   and why it is here ("5 sources · 2 new facts · AI research") instead of a hidden rank.
+2. `WhatsNewSection` — list of new claims since last read, with timestamps; a claim only
+   one source reports says "One source so far".
 3. `DisagreementPanel` — conflicting claims side by side, each with source link.
-4. `StoryTimeline` — vertical timeline of story events.
+4. `StoryTimeline` — vertical timeline of story events; a correction shows as
+   "Corrected", the old fact struck through.
 5. `BriefingPlayer` — play/pause, progress, chapter list (one chapter per story).
 6. `SourceChip` — source name, language flag/label, source-type icon (a generic glyph
    such as video or post, never the platform's logo).
@@ -939,21 +993,27 @@ usage reporting is switched off in `widgetbook/build.yaml`; keep it off.
     sign-in-unavailable states.
 12. `WhatWeKeepPage` — the short privacy page linked from sign-in.
 13. `AccountRow` and `DemoBanner` — the account at the foot of the sidebar, and the
-    signed-out banner above the story list.
+    signed-out banner above the story list, which says the demo's stories are invented
+    samples while they are.
 14. `SettingsPage` and `ThemePicker` — appearance (mode, theme tiles previewed in their
     own colours, pure black, floating-bar glass, reading font and size), reading
     language, default view, account and "Delete my account".
 15. `TodayOverview` — the home view: greeting, lead story, briefing tile, "new since you
     last read", "new research for you" (papers matched to the reader's interests, each
-    with its reason), then a grid of stories.
+    with its reason), then a grid of stories. Empty (`TodayOverview` and `StoryList`): with
+    no sources, **Choose topics and sources**; with sources, that the first stories
+    appear once OSMS has collected them.
 16. `BriefingFloatingBar`, `PillNav` and the story toolbar — the floating glass chrome.
 17. `CommandPalette` — ⌘K search over stories, sources and actions.
 18. `InterestsEditor` — follow research on arXiv: keywords, suggested related terms,
     categories, the plan in plain words, and the papers it would have pulled in the last
     30 days. Flagged keywords stay visible, struck through. Also embedded in onboarding.
-19. `SampleBanner` — above the stories while they are samples: signed in, but no real
-    stories collected yet. `TodayOverview` and `StoryList` take it (or `DemoBanner`) in
-    their `banner` slot. Invented stories never pass for real ones.
+19. `SourceQuote` — a source's own words in its language; in a story written in another
+    language, a translation below it labelled "Translated by OSMS". Used by
+    `WhatsNewSection`, `DisagreementPanel` and `StoryTimeline`.
+20. `AskStoryBox` — "Ask this story" on the story page, below the story's own sections
+    (secondary, rule 4): a typed question, then the answer with source chips, or "Not
+    reported yet"; idle, thinking, answered, not reported and unavailable states.
 
 The real app (`frontend/lib/features/*/…_screen.dart`, `home/`) wires these components to
 the session and the API; Widgetbook keeps showing them with fake data.
@@ -1016,15 +1076,15 @@ readable line length (~65–75 characters) in the reading view.
 | 0 | Oct 26 | Kickoff, claim credits (Meta, Baseten, Modal), repo + README, pick sources, **Widgetbook UI design** |
 | 1 | Oct 27 | Ingestion: RSS, newsletters (dedicated inbox), article store. Agents 101 |
 | 2 | Oct 28 | SQLite schema + Alembic; BGE-M3 → Milvus Lite (server mode); hand-label 150–200 articles for eval. Agents 102 |
-| 3 | Oct 29 | **Done:** sign-in (Better Auth: Google + dev links), accounts API, the web app wired end to end (sign-up, onboarding, settings, interests, deletion), macOS sign-in written. **Next:** incremental clustering + judge agent (Muse Spark Open); agent runtime (tools, structured output, budgets, decision log); model clients, routing table and backups; first eval numbers |
-| 4 | Oct 30 | Triage agent (Muse Glimmer, local); claims and verifier agents; what's-new diff, disagreement detection; agent task set in `eval/agents/`. Fireworks session |
-| 5 | Oct 31 | **arXiv:** category feeds, interest queries, 30-day backfill, related-by-meaning matches, one rate-limited client; Muse Voice Transcribe for podcasts; users + subscriptions in the database; add by link/handle, OPML import, YouTube/Mastodon/Bluesky/Reddit adapters; label paper examples; re-run eval |
-| 6 | Nov 1 | Editor and writer agents (overnight run, decision log, "How OSMS decided" view); editor on Muse Spark vs Muse Wonder (the task set decides); story summaries; briefing script + open-source TTS, checked with Muse Voice Transcribe |
-| 7 | Nov 2 | Google OAuth client + consent screen (any Google account); macOS build and sign-in check (needs Xcode); the interest agent; real stories in place of the samples; adding sources from the app; Muse Image illustrations in one house style, checked and cropped with SAM 3.1; language toggle |
-| 8 | Nov 3 | Hardening, deploy (one backend machine with a disk; Muse Glimmer on a GPU or a hosted provider), fallback data, signed-out demo view, check any Google account can sign in; Harness² run if time allows (stretch); **feature freeze** |
-| 9 | Nov 4 | 3-min demo video, submit, post on X |
+| 3 | Oct 29 | **Done:** sign-in (Better Auth: Google + dev links), accounts API, the web app wired end to end (sign-up, onboarding, settings, interests, deletion). **Oct 30:** the macOS app built (debug and release) and tested in its sandbox against the real sign-in service and API (`make test-macos`): sign-in in the browser, the desktop hand-off, onboarding, Today, Settings, deletion; menu bar and window. Signed-in readers get an empty Today, never samples, until real stories exist |
+| 4 | Oct 30 | **From here, one real story end to end first, then papers, the briefing and illustrations** (decided Oct 30). Danish and English feeds in tech, science and business that cover the same companies, in the seed list; the generic feed adapter, fetcher (link safety, polite fetching), scheduler and jobs queue; items stored; start hand-labelling 150–200 items as they arrive. Fireworks session |
+| 5 | Oct 31 | BGE-M3 → Milvus Lite (server mode), each item saved first and indexed by a job that retries; incremental clustering (close in meaning, time and names joins; other similar pairs go to the judge agent, Muse Spark Open; unsure stays apart); agent runtime (tools, structured output, budgets, decision log); model clients, routing table and backups; first eval numbers |
+| 6 | Nov 1 | Claims agent (each claim with its quote in the source's language, and the model and prompt version) and verifier agent; the dated story history: what's new, disagreements, corrections in the timeline; writer agent: story titles and cited summaries; quotes with labelled translations; real stories replace the empty Today; agent task set in `eval/agents/` |
+| 7 | Nov 2 | **arXiv:** category feeds, interest queries, 30-day backfill, related-by-meaning matches, one rate-limited client; label paper examples; the interest agent. Editor agent (overnight run, decision log) and briefing script + open-source TTS, checked with Muse Voice Transcribe; editor on Muse Spark vs Muse Wonder (the task set decides). Muse Image illustrations in one house style, checked and cropped with SAM 3.1. Triage agent (Muse Glimmer), names included. Google consent screen for any Google account; Google sign-in on the macOS app checked by hand |
+| 8 | Nov 3 | Ask this story; the "How OSMS decided" view; Muse Voice Transcribe for podcasts, newsletters (dedicated inbox), adding sources from the app (link, handle, OPML import), YouTube/Mastodon/Bluesky/Reddit adapters, language toggle; hardening, deploy (one backend machine with a disk; Muse Glimmer on a GPU or a hosted provider), the replayable demo set and fallback data; README comparison table (dense, sparse, hybrid, hybrid + judge); Harness² run if time allows (stretch); **feature freeze** |
+| 9 | Nov 4 | 3-min demo video, showing real model calls and what each changed; submit (deadline 03:00 Nov 5, Danish time); post on X |
 
-**If behind, cut in this order:** Harness² (stretch) → the Muse Wonder editor trial (the
+**If behind, cut in this order:** Harness² (stretch) → Ask this story → the Muse Wonder editor trial (the
 editor stays on Muse Spark) → related-by-meaning arXiv matches (keyword matches stay) →
 the briefing audio check → the triage agent (rule 3 rests on source choice) →
 YouTube/Mastodon/Bluesky/Reddit adapters (their feeds still work through the generic
@@ -1069,8 +1129,9 @@ demo shows.
   handles and feeds. Use the reserved `.example` domain (e.g. `ada@users.example`,
   `@ada@social.example`), never real people or accounts. Fake papers use invented
   authors, ids far above arXiv's monthly volume (`2610.9xxxx`) and `arxiv.example` links.
-  The fake data lives in `frontend/lib/sample/`; the app shows its stories only under a
-  "These are sample stories" banner, never as real news.
+  The fake data lives in `frontend/lib/sample/`; the app shows its stories only in the
+  signed-out demo, whose banner says they are invented samples, never as real news.
+  Signed-in readers never see them.
 - Do not commit scraped article text, newsletter contents, transcripts, posts or media.
   Store data locally under `data/` (gitignored).
 - **A user's OPML file shows what they read.** Parse it, then discard it; never commit
@@ -1097,7 +1158,9 @@ demo shows.
   topics and kinds, never their email, name, handles or reading history. Logs use user
   ids, not emails. Research keywords count as topics: the interest agent sees the
   keywords it is working on, never who typed them (see *Agents*); interests are never
-  logged.
+  logged. A typed question to a story counts the same way: the ask agent sees only the
+  question and the story's verified claims, and questions and answers are never stored
+  or logged.
 - **`BETTER_AUTH_SECRET` signs every session.** `make env` generates one into `.env`;
   production gets its own from the secret store. Google's client secret is a secret too.
   Neither goes in the repo, a log or a chat.
@@ -1106,7 +1169,9 @@ demo shows.
   and the address never does.
 - **Only our origins.** The auth service and the API answer CORS only for
   `OSMS_APP_ORIGINS`, and Better Auth redirects only to those. The desktop hand-off token
-  is one-time, three minutes, stored hashed, and minted only by the server.
+  is one-time, three minutes, stored hashed, minted only by the server, sent only to a
+  loopback address of the exact shape `http://127.0.0.1:<port>/callback?state=…`, and only
+  for a sign-in the same browser started (a short-lived, HttpOnly flow cookie).
 - **Cap what one account can add.** Limit sources per user, OPML size and the add-source
   rate, so one account cannot swamp the fetcher.
 - **`data/` holds personal data.** `osms.db` has users and reading state, and `milvus/` and
@@ -1157,6 +1222,7 @@ it whenever a file under its `lib/` is saved, and a **Hot restart** button.
 | `worker` | backend | Scheduled checks, the jobs queue, embeddings, judge, claims and verifier agents, the daily arXiv run; **Fetch now** and **arXiv now** buttons (arXiv now still keeps arXiv's rate limit) | – | after `api` |
 | `overnight-agent` | backend | One run of the editor and writer agents, on the models in the routing table; decision log in Tilt | – | button |
 | `app` | frontend | `flutter run -d web-server` | 8080 | on `tilt up` |
+| `app-macos` | frontend | `flutter run -d macos` (needs Xcode); a window, hot-reloaded on save | – | button |
 | `widgetbook-gen` | frontend | `dart run build_runner watch` | – | on `tilt up` |
 | `widgetbook` | frontend | Widgetbook, `flutter run -d web-server` | 8090 | after `widgetbook-gen` |
 | `backend-checks` | checks | `make check-backend` (ruff and pytest) | – | button |
@@ -1218,7 +1284,10 @@ server mode and every backend process connects to it.
 # the usual entry points (make help lists them all)
 make env                                   # .env from .env.example, with a fresh sign-in secret
 make setup                                 # .env, every package, Widgetbook navigation
-make app                                   # the app alone, in Chrome (DEVICE=macos for desktop)
+make app                                   # the app alone, in Chrome on port 8080
+make app DEVICE=macos                      # the macOS desktop app (needs Xcode)
+make build-macos                           # OSMS.app, release build (needs Xcode)
+make test-macos                            # with make up running: the real macOS app, end to end
 make widgetbook                            # Widgetbook alone, in Chrome
 make auth                                  # sign-in (Better Auth) alone: http://localhost:3000
 make api                                   # the API alone: http://localhost:8000

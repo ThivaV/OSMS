@@ -91,6 +91,34 @@ local_resource(
 
 flutter_web('app', 'frontend', 8080, watch=['frontend/lib'])
 
+# The macOS desktop app (needs Xcode). It opens a window, so it starts from its button,
+# never on `tilt up`; saving a file hot-reloads it like the web app.
+MAC_PID = os.path.join(PIDS, 'tilt-app-macos.pid')
+local_resource(
+    'app-macos',
+    serve_cmd='mkdir -p "%s" && rm -f "%s" && flutter run -d macos --pid-file="%s"' % (PIDS, MAC_PID, MAC_PID),
+    serve_dir='frontend',
+    auto_init=False,
+    trigger_mode=TRIGGER_MODE_MANUAL,
+    labels=['frontend'],
+)
+local_resource(
+    'app-macos-reload',
+    cmd=signal_flutter('USR1', MAC_PID),
+    deps=['frontend/lib'],
+    resource_deps=['app-macos'],
+    auto_init=False,
+    allow_parallel=True,
+    labels=['frontend'],
+)
+cmd_button(
+    'app-macos-restart',
+    resource='app-macos',
+    argv=['sh', '-c', signal_flutter('USR2', MAC_PID)],
+    text='Hot restart',
+    icon_name='restart_alt',
+)
+
 local_resource(
     'widgetbook-gen',
     serve_cmd='dart run build_runner watch',

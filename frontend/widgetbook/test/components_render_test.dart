@@ -16,7 +16,6 @@ import 'package:osms/core/theme/appearance.dart';
 import 'package:osms/core/theme/palettes.dart';
 import 'package:osms/features/onboarding/onboarding_flow.dart';
 import 'package:osms/features/search/command_palette.dart';
-import 'package:osms/features/stories/sample_banner.dart';
 import 'package:osms/features/stories/today_overview.dart';
 import 'package:osms/shared/widgets/pill_nav.dart';
 import 'package:osms/features/settings/settings_page.dart';
@@ -139,9 +138,9 @@ final Map<String, Widget Function()> _sections = {
   'Account signed out': () => const AccountRow(),
   'Account long name': () => const AccountRow(user: fx.longUser),
   'Demo banner': () => const DemoBanner(),
-  'Sample banner': () => const SampleBanner(sourceCount: 4),
-  'Sample banner, no sources': () => const SampleBanner(),
+  'Demo banner with samples': () => const DemoBanner(samples: true),
   'Demo banner, sign-in down': () => const DemoBanner(signInAvailable: false),
+  'Demo banner with samples, sign-in down': () => const DemoBanner(signInAvailable: false, samples: true),
   'Onboarding empty': () => const Onboarding(
     languages: fx.languages,
     topics: fx.topics,
@@ -209,10 +208,17 @@ final Map<String, Widget Function()> _screens = {
     child: TodayOverview(stories: fx.stories, briefing: fx.briefing, user: fx.user, research: fx.research),
   ),
   'Today overview with a banner': () => Material(
-    child: TodayOverview(stories: fx.stories, briefing: fx.briefing, user: fx.user, banner: const SampleBanner()),
+    child: TodayOverview(stories: fx.stories, briefing: fx.briefing, banner: const DemoBanner(samples: true)),
   ),
   'Today overview empty with a banner': () => const Material(child: TodayOverview(stories: [], banner: DemoBanner())),
   'Today overview empty': () => const Material(child: TodayOverview(stories: [])),
+  'Today overview empty, no sources': () =>
+      Material(child: TodayOverview(stories: const [], user: fx.user, onChooseSources: () {}, onAddSource: () {})),
+  'Today overview empty, sources followed': () =>
+      Material(child: TodayOverview(stories: const [], user: fx.user, sourceCount: 1)),
+  'Story list empty, no sources': () =>
+      Material(child: StoryList(stories: const [], onChooseSources: () {}, onAddSource: () {})),
+  'Story list empty, sources followed': () => const Material(child: StoryList(stories: [], sourceCount: 40)),
   'Today overview extreme': () => Material(
     child: TodayOverview(
       stories: [fx.extremeStory, ...fx.stories],

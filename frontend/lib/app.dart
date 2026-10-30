@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,13 +16,14 @@ import 'features/settings/settings_screen.dart';
 import 'features/sources/interests_screen.dart';
 
 /// Where a reader may be. Signed out: everywhere but onboarding and interests (the
-/// demo). Signed in but new: onboarding first. Returning: never back to sign-in.
+/// demo). Signed in but new: onboarding first. Returning: never back to sign-in, and
+/// onboarding again only to choose topics and sources (an empty Today offers it).
 String? redirectFor(Session? session, String path) {
   if (session == null) return null; // Still loading: the app shows its splash.
   final account = session.account;
   if (account == null) return const {'/onboarding', '/interests'}.contains(path) ? '/sign-in' : null;
   if (!account.onboarded) return const {'/onboarding', '/what-we-keep'}.contains(path) ? null : '/onboarding';
-  return const {'/sign-in', '/onboarding'}.contains(path) ? '/' : null;
+  return path == '/sign-in' ? '/' : null;
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -92,7 +95,66 @@ class _OsmsAppState extends ConsumerState<OsmsApp> {
       darkTheme: AppTheme.forAppearance(appearance, Brightness.dark),
       themeMode: appearance.mode,
       routerConfig: router,
-      builder: (context, child) => loaded ? child! : const _Splash(),
+      builder: (context, child) {
+        final page = loaded ? child! : const _Splash();
+        return _onMacOS ? _MacMenus(router: router, child: page) : page;
+      },
+    );
+  }
+}
+
+bool get _onMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+
+/// The macOS menu bar: the app menu with a working Settings… (⌘,), and a Window menu.
+class _MacMenus extends StatelessWidget {
+  const _MacMenus({required this.router, required this.child});
+
+  final GoRouter router;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return PlatformMenuBar(
+      menus: [
+        PlatformMenu(
+          label: 'OSMS',
+          menus: [
+            const PlatformMenuItemGroup(
+              members: [PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.about)],
+            ),
+            PlatformMenuItemGroup(
+              members: [
+                PlatformMenuItem(
+                  label: 'Settings…',
+                  shortcut: const SingleActivator(LogicalKeyboardKey.comma, meta: true),
+                  onSelected: () => router.go('/settings'),
+                ),
+              ],
+            ),
+            const PlatformMenuItemGroup(
+              members: [
+                PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.hide),
+                PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.hideOtherApplications),
+                PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.showAllApplications),
+              ],
+            ),
+            const PlatformMenuItemGroup(members: [PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.quit)]),
+          ],
+        ),
+        const PlatformMenu(
+          label: 'Window',
+          menus: [
+            PlatformMenuItemGroup(
+              members: [
+                PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.minimizeWindow),
+                PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.zoomWindow),
+                PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.toggleFullScreen),
+              ],
+            ),
+          ],
+        ),
+      ],
+      child: child,
     );
   }
 }

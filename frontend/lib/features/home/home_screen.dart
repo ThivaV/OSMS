@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/layout/three_pane_layout.dart';
+import '../../core/models/models.dart';
 import '../../core/session/session.dart';
 import '../../core/theme/tokens.dart';
 import '../../sample/sample_content.dart' as sample;
@@ -15,7 +16,6 @@ import '../auth/demo_banner.dart';
 import '../briefing/briefing_player.dart';
 import '../search/command_palette.dart';
 import '../sources/sources_sidebar.dart';
-import '../stories/sample_banner.dart';
 import '../stories/story_list.dart';
 import '../stories/today_overview.dart';
 import '../story_detail/story_detail_view.dart';
@@ -28,8 +28,9 @@ const _phoneTabs = [
 ];
 
 /// Today: the three panes, or the overview when no story is open. Signed out, it is
-/// the demo; signed in, the reader's own topics, sources and interests around sample
-/// stories, each labelled as such until real stories exist.
+/// the demo, whose stories are invented samples, labelled, until OSMS collects real
+/// ones. Signed in, only the reader's own stories: a new reader, or one without
+/// sources, starts with an empty Today that says what comes next.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -44,14 +45,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   SessionController get _session => ref.read(sessionProvider.notifier);
 
+  /// The stories Today shows: the demo's samples while signed out; signed in, the
+  /// reader's own, of which there are none until OSMS collects them.
+  static List<Story> _storiesFor(Session session) => session.signedIn ? const [] : sample.stories;
+
   void _openPalette(BuildContext context, Session session) {
     final sources = session.account?.subscriptions ?? sample.followedSources;
     CommandPalette.show(context, [
-      for (final s in sample.stories)
+      for (final s in _storiesFor(session))
         CommandItem(
           icon: Icons.article_outlined,
           label: s.title,
-          detail: 'Sample · ${s.topic}',
+          detail: session.signedIn ? s.topic : 'Sample · ${s.topic}',
           group: 'Stories',
           onRun: () => setState(() => _selected = s.id),
         ),
@@ -99,18 +104,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final session = ref.watch(sessionProvider).requireValue;
     final account = session.account;
     final user = account?.user;
-    final stories = sample.stories;
-    final briefing = sample.briefing;
+    final stories = _storiesFor(session);
+    final briefing = account == null ? sample.briefing : null;
     final story = stories.where((s) => s.id == _selected).firstOrNull;
     final layout = _layout ?? account?.defaultLayout ?? StoryCardLayout.row;
+    final sourceCount = account?.subscriptions.length ?? 0;
+    // Until sources can be added one by one from the app, onboarding is where a reader picks them.
+    final chooseSources = account != null && sourceCount == 0 ? () => context.go('/onboarding') : null;
 
-    Widget banner() => account == null
+    Widget? banner() => account == null
         ? DemoBanner(
             signInAvailable: session.available && session.providers.any,
+            samples: true,
             onCreateAccount: () => context.go('/sign-in?intent=create'),
             onSignIn: () => context.go('/sign-in'),
           )
-        : SampleBanner(sourceCount: account.subscriptions.length);
+        : null;
 
     SourcesSidebar sidebar({bool withSearch = true}) => SourcesSidebar(
       topics: account?.topics ?? sample.topics,
@@ -131,8 +140,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         stories: stories,
         selectedId: _selected,
         layout: layout,
-        bottomInset: ThreePaneLayout.floatingInset,
+        bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,
         banner: banner(),
+        sourceCount: sourceCount,
+        onChooseSources: chooseSources,
         onSelect: (s) => setState(() => _selected = s.id),
         onLayoutChanged: (l) {
           setState(() => _layout = l);
@@ -143,13 +154,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         stories: stories,
         briefing: briefing,
         user: user,
-        // Sample papers only for a reader who follows research, so the section means something.
-        research: (account?.interests.isNotEmpty ?? false) ? sample.research : const [],
         banner: banner(),
+        sourceCount: sourceCount,
+        onChooseSources: chooseSources,
         onOpen: (s) => setState(() => _selected = s.id),
       ),
       detail: story == null ? null : StoryDetailView(key: ValueKey(story.id), story: story),
-      floatingPlayer: BriefingFloatingBar(briefing: briefing),
+      floatingPlayer: briefing == null ? null : BriefingFloatingBar(briefing: briefing),
       phoneNav: PillNav(destinations: _phoneTabs, selected: _phoneTab, onSelect: (i) => setState(() => _phoneTab = i)),
       phoneBody: switch (_phoneTab) {
         1 => SingleChildScrollView(

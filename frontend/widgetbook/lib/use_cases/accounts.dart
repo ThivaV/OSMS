@@ -5,7 +5,6 @@ import 'package:osms/features/auth/account_row.dart';
 import 'package:osms/features/auth/demo_banner.dart';
 import 'package:osms/features/auth/sign_in_page.dart';
 import 'package:osms/features/auth/what_we_keep_page.dart';
-import 'package:osms/features/stories/sample_banner.dart';
 import 'package:widgetbook/widgetbook.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart' as widgetbook;
 
@@ -98,24 +97,17 @@ Widget accountExtreme(BuildContext context) => Frame(
 
 // ── Demo banner ──────────────────────────────────────────────────────────────
 
+/// The demo shows invented sample stories until OSMS collects real ones, and says so.
 @widgetbook.UseCase(name: 'Normal', type: DemoBanner, path: '[Accounts]')
 Widget demoBannerNormal(BuildContext context) =>
-    Frame(child: DemoBanner(onCreateAccount: () {}, onSignIn: () {}));
+    Frame(child: DemoBanner(samples: true, onCreateAccount: () {}, onSignIn: () {}));
+
+@widgetbook.UseCase(name: 'Real stories', type: DemoBanner, path: '[Accounts]')
+Widget demoBannerReal(BuildContext context) => Frame(child: DemoBanner(onCreateAccount: () {}, onSignIn: () {}));
 
 @widgetbook.UseCase(name: 'Empty', type: DemoBanner, path: '[Accounts]')
-Widget demoBannerEmpty(BuildContext context) => const Frame(child: DemoBanner(signInAvailable: false));
+Widget demoBannerEmpty(BuildContext context) => const Frame(child: DemoBanner(signInAvailable: false, samples: true));
 
 @widgetbook.UseCase(name: 'Extreme content', type: DemoBanner, path: '[Accounts]')
 Widget demoBannerExtreme(BuildContext context) =>
-    _largeText(Frame(child: DemoBanner(onCreateAccount: () {}, onSignIn: () {})));
-
-// ── Sample stories banner ────────────────────────────────────────────────────
-
-@widgetbook.UseCase(name: 'Normal', type: SampleBanner, path: '[Accounts]')
-Widget sampleBannerNormal(BuildContext context) => const Frame(child: SampleBanner(sourceCount: 4));
-
-@widgetbook.UseCase(name: 'Empty', type: SampleBanner, path: '[Accounts]')
-Widget sampleBannerEmpty(BuildContext context) => const Frame(child: SampleBanner());
-
-@widgetbook.UseCase(name: 'Extreme content', type: SampleBanner, path: '[Accounts]')
-Widget sampleBannerExtreme(BuildContext context) => _largeText(const Frame(child: SampleBanner(sourceCount: 500)));
+    _largeText(Frame(child: DemoBanner(samples: true, onCreateAccount: () {}, onSignIn: () {})));
