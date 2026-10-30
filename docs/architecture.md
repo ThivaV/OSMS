@@ -419,7 +419,12 @@ briefing run overnight. The ask agent runs when a reader asks a story a question
   that validate their inputs and outputs. Tools are plain code over SQLite and Milvus Lite.
 - **Structured output.** Every model step returns JSON matching a schema; a step that
   doesn't validate is retried once with the error, then logged as failed.
-- **Bounded.** Each run has a step limit, a token budget and a time limit.
+  Both live in `backend/app/agent/runtime.py`: `call_once` for the judge/claims
+  style agents, `run_tool_loop` for orchestrator-style ones, each behind a
+  `ModelClient` interface the fake in `backend/app/clients/fake.py` stands in
+  for until Day 5 wires the network client. No framework, one file.
+- **Bounded.** Each run has a step limit, a token budget and a time limit
+  (`AgentSpec`); hitting one stops the run with its reason in the log.
 - **State, not chat history.** Agents read a story's claims and timeline from SQLite.
   About readers they see only language, topics, kinds and what they've read; the interest
   agent sees only the keywords being edited, never who typed them, and the ask agent
@@ -441,7 +446,14 @@ briefing run overnight. The ask agent runs when a reader asks a story a question
     to a second provider.
 - **Decision log.** Every run and step is stored with its reason, model and tokens, plus
   any escalation or fallback and Muse Spark Open's commentary (its stated intent). It
-  shows in the Tilt logs and in a "How OSMS decided" view.
+  shows in the Tilt logs and in a "How OSMS decided" view. The writer is
+  `backend/app/agent/decision_log.py` over the `agent_runs`/`agent_steps`
+  tables (migration `0002`); `backend/app/agent/guardrails.py` keeps interests,
+  questions and answers out of it — keyed entries dropped, known sensitive
+  values redacted even from free text. The routing table in `backend/app/config.py`
+  (`model_routes`, checked by `check_routes`) resolves every agent to its pinned
+  model, endpoint and backup; backups stay limited to the agents that see public
+  source text.
 
 ### Improving the agents offline
 
@@ -539,6 +551,19 @@ flowchart LR
 Meta Model API has no text-to-speech model, so the briefing audio uses an open-source
 voice, named in the README once chosen. Muse Voice Transcribe doesn't list its languages
 yet: check Danish and Tamil before relying on it for those podcasts and briefings.
+
+## Eval
+
+Hand-labelled story groups (`eval/labels/*.json`, ids + links only — never
+third-party text) score the pipeline's `{item_id: story_id}` answer with
+pairwise precision/recall/F1 and B-cubed F1 (`eval/metrics.py`, pure stdlib).
+`eval/labels.py` validates the format and refuses text-bearing keys, duplicate
+ids and non-http(s) links; `python run_eval.py labels/ predictions.json`
+prints both triples and writes a timestamped result to `eval/results/`, while
+no labels yet means "nothing to score", exit 0. `make eval-test` runs the
+harness's own tests (`eval/test_metrics.py`, hand-computed numbers). The
+harness reports; thresholds stay the author's call, and new metrics need the
+author too.
 
 ## Running it
 

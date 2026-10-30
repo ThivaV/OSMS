@@ -105,7 +105,7 @@ def _replace_interests(user: User, interests: list[InterestIn]) -> None:
 
 
 def complete_onboarding(db: Session, user: User, picks: OnboardingIn) -> User:
-    topics = db.scalars(select(Topic).where(Topic.id.in_(picks.topics))).all()
+    topics = db.scalars(select(Topic).where(Topic.id.in_(picks.topics)).order_by(Topic.position)).all()
     if missing := set(picks.topics) - {t.id for t in topics}:
         raise UnknownIds("topics", list(missing))
     ids = [int(i) for i in picks.source_ids if i.isdigit()]

@@ -9,9 +9,12 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.auth.tokens import TokenVerifier
 from app.config import Settings
+from app.db.models import Base
+from app.db.sqlite import make_engine
 from app.main import create_app
 
 ISSUER = "http://localhost:3000"
@@ -62,3 +65,13 @@ def client(settings: Settings) -> Iterator[TestClient]:
 @pytest.fixture
 def auth() -> Auth:
     return lambda sub: {"Authorization": f"Bearer {sign(sub)}"}
+
+
+@pytest.fixture
+def memory_db(tmp_path) -> Iterator[Session]:
+    """A throwaway database with every table, for tests that never touch HTTP."""
+    engine = make_engine(f"sqlite:///{tmp_path / 'test.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        yield db
+    engine.dispose()

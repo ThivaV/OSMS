@@ -37,6 +37,14 @@ Oct 27 – Nov 4, 2026.
   "New research for you". The wire contract (`AskRequest`/`AskResponse`, cited
   sentences enforced) lives in `backend/app/schemas/ask.py` with tests; the ask
   agent and route land Day 8, so asking today ends in the spec'd unavailable state.
+- [x] **Architecture hardening (Oct 30):** the agent loop (`call_once` +
+  bounded tool loop, fake models, no framework), frozen guardrails as code
+  (backup matrix, no search grounding, log scrubbing with value redaction),
+  the model routing table with startup-checked backup rules, the decision-log
+  tables (migration `0002`), a real eval harness (pairwise + B-cubed, label
+  validation, `make eval-test`), and ingestion safety (fail-closed URLs,
+  hostile-OPML refusal, seed languages). Specs: `agent-runtime.md`,
+  `eval-harness.md`, `ingestion-safety.md`.
 - [ ] Ingestion, clustering + judge, agents, arXiv matching, briefing audio,
   illustrations — in build-plan order (see AGENTS.md).
 

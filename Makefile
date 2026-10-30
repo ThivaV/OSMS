@@ -60,7 +60,7 @@ tilt_disable = if $(tilt_up); then \
 .DEFAULT_GOAL := help
 .PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
   stop-api stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
-  check-flutter check-backend check-auth clean _run-dir _need-tilt
+  check-flutter check-backend check-auth eval-test clean _run-dir _need-tilt
 
 help: ## List the commands
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -184,6 +184,9 @@ check-backend: ## Lint and test the API (Tilt's "backend-checks" button)
 
 check-auth: ## Type-check and test the sign-in service (Tilt's "auth-checks" button)
 	cd $(AUTH_DIR) && $(NPM) run typecheck && $(NPM) test
+
+eval-test: ## Test the clustering eval harness (stdlib only, no venv needed)
+	cd eval && python3 -m unittest
 
 clean: stop ## Stop everything, then remove Flutter build output and run files
 	cd $(APP_DIR) && $(FLUTTER) clean

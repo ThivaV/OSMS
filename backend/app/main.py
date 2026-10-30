@@ -33,7 +33,8 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origins,
-        allow_methods=["GET", "PUT", "PATCH", "DELETE"],
+        # POST is for Day 8's `POST /stories/{id}/ask`; nothing posts yet.
+        allow_methods=["GET", "PUT", "PATCH", "DELETE", "POST"],
         allow_headers=["Authorization", "Content-Type"],
     )
 

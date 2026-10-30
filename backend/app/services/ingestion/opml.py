@@ -22,6 +22,7 @@ class SeedSource:
     feed_url: str
     html_url: str | None
     type: str
+    language: str = "en"
 
 
 @dataclass
@@ -40,6 +41,11 @@ def source_type(feed_url: str) -> str:
     return "arxiv" if urlparse(feed_url).hostname == "rss.arxiv.org" else "feed"
 
 
+# The interface languages OSMS writes in. A seed outline may carry one as
+# `language="da"`; anything else is English until triage says otherwise.
+SEED_LANGUAGES = frozenset({"en", "da", "ta"})
+
+
 def read_seed(path: Path) -> list[SeedTopic]:
     body = ET.parse(path).getroot().find("body")
     topics = []
@@ -49,7 +55,16 @@ def read_seed(path: Path) -> list[SeedTopic]:
         for outline in folder:
             if feed_url := outline.get("xmlUrl"):
                 title = outline.get("title") or outline.get("text") or feed_url
-                topic.sources.append(SeedSource(title, feed_url, outline.get("htmlUrl"), source_type(feed_url)))
+                language = outline.get("language") or "en"
+                topic.sources.append(
+                    SeedSource(
+                        title,
+                        feed_url,
+                        outline.get("htmlUrl"),
+                        source_type(feed_url),
+                        language if language in SEED_LANGUAGES else "en",
+                    )
+                )
         topics.append(topic)
     return topics
 
@@ -63,7 +78,7 @@ def load_seed(db: Session, path: Path) -> None:
         suggested = []
         for s in seed.sources:
             source = db.scalar(select(Source).where(Source.feed_url == s.feed_url)) or Source(feed_url=s.feed_url)
-            source.title, source.html_url, source.type, source.language = s.title, s.html_url, s.type, "en"
+            source.title, source.html_url, source.type, source.language = s.title, s.html_url, s.type, s.language
             db.add(source)
             suggested.append(source)
         topic.suggested = suggested
