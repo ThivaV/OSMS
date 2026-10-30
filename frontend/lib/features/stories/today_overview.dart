@@ -26,6 +26,8 @@ class TodayOverview extends StatelessWidget {
     this.sourceCount = 0,
     this.onChooseSources,
     this.onAddSource,
+    this.emptyTitle,
+    this.emptyBody,
     this.banner,
   });
 
@@ -46,6 +48,10 @@ class TodayOverview extends StatelessWidget {
   /// The empty state's buttons; each is hidden without its callback.
   final VoidCallback? onChooseSources;
   final VoidCallback? onAddSource;
+
+  /// Overrides for a filtered empty Today (e.g. Saved, with nothing kept yet).
+  final String? emptyTitle;
+  final String? emptyBody;
 
   /// Above the greeting, e.g. the demo notice while signed out.
   final Widget? banner;
@@ -110,9 +116,12 @@ class TodayOverview extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(NoStories.title, style: t.subhead),
+                          Text(emptyTitle ?? NoStories.title, style: t.subhead),
                           const SizedBox(height: Space.xs),
-                          Text(NoStories.body(sourceCount), style: t.bodySmall.copyWith(color: c.textSecondary)),
+                          Text(
+                            emptyBody ?? NoStories.body(sourceCount),
+                            style: t.bodySmall.copyWith(color: c.textSecondary),
+                          ),
                           if (actions.hasActions) ...[const SizedBox(height: Space.lg), actions],
                         ],
                       ),
@@ -243,7 +252,7 @@ class _LeadCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Lead story  ·  ${story.topic}  ·  ${timeAgo(story.updatedAt)}',
+                      '${story.topic}  ·  ${timeAgo(story.updatedAt)}',
                       style: t.caption.copyWith(color: c.textTertiary, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: Space.sm),

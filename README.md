@@ -30,6 +30,13 @@ Oct 27 – Nov 4, 2026.
 - [x] **The macOS desktop app (Oct 30):** everything the web app has, built and tested in
   its sandbox against the real sign-in service and API. Sign-in opens your own browser
   and hands the session back to the app; a native menu bar; a desktop-sized window.
+- [x] **Ask this story, UI-first (Oct 30):** `AskStoryBox` at the end of the story
+  page with its five states (idle, thinking, answered, not reported, unavailable),
+  story-derived suggestions, and a toolbar jump; the sidebar now filters the list
+  (Today, topic, source, Saved); ⌘K hover/keyboard polish; the demo Today shows
+  "New research for you". The wire contract (`AskRequest`/`AskResponse`, cited
+  sentences enforced) lives in `backend/app/schemas/ask.py` with tests; the ask
+  agent and route land Day 8, so asking today ends in the spec'd unavailable state.
 - [ ] Ingestion, clustering + judge, agents, arXiv matching, briefing audio,
   illustrations — in build-plan order (see AGENTS.md).
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:osms/core/models/models.dart';
 import 'package:osms/core/theme/tokens.dart';
 import 'package:osms/features/story_detail/story_detail_view.dart';
+import 'package:osms/shared/widgets/ask_story_box.dart';
 import 'package:osms/shared/widgets/disagreement_panel.dart';
 import 'package:osms/shared/widgets/story_timeline.dart';
 import 'package:osms/shared/widgets/whats_new_section.dart';
@@ -66,6 +68,95 @@ Widget timelineExtreme(BuildContext context) => Frame(
   maxWidth: _sectionWidth,
   child: StoryTimeline(events: fx.extremeStory.timeline, lastReadAt: fx.extremeStory.lastReadAt),
 );
+
+// ── Ask this story ───────────────────────────────────────────────────────────
+// A state machine, so one use case per state rather than the usual trilogy.
+
+@widgetbook.UseCase(name: 'Answered', type: AskStoryBox, path: '[Story]')
+Widget askAnswered(BuildContext context) => Frame(
+  maxWidth: _sectionWidth,
+  child: AskStoryBox(
+    question: fx.halcyonAskAnswered.question,
+    result: fx.halcyonAskAnswered,
+    suggestions: fx.halcyonAskSuggestions,
+    onAsk: (_) {},
+  ),
+);
+
+@widgetbook.UseCase(name: 'Idle', type: AskStoryBox, path: '[Story]')
+Widget askIdle(BuildContext context) => Frame(
+  maxWidth: _sectionWidth,
+  child: AskStoryBox(suggestions: fx.halcyonAskSuggestions, onAsk: (_) {}),
+);
+
+@widgetbook.UseCase(name: 'Thinking', type: AskStoryBox, path: '[Story]')
+Widget askThinking(BuildContext context) => const Frame(
+  maxWidth: _sectionWidth,
+  child: AskStoryBox(question: 'How big is the model?', thinking: true, onAsk: _noopAsk),
+);
+
+void _noopAsk(String _) {}
+
+@widgetbook.UseCase(name: 'Not reported', type: AskStoryBox, path: '[Story]')
+Widget askNotReported(BuildContext context) => Frame(
+  maxWidth: _sectionWidth,
+  child: AskStoryBox(
+    question: fx.halcyonAskNotReported.question,
+    result: fx.halcyonAskNotReported,
+    suggestions: fx.halcyonAskSuggestions,
+    onAsk: (_) {},
+  ),
+);
+
+@widgetbook.UseCase(name: 'Unavailable', type: AskStoryBox, path: '[Story]')
+Widget askUnavailable(BuildContext context) => const Frame(
+  maxWidth: _sectionWidth,
+  child: AskStoryBox(question: 'How big is the model?', unavailable: true, onAsk: _noopAsk),
+);
+
+@widgetbook.UseCase(name: 'Live', type: AskStoryBox, path: '[Story]')
+Widget askLive(BuildContext context) => const Frame(maxWidth: _sectionWidth, child: _LiveAsk());
+
+/// Asks, thinks for a moment, then answers from the fake facts — or reports
+/// nothing when the question names nothing the story covers.
+class _LiveAsk extends StatefulWidget {
+  const _LiveAsk();
+
+  @override
+  State<_LiveAsk> createState() => _LiveAskState();
+}
+
+class _LiveAskState extends State<_LiveAsk> {
+  String? _question;
+  AskResult? _result;
+  bool _thinking = false;
+
+  void _ask(String question) {
+    setState(() {
+      _question = question;
+      _result = null;
+      _thinking = true;
+    });
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      setState(() {
+        _thinking = false;
+        _result = question.toLowerCase().contains('cost')
+            ? const AskResult(question: 'What does it cost?', segments: [], reported: false)
+            : AskResult(question: question, segments: fx.halcyonAskAnswered.segments, reported: true);
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AskStoryBox(
+    question: _question,
+    result: _result,
+    thinking: _thinking,
+    suggestions: fx.halcyonAskSuggestions,
+    onAsk: _ask,
+  );
+}
 
 // ── The whole story page ─────────────────────────────────────────────────────
 

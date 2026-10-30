@@ -37,6 +37,18 @@ publications. Fake papers use invented authors, ids like `2610.9xxxx` and
 
 API calls, state management, routing, real audio playback, translations of the UI.
 
+## Oct 30 additions (same rules)
+
+- `AskStoryBox` (AGENTS.md §10 item 20, spec `docs/specs/ask-story.md`): one use
+  case per state (Answered, Idle, Thinking, Not reported, Unavailable) plus a
+  Live case that thinks, then answers or reports nothing — a state machine
+  shows better per-state than in the Normal/Empty/Extreme trilogy.
+- `SourcesSidebar.onSelect`: Today, topic, source and Saved rows drive the
+  story list (research interests route to `/interests`); rows with nowhere to
+  go stay inert, never dead taps.
+- `CommandPalette`: hover follows the highlight, keyboard travel keeps the row
+  on screen, the highlight clamps as the list shrinks with the query.
+
 ## How to test
 
 - `flutter analyze` in `frontend/` and `frontend/widgetbook/`: no issues.

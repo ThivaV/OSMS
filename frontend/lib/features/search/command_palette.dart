@@ -80,19 +80,19 @@ class _CommandPaletteState extends State<CommandPalette> {
     item.onRun?.call();
   }
 
-  KeyEventResult _onKey(FocusNode node, KeyEvent event, List<CommandItem> matches) {
+  KeyEventResult _onKey(FocusNode node, KeyEvent event, List<CommandItem> matches, int highlight) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowDown && matches.isNotEmpty) {
-      setState(() => _highlight = (_highlight + 1) % matches.length);
+      setState(() => _highlight = (highlight + 1) % matches.length);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp && matches.isNotEmpty) {
-      setState(() => _highlight = (_highlight - 1 + matches.length) % matches.length);
+      setState(() => _highlight = (highlight - 1 + matches.length) % matches.length);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.enter && matches.isNotEmpty) {
-      _run(matches[_highlight.clamp(0, matches.length - 1)]);
+      _run(matches[highlight]);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.escape) {
@@ -107,6 +107,8 @@ class _CommandPaletteState extends State<CommandPalette> {
     final c = context.colors;
     final t = context.text;
     final matches = _matches;
+    // The list shrinks as the query grows; keep the highlight on a real row.
+    final highlight = matches.isEmpty ? 0 : _highlight.clamp(0, matches.length - 1);
     final groups = <String, List<(int, CommandItem)>>{};
     for (final (i, item) in matches.indexed) {
       groups.putIfAbsent(item.group, () => []).add((i, item));
@@ -128,7 +130,7 @@ class _CommandPaletteState extends State<CommandPalette> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Focus(
-              onKeyEvent: (node, event) => _onKey(node, event, matches),
+              onKeyEvent: (node, event) => _onKey(node, event, matches, highlight),
               child: TextField(
                 controller: _controller,
                 autofocus: true,
@@ -174,7 +176,12 @@ class _CommandPaletteState extends State<CommandPalette> {
                             ),
                           ),
                           for (final (i, item) in rows)
-                            _Row(item: item, highlighted: i == _highlight, onTap: () => _run(item)),
+                            _Row(
+                              item: item,
+                              highlighted: i == highlight,
+                              onTap: () => _run(item),
+                              onHover: () => setState(() => _highlight = i),
+                            ),
                         ],
                       ],
                     ),
@@ -205,26 +212,45 @@ class _CommandPaletteState extends State<CommandPalette> {
   }
 }
 
-class _Row extends StatelessWidget {
-  const _Row({required this.item, required this.highlighted, required this.onTap});
+class _Row extends StatefulWidget {
+  const _Row({required this.item, required this.highlighted, required this.onTap, required this.onHover});
 
   final CommandItem item;
   final bool highlighted;
   final VoidCallback onTap;
+  final VoidCallback onHover;
+
+  @override
+  State<_Row> createState() => _RowState();
+}
+
+class _RowState extends State<_Row> {
+  @override
+  void didUpdateWidget(covariant _Row old) {
+    super.didUpdateWidget(old);
+    // Keyboard travel keeps the row on screen; after layout, never during it.
+    if (widget.highlighted && !old.highlighted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Scrollable.ensureVisible(context, alignment: 0.5);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final t = context.text;
+    final item = widget.item;
     return Semantics(
       button: true,
-      selected: highlighted,
+      selected: widget.highlighted,
       child: Material(
-        color: highlighted ? c.accentSoft : Colors.transparent,
+        color: widget.highlighted ? c.accentSoft : Colors.transparent,
         borderRadius: BorderRadius.circular(Radii.md),
         child: InkWell(
           borderRadius: BorderRadius.circular(Radii.md),
-          onTap: onTap,
+          onTap: widget.onTap,
+          onHover: (_) => widget.onHover(),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.sm),
             child: Row(

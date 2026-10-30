@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
 import '../../shared/formatting.dart';
+import '../../shared/widgets/ask_story_box.dart';
 import '../../shared/widgets/citation_chip.dart';
 import '../../shared/widgets/disagreement_panel.dart';
 import '../../shared/widgets/glass.dart';
@@ -15,14 +16,34 @@ import '../../shared/widgets/story_visual.dart';
 import '../../shared/widgets/whats_new_section.dart';
 
 /// The story page, in a fixed order: summary, what's new, where sources
-/// disagree, how it developed, every source. A floating toolbar listens,
-/// jumps to sections, saves and shares.
+/// disagree, how it developed, every source, then ask this story. A floating
+/// toolbar listens, jumps to sections, saves and shares.
 class StoryDetailView extends StatefulWidget {
-  const StoryDetailView({super.key, required this.story, this.onListen, this.onShare});
+  const StoryDetailView({
+    super.key,
+    required this.story,
+    this.onListen,
+    this.onShare,
+    this.askQuestion,
+    this.askResult,
+    this.askThinking = false,
+    this.askUnavailable = false,
+    this.askSuggestions = const [],
+    this.onAsk,
+  });
 
   final Story story;
   final VoidCallback? onListen;
   final VoidCallback? onShare;
+
+  /// Ask this story (secondary, rule 4). The parent owns the async work and
+  /// rebuilds with the answer; without [onAsk] the box explains it is idle.
+  final String? askQuestion;
+  final AskResult? askResult;
+  final bool askThinking;
+  final bool askUnavailable;
+  final List<String> askSuggestions;
+  final ValueChanged<String>? onAsk;
 
   @override
   State<StoryDetailView> createState() => _StoryDetailViewState();
@@ -33,6 +54,7 @@ class _StoryDetailViewState extends State<StoryDetailView> {
   final _disagreements = GlobalKey();
   final _timeline = GlobalKey();
   final _sources = GlobalKey();
+  final _ask = GlobalKey();
   bool _saved = false;
 
   void _jumpTo(GlobalKey key) {
@@ -161,6 +183,18 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                         runSpacing: Space.sm,
                         children: [for (final s in sources) SourceChip(source: s, onTap: () {})],
                       ),
+                      const SizedBox(height: Space.xxl),
+                      KeyedSubtree(
+                        key: _ask,
+                        child: AskStoryBox(
+                          question: widget.askQuestion,
+                          result: widget.askResult,
+                          thinking: widget.askThinking,
+                          unavailable: widget.askUnavailable,
+                          suggestions: widget.askSuggestions,
+                          onAsk: widget.onAsk,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -179,6 +213,7 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                   onDisagreements: () => _jumpTo(_disagreements),
                   onTimeline: () => _jumpTo(_timeline),
                   onSources: () => _jumpTo(_sources),
+                  onAsk: () => _jumpTo(_ask),
                   onSave: () => setState(() => _saved = !_saved),
                   onShare: widget.onShare ?? () {},
                 ),
@@ -202,6 +237,7 @@ class _StoryToolbar extends StatelessWidget {
     required this.onDisagreements,
     required this.onTimeline,
     required this.onSources,
+    required this.onAsk,
     required this.onSave,
     required this.onShare,
   });
@@ -213,6 +249,7 @@ class _StoryToolbar extends StatelessWidget {
   final VoidCallback onDisagreements;
   final VoidCallback onTimeline;
   final VoidCallback onSources;
+  final VoidCallback onAsk;
   final VoidCallback onSave;
   final VoidCallback onShare;
 
@@ -270,6 +307,12 @@ class _StoryToolbar extends StatelessWidget {
               ),
               if (!compact)
                 IconButton(tooltip: 'Every source', onPressed: onSources, icon: const Icon(Icons.layers_outlined)),
+              IconButton(
+                tooltip: 'Ask this story',
+                visualDensity: density,
+                onPressed: onAsk,
+                icon: const Icon(Icons.contact_support_outlined),
+              ),
               gap(),
               IconButton(
                 tooltip: saved ? 'Saved' : 'Save for later',

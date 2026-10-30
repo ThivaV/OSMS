@@ -21,6 +21,9 @@ class StoryList extends StatelessWidget {
     this.sourceCount = 0,
     this.onChooseSources,
     this.onAddSource,
+    this.emptyTitle,
+    this.emptyBody,
+    this.emptyIcon,
     this.banner,
     this.bottomInset = Space.xl,
   });
@@ -44,6 +47,11 @@ class StoryList extends StatelessWidget {
   /// The empty state's buttons; each is hidden without its callback.
   final VoidCallback? onChooseSources;
   final VoidCallback? onAddSource;
+
+  /// Overrides for a filtered empty list (e.g. Saved, with nothing kept yet).
+  final String? emptyTitle;
+  final String? emptyBody;
+  final IconData? emptyIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -100,9 +108,9 @@ class StoryList extends StatelessWidget {
             padding: const EdgeInsets.all(Space.lg),
             sliver: SliverToBoxAdapter(
               child: QuietNote(
-                icon: Icons.inbox_outlined,
-                title: NoStories.title,
-                body: NoStories.body(sourceCount),
+                icon: emptyIcon ?? Icons.inbox_outlined,
+                title: emptyTitle ?? NoStories.title,
+                body: emptyBody ?? NoStories.body(sourceCount),
                 action: actions.hasActions ? actions : null,
               ),
             ),

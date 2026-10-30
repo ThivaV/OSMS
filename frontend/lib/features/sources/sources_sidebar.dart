@@ -19,6 +19,7 @@ class SourcesSidebar extends StatelessWidget {
     this.briefing,
     this.user,
     this.selected = 'today',
+    this.onSelect,
     this.onAddSource,
     this.onSignIn,
     this.onSearch,
@@ -44,6 +45,10 @@ class SourcesSidebar extends StatelessWidget {
 
   /// The selected entry's id: `today`, `saved`, a topic id or a source id.
   final String selected;
+
+  /// The story list follows the selection: Today clears it, a topic or a
+  /// source filters to its stories, Saved shows what was kept.
+  final ValueChanged<String>? onSelect;
   final VoidCallback? onAddSource;
   final VoidCallback? onSignIn;
 
@@ -95,11 +100,26 @@ class SourcesSidebar extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: Space.sm),
             children: [
-              _NavRow(icon: Icons.wb_sunny_outlined, label: 'Today', selected: selected == 'today'),
-              _NavRow(icon: Icons.bookmark_outline_rounded, label: 'Saved', selected: selected == 'saved'),
+              _NavRow(
+                icon: Icons.wb_sunny_outlined,
+                label: 'Today',
+                selected: selected == 'today',
+                onTap: onSelect == null ? null : () => onSelect!('today'),
+              ),
+              _NavRow(
+                icon: Icons.bookmark_outline_rounded,
+                label: 'Saved',
+                selected: selected == 'saved',
+                onTap: onSelect == null ? null : () => onSelect!('saved'),
+              ),
               if (topics.isNotEmpty) _Heading('Topics'),
               for (final topic in topics)
-                _NavRow(icon: Icons.tag_rounded, label: topic.name, selected: selected == topic.id),
+                _NavRow(
+                  icon: Icons.tag_rounded,
+                  label: topic.name,
+                  selected: selected == topic.id,
+                  onTap: onSelect == null ? null : () => onSelect!(topic.id),
+                ),
               if (interests.isNotEmpty) ...[
                 _Heading('Research on arXiv'),
                 for (final interest in interests)
@@ -113,6 +133,7 @@ class SourcesSidebar extends StatelessWidget {
                             style: t.caption.copyWith(color: c.newSignal, fontWeight: FontWeight.w600),
                           ),
                     selected: selected == interest.id,
+                    onTap: onSelect == null ? null : () => onSelect!(interest.id),
                   ),
               ],
               _Heading(user == null ? 'Demo sources' : 'Sources'),
@@ -127,6 +148,7 @@ class SourcesSidebar extends StatelessWidget {
                   label: s.name,
                   trailing: Icon(iconForSourceType(s.type), size: Sizes.iconXs, color: c.textTertiary),
                   selected: selected == s.id,
+                  onTap: onSelect == null ? null : () => onSelect!(s.id),
                 ),
               if (user != null) ...[
                 const SizedBox(height: Space.sm),
@@ -182,7 +204,7 @@ class _Heading extends StatelessWidget {
 
 /// Selection is a fill plus bold text, never colour alone.
 class _NavRow extends StatelessWidget {
-  const _NavRow({this.icon, this.leading, required this.label, this.trailing, this.selected = false});
+  const _NavRow({this.icon, this.leading, required this.label, this.trailing, this.selected = false, this.onTap});
 
   final IconData? icon;
   final Widget? leading;
@@ -190,19 +212,23 @@ class _NavRow extends StatelessWidget {
   final Widget? trailing;
   final bool selected;
 
+  /// Null renders the row inert (no ripple, no hover): only for rows with
+  /// nowhere to go.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final t = context.text;
     return Semantics(
       selected: selected,
-      button: true,
+      button: onTap != null,
       child: Material(
         color: selected ? c.accentSoft : Colors.transparent,
         borderRadius: BorderRadius.circular(Radii.md),
         child: InkWell(
           borderRadius: BorderRadius.circular(Radii.md),
-          onTap: () {},
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.sm),
             child: Row(

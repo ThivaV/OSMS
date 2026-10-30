@@ -1014,6 +1014,8 @@ usage reporting is switched off in `widgetbook/build.yaml`; keep it off.
 20. `AskStoryBox` — "Ask this story" on the story page, below the story's own sections
     (secondary, rule 4): a typed question, then the answer with source chips, or "Not
     reported yet"; idle, thinking, answered, not reported and unavailable states.
+    UI built Oct 30 with fake data (spec `docs/specs/ask-story.md`); the ask agent
+    and route land Day 8.
 
 The real app (`frontend/lib/features/*/…_screen.dart`, `home/`) wires these components to
 the session and the API; Widgetbook keeps showing them with fake data.

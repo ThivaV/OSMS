@@ -336,7 +336,11 @@ flowchart TB
 - **Ask this story:** a reader's typed question goes to the ask agent with that story's
   verified claims and nothing else. The answer cites them, or says "Not reported yet";
   code drops any sentence that doesn't cite one. The question and the answer are never
-  stored or logged.
+  stored or logged. The wire contract (`AskRequest`/`AskResponse` in
+  `backend/app/schemas/ask.py`, validated since Oct 30) enforces the shape on both
+  sides; the `POST /stories/{id}/ask` route and the agent land on Day 8. The app's
+  `AskStoryBox` already speaks that contract, so asking today ends in its spec'd
+  unavailable state instead of a faked answer.
 - **Illustrate:** when a story first has three sources, Muse Image draws its
   illustration, and SAM 3.1 checks and crops it (see *Meta models*).
 

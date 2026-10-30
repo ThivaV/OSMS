@@ -432,6 +432,32 @@ final selene = Story(
 
 final stories = [halcyon, kestrel, cellcycle, kiteToolkit, microbes, selene];
 
+// ── Ask this story ───────────────────────────────────────────────────────────
+
+/// Story-derived prompts for the idle box. From the story, never the reader.
+const halcyonAskSuggestions = [
+  'How big is the model?',
+  'What licence does it use?',
+  'What improved most in Danish?',
+];
+
+final halcyonAskAnswered = AskResult(
+  question: 'How big is the model?',
+  segments: const [
+    SummaryPoint(
+      text: 'Sources report 1.2 trillion total parameters across all experts.',
+      sources: [inferenceBrief, circuitLedger],
+    ),
+    SummaryPoint(
+      text: 'The technical report gives 900 billion parameters active per token.',
+      sources: [arxivCsCl, siliconTides],
+    ),
+  ],
+  reported: true,
+);
+
+const halcyonAskNotReported = AskResult(question: 'What does it cost?', segments: [], reported: false);
+
 /// 200-character title, 40 sources, 30 new facts, 10 disagreements, 40 events.
 final extremeStory = Story(
   id: 'extreme',

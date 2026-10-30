@@ -344,6 +344,35 @@ final directories = <_widgetbook.WidgetbookNode>[
     name: 'Story',
     children: [
       _widgetbook.WidgetbookComponent(
+        name: 'AskStoryBox',
+        useCases: [
+          _widgetbook.WidgetbookUseCase(
+            name: 'Answered',
+            builder: _osms_widgetbook_use_cases_story_sections.askAnswered,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Idle',
+            builder: _osms_widgetbook_use_cases_story_sections.askIdle,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Live',
+            builder: _osms_widgetbook_use_cases_story_sections.askLive,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Not reported',
+            builder: _osms_widgetbook_use_cases_story_sections.askNotReported,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Thinking',
+            builder: _osms_widgetbook_use_cases_story_sections.askThinking,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Unavailable',
+            builder: _osms_widgetbook_use_cases_story_sections.askUnavailable,
+          ),
+        ],
+      ),
+      _widgetbook.WidgetbookComponent(
         name: 'DisagreementPanel',
         useCases: [
           _widgetbook.WidgetbookUseCase(
