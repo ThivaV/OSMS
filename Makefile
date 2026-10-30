@@ -25,6 +25,7 @@ APP_PID := $(RUN_DIR)/app.pid
 WIDGETBOOK_PID := $(RUN_DIR)/widgetbook.pid
 AUTH_PID := $(RUN_DIR)/auth.pid
 API_PID := $(RUN_DIR)/api.pid
+WORKER_PID := $(RUN_DIR)/worker.pid
 TILT_PID := $(RUN_DIR)/tilt.pid
 
 # Tilt never sends usage data from this project.
@@ -59,7 +60,7 @@ tilt_disable = if $(tilt_up); then \
 
 .DEFAULT_GOAL := help
 .PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
-  stop-api stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
+  stop-api stop-worker worker fetch-now pipeline-status eval stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
   check-flutter check-backend check-auth eval-test clean _run-dir _need-tilt
 
 help: ## List the commands
@@ -88,7 +89,7 @@ setup: env ## Create .env if needed, fetch every package, generate Widgetbook's 
 	cd $(APP_DIR) && $(FLUTTER) pub get
 	cd $(WIDGETBOOK_DIR) && $(FLUTTER) pub get && $(DART) run build_runner build
 	cd $(AUTH_DIR) && $(NPM) ci
-	cd $(BACKEND_DIR) && $(UV) sync
+	cd $(BACKEND_DIR) && $(UV) sync --extra models
 
 ##@ Run one thing on its own
 
@@ -104,6 +105,15 @@ auth: _run-dir ## Run sign-in (Better Auth) on http://localhost:3000; stop with 
 api: _run-dir ## Run the API on http://localhost:8000, reloading on save; stop with Ctrl+C or make stop-api
 	@cd $(BACKEND_DIR) && sh -c 'echo $$$$ > "$(API_PID)"; \
 	  exec $(UV) run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000'
+
+worker: _run-dir ## Run the story pipeline: fetch, embed, cluster, facts; stop with Ctrl+C or make stop-worker
+	@cd $(BACKEND_DIR) && sh -c 'echo $$$$ > "$(WORKER_PID)"; exec $(UV) run python -m app.worker run'
+
+fetch-now: ## Fetch every followed source now (the worker runs the fetches)
+	cd $(BACKEND_DIR) && $(UV) run python -m app.worker fetch-now
+
+pipeline-status: ## What the pipeline has stored, clustered and queued
+	cd $(BACKEND_DIR) && $(UV) run python -m app.worker status
 
 ##@ Run everything at once (Tilt)
 
@@ -131,11 +141,16 @@ stop-api: ## Stop the API, whether it runs on its own or in Tilt
 	@$(call stop_pid,api (on its own),$(API_PID),uvicorn)
 	@$(call tilt_disable,api,api)
 
+stop-worker: ## Stop the story pipeline, whether it runs on its own or in Tilt
+	@$(call stop_pid,worker (on its own),$(WORKER_PID),app.worker)
+	@$(call tilt_disable,worker,worker)
+
 stop: ## Stop everything at once: the app, Widgetbook, sign-in, the API and the whole Tilt session
 	@$(call stop_pid,app (on its own),$(APP_PID),flutter)
 	@$(call stop_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
 	@$(call stop_pid,auth (on its own),$(AUTH_PID),npm)
 	@$(call stop_pid,api (on its own),$(API_PID),uvicorn)
+	@$(call stop_pid,worker (on its own),$(WORKER_PID),app.worker)
 	@$(call stop_pid,Tilt and everything in it,$(TILT_PID),tilt)
 	@rm -f "$(RUN_DIR)"/tilt-*.pid
 	@if command -v $(TILT) >/dev/null; then mkdir -p "$(RUN_DIR)" && : > "$(TILT_KUBECONFIG)" && \
@@ -148,6 +163,7 @@ status: ## Show what is running
 	@$(call show_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
 	@$(call show_pid,auth (on its own),$(AUTH_PID),npm)
 	@$(call show_pid,api (on its own),$(API_PID),uvicorn)
+	@$(call show_pid,worker (on its own),$(WORKER_PID),app.worker)
 	@if $(tilt_up); then \
 	  echo "Tilt: running at http://localhost:10350"; \
 	  $(TILT_RUN) get uiresources -o \
@@ -187,6 +203,10 @@ check-auth: ## Type-check and test the sign-in service (Tilt's "auth-checks" but
 
 eval-test: ## Test the clustering eval harness (stdlib only, no venv needed)
 	cd eval && python3 -m unittest
+
+eval: ## Score today's clustering against your labels in eval/labels/
+	cd $(BACKEND_DIR) && $(UV) run python -m app.worker export-predictions ../eval/results/predictions.json
+	cd eval && python3 run_eval.py labels/ results/predictions.json
 
 clean: stop ## Stop everything, then remove Flutter build output and run files
 	cd $(APP_DIR) && $(FLUTTER) clean

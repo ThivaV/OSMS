@@ -75,7 +75,11 @@ Account accountFromJson(Json j) => Account(
 OnboardingOptions onboardingOptionsFromJson(Json j) => OnboardingOptions(
   languages: [
     for (final l in _list(j['languages']))
-      AppLanguage(code: l['code'] as String, nativeName: l['native_name'] as String, englishName: l['english_name'] as String),
+      AppLanguage(
+        code: l['code'] as String,
+        nativeName: l['native_name'] as String,
+        englishName: l['english_name'] as String,
+      ),
   ],
   topics: _list(j['topics']).map(topicFromJson).toList(),
   suggestions: [
@@ -96,3 +100,68 @@ Json onboardingToJson(OnboardingPicks picks) => {
   'source_ids': [...picks.sourceIds],
   'interests': [if (picks.interest case final interest?) interestToJson(interest)],
 };
+
+// ── Stories ─────────────────────────────────────────────────────────────────
+
+DateTime _time(Object? value) => DateTime.parse(value as String).toLocal();
+
+Source storySourceFromJson(Json j) => sourceFromJson(j, followed: j['followed'] == true);
+
+List<Source> _sources(Object? value) => _list(value).map(storySourceFromJson).toList();
+
+Claim claimFromJson(Json j) => Claim(
+  id: j['id'] as String,
+  text: j['text'] as String,
+  sources: _sources(j['sources']),
+  reportedAt: _time(j['reported_at']),
+  quote: j['quote'] as String?,
+  quoteLanguage: j['quote_language'] as String?,
+  translation: j['translation'] as String?,
+  corrects: j['corrects'] as String?,
+);
+
+Disagreement disagreementFromJson(Json j) => Disagreement(
+  id: j['id'] as String,
+  topic: j['topic'] as String,
+  sides: [
+    for (final s in _list(j['sides']))
+      DisagreementSide(value: s['value'] as String, claim: s['claim'] as String, sources: _sources(s['sources'])),
+  ],
+);
+
+TimelineEvent timelineEventFromJson(Json j) => TimelineEvent(
+  id: j['id'] as String,
+  at: _time(j['at']),
+  text: j['text'] as String,
+  kind: _byName(ItemKind.values, j['kind']) ?? ItemKind.article,
+  sourceCount: (j['source_count'] as num?)?.toInt() ?? 1,
+  url: j['url'] as String?,
+  correctedFrom: j['corrected_from'] as String?,
+);
+
+Story storyFromJson(Json j) => Story(
+  id: j['id'] as String,
+  title: j['title'] as String,
+  summary: (j['summary'] as String?) ?? '',
+  summaryPoints: [
+    for (final p in _list(j['summary_points']))
+      SummaryPoint(text: p['text'] as String, sources: _sources(p['sources'])),
+  ],
+  topic: (j['topic'] as String?) ?? 'News',
+  updatedAt: _time(j['updated_at']),
+  sources: _sources(j['sources']),
+  kindCounts: {
+    for (final entry in ((j['kind_counts'] as Map<String, Object?>?) ?? const {}).entries)
+      ?_byName(ItemKind.values, entry.key): (entry.value as num).toInt(),
+  },
+  languages: _strings(j['languages']),
+  visualSeed: (j['visual_seed'] as num?)?.toInt() ?? 0,
+  hasIllustration: j['has_illustration'] == true,
+  lastReadAt: j['last_read_at'] == null ? null : _time(j['last_read_at']),
+  whatsNew: _list(j['whats_new']).map(claimFromJson).toList(),
+  disagreements: _list(j['disagreements']).map(disagreementFromJson).toList(),
+  timeline: _list(j['timeline']).map(timelineEventFromJson).toList(),
+  why: _strings(j['why']),
+);
+
+List<Story> storiesFromJson(Json j) => _list(j['stories']).map(storyFromJson).toList();

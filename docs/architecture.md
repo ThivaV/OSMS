@@ -45,7 +45,7 @@ flowchart LR
     agents --> metaapi
     agents --> openweights
     worker --> sqlite
-    pipeline --> milvus
+    worker --> milvus
     pipeline --> sqlite
     agents --> sqlite
     agents --> files
@@ -55,7 +55,6 @@ flowchart LR
     auth --> authdb
     api -->|"checks tokens with its public keys"| auth
     api --> sqlite
-    api --> milvus
 ```
 
 Plain code does the heavy, predictable work: fetching, parsing, embedding, vector search.
@@ -350,7 +349,7 @@ flowchart TB
 |---|---|---|
 | SQLite | `data/osms.db` | Users, topics, sources (with their check schedule), subscriptions, research interests and their matches, items, the jobs queue, stories, claims and their dated history, disagreements, timeline, read state, saved items, briefings, the agents' decision log |
 | SQLite | `data/auth.db` | Sign-in only: Better Auth's accounts, sessions, linked Google accounts and signing keys. Only the sign-in service opens it. |
-| Milvus Lite | `data/milvus/` | One vector record per item, papers included (dense + sparse, with story, language, kind and time), one per story, and one per research interest, for hybrid search |
+| Milvus Lite | `data/milvus.db` | One vector record per item that can join a story (dense + sparse BGE-M3, with its publication time for the window); papers join it with related-by-meaning matches (Day 7) |
 | Audio files | `data/audio/` | Briefing audio; podcast audio only until it is transcribed |
 
 - Everything sits under `data/`, which is never committed: it holds personal data and
@@ -358,9 +357,8 @@ flowchart TB
 - **SQLite** runs in WAL mode with a busy timeout and foreign keys switched on, so readers
   never block and deleting an account removes everything that belongs to it. Writes are
   short transactions.
-- **Milvus Lite** lets one process own its data, so it runs as a small local server
-  (`127.0.0.1:19530`) that every backend process connects to. Only the ingestion worker
-  writes vectors.
+- **Milvus Lite** lets one process own its file, and only the worker needs it, so it runs
+  embedded in the worker; the API reads SQLite and never opens it.
 - Items from a reader's private sources carry their owner and never feed shared stories.
 
 ## The agents
@@ -575,9 +573,9 @@ flowchart LR
         l_wb["Widgetbook: 8090"]
         l_api["API: 8000"]
         l_worker["Worker"]
-        l_milvus["Milvus Lite server: 19530"]
+        l_milvus["Milvus Lite, inside the worker"]
         l_glimmer["Ollama with Muse Glimmer: 11434"]
-        l_data[("data/: osms.db, auth.db, milvus, audio")]
+        l_data[("data/: osms.db, auth.db, milvus.db, audio")]
     end
 
     subgraph cloud["Deployed"]
@@ -594,7 +592,6 @@ flowchart LR
     l_api --> l_auth
     l_api --> l_data
     l_worker --> l_data
-    l_api --> l_milvus
     l_worker --> l_milvus
     l_worker --> l_glimmer
     l_milvus --> l_data
@@ -604,8 +601,9 @@ flowchart LR
     box --> glimmer
 ```
 
-- **Local:** everything runs on the laptop with no Docker: SQLite is a file, and Milvus
-  Lite and Muse Glimmer (through Ollama) are local processes on localhost. `make up`
+- **Local:** everything runs on the laptop with no Docker: SQLite and Milvus Lite are files
+  (the worker embeds Milvus Lite), and Muse Glimmer (through Ollama) is a local process on
+  localhost. `make worker` (or Tilt's `worker`) runs the story pipeline. `make up`
   starts it all; see the README. The other models are called over the network.
 - **Deployed:** because SQLite and Milvus Lite are files with one writer, the backend
   runs as one machine with a persistent disk, next to its data. Muse Glimmer needs a GPU,

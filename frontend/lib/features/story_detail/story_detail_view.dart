@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
@@ -57,6 +58,14 @@ class _StoryDetailViewState extends State<StoryDetailView> {
   final _ask = GlobalKey();
   bool _saved = false;
 
+  /// The original article, on its publisher's site: OSMS links, never republishes.
+  static Future<void> _openOriginal(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   void _jumpTo(GlobalKey key) {
     final target = key.currentContext;
     if (target == null) return;
@@ -74,9 +83,7 @@ class _StoryDetailViewState extends State<StoryDetailView> {
     final c = context.colors;
     final t = context.text;
     final sources = [...story.sources]..sort((a, b) => (b.followed ? 1 : 0) - (a.followed ? 1 : 0));
-    final firstReport = story.timeline.isEmpty
-        ? null
-        : story.timeline.reduce((a, b) => a.at.isBefore(b.at) ? a : b);
+    final firstReport = story.timeline.isEmpty ? null : story.timeline.reduce((a, b) => a.at.isBefore(b.at) ? a : b);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -113,6 +120,13 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                             NewFactsBadge(count: story.newFactCount, since: story.lastReadAt),
                         ],
                       ),
+                      if (story.why.isNotEmpty) ...[
+                        const SizedBox(height: Space.sm),
+                        Text(
+                          'Here because: ${story.why.join('  ·  ')}',
+                          style: t.caption.copyWith(color: c.textSecondary),
+                        ),
+                      ],
                       if (firstReport != null) ...[
                         const SizedBox(height: Space.sm),
                         Text(
@@ -162,11 +176,18 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                         child: WhatsNewSection(claims: story.whatsNew, since: story.lastReadAt),
                       ),
                       const SizedBox(height: Space.xxl),
-                      KeyedSubtree(key: _disagreements, child: DisagreementPanel(disagreements: story.disagreements)),
+                      KeyedSubtree(
+                        key: _disagreements,
+                        child: DisagreementPanel(disagreements: story.disagreements),
+                      ),
                       const SizedBox(height: Space.xxl),
                       KeyedSubtree(
                         key: _timeline,
-                        child: StoryTimeline(events: story.timeline, lastReadAt: story.lastReadAt),
+                        child: StoryTimeline(
+                          events: story.timeline,
+                          lastReadAt: story.lastReadAt,
+                          onOpen: _openOriginal,
+                        ),
                       ),
                       const SizedBox(height: Space.xxl),
                       SectionHeader(
@@ -275,11 +296,7 @@ class _StoryToolbar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (compact)
-                IconButton.filled(
-                  tooltip: 'Listen',
-                  onPressed: onListen,
-                  icon: const Icon(Icons.headphones_rounded),
-                )
+                IconButton.filled(tooltip: 'Listen', onPressed: onListen, icon: const Icon(Icons.headphones_rounded))
               else
                 FilledButton.icon(
                   onPressed: onListen,

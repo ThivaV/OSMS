@@ -11,8 +11,19 @@ class FakeModelClient:
         self._script = list(script)
         self.calls: list[dict] = []
 
-    def step(self, *, system: str, messages: list[dict[str, str]], tools: list[dict], agent: str) -> ModelStep:
-        self.calls.append({"agent": agent, "messages": len(messages), "tools": len(tools)})
+    def step(
+        self,
+        *,
+        system: str,
+        messages: list[dict],
+        tools: list[dict],
+        agent: str,
+        schema: dict | None = None,
+        effort: str | None = None,
+    ) -> ModelStep:
+        self.calls.append(
+            {"agent": agent, "messages": len(messages), "tools": len(tools), "schema": schema is not None, "effort": effort}
+        )
         if not self._script:
             raise AssertionError("fake model ran out of scripted steps")
         acted = self._script.pop(0)

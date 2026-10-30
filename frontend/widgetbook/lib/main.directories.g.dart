@@ -393,6 +393,25 @@ final directories = <_widgetbook.WidgetbookNode>[
         ],
       ),
       _widgetbook.WidgetbookComponent(
+        name: 'SourceQuote',
+        useCases: [
+          _widgetbook.WidgetbookUseCase(
+            name: 'Empty',
+            builder: _osms_widgetbook_use_cases_story_sections.sourceQuoteEmpty,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Extreme content',
+            builder:
+                _osms_widgetbook_use_cases_story_sections.sourceQuoteExtreme,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Normal',
+            builder:
+                _osms_widgetbook_use_cases_story_sections.sourceQuoteNormal,
+          ),
+        ],
+      ),
+      _widgetbook.WidgetbookComponent(
         name: 'StoryCard',
         useCases: [
           _widgetbook.WidgetbookUseCase(

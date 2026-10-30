@@ -11,12 +11,34 @@ class SummaryPoint {
 
 /// A fact one or more sources reported.
 class Claim {
-  const Claim({required this.id, required this.text, required this.sources, required this.reportedAt});
+  const Claim({
+    required this.id,
+    required this.text,
+    required this.sources,
+    required this.reportedAt,
+    this.quote,
+    this.quoteLanguage,
+    this.translation,
+    this.corrects,
+  });
 
   final String id;
   final String text;
   final List<Source> sources;
   final DateTime reportedAt;
+
+  /// The words it rests on, exactly as the source wrote them, in [quoteLanguage].
+  final String? quote;
+  final String? quoteLanguage;
+
+  /// [quote] in English when the source wrote in another language: "Translated by OSMS".
+  final String? translation;
+
+  /// For a correction: what the source said before.
+  final String? corrects;
+
+  /// Only one source reports it so far.
+  bool get singleSource => sources.length == 1;
 }
 
 /// One side of a disagreement: a value, the claim behind it, who said it.
@@ -46,6 +68,8 @@ class TimelineEvent {
     required this.text,
     required this.kind,
     required this.sourceCount,
+    this.url,
+    this.correctedFrom,
   });
 
   final String id;
@@ -55,6 +79,12 @@ class TimelineEvent {
   /// The kind of item that first reported it.
   final ItemKind kind;
   final int sourceCount;
+
+  /// The original article, on its publisher's site.
+  final String? url;
+
+  /// For a correction: the value the source replaced, shown struck through.
+  final String? correctedFrom;
 }
 
 class Story {
@@ -74,6 +104,7 @@ class Story {
     this.whatsNew = const [],
     this.disagreements = const [],
     this.timeline = const [],
+    this.why = const [],
   });
 
   final String id;
@@ -108,6 +139,9 @@ class Story {
   final List<Disagreement> disagreements;
   final List<TimelineEvent> timeline;
 
+  /// Why it is in the reader's list, in words: "3 sources", "2 new facts", "AI research".
+  final List<String> why;
+
   int get newFactCount => whatsNew.length;
   int get itemCount => kindCounts.values.fold(0, (sum, n) => sum + n);
 
@@ -127,5 +161,6 @@ class Story {
     whatsNew: whatsNew ?? this.whatsNew,
     disagreements: disagreements,
     timeline: timeline,
+    why: why,
   );
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/layout/three_pane_layout.dart';
 import '../../core/models/models.dart';
 import '../../core/session/session.dart';
+import '../../core/session/stories.dart';
 import '../../core/theme/tokens.dart';
 import '../../sample/sample_content.dart' as sample;
 import '../../shared/widgets/pill_nav.dart';
@@ -28,9 +31,10 @@ const _phoneTabs = [
 ];
 
 /// Today: the three panes, or the overview when no story is open. Signed out, it is
-/// the demo, whose stories are invented samples, labelled, until OSMS collects real
-/// ones. Signed in, only the reader's own stories: a new reader, or one without
-/// sources, starts with an empty Today that says what comes next.
+/// the demo: the seed sources' real stories, or invented samples, labelled, until the
+/// pipeline has collected some. Signed in, only the reader's own stories: a new reader,
+/// or one without sources, starts with an empty Today that says what comes next.
+/// Stories refresh every minute and when the app comes back to the front.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -38,7 +42,9 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  static const _refreshEvery = Duration(minutes: 1);
+  Timer? _refresh;
   String? _selected;
   int _phoneTab = 0;
   StoryCardLayout? _layout;
@@ -55,13 +61,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   SessionController get _session => ref.read(sessionProvider.notifier);
 
-  void _selectStory(String? id) => setState(() {
-    _selected = id;
-    _askQuestion = null;
-    _askResult = null;
-    _askThinking = false;
-    _askUnavailable = false;
-  });
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh = Timer.periodic(_refreshEvery, (_) => ref.invalidate(storiesProvider));
+  }
+
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) ref.invalidate(storiesProvider);
+  }
+
+  void _selectStory(String? id) {
+    setState(() {
+      _selected = id;
+      _askQuestion = null;
+      _askResult = null;
+      _askThinking = false;
+      _askUnavailable = false;
+    });
+    // Opening a story is reading it: what's new starts again from now. The page keeps
+    // showing what was new until the next refresh.
+    final session = ref.read(sessionProvider).value;
+    if (id != null && (session?.signedIn ?? false)) {
+      unawaited(ref.read(apiClientProvider).markRead(id).catchError((Object _) {}));
+    }
+  }
 
   void _askStory(String question) {
     setState(() {
@@ -87,10 +120,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (story.timeline.isNotEmpty) 'How did this story develop?',
   ];
 
-  /// The stories Today shows: the demo's samples while signed out; signed in, the
-  /// reader's own, of which there are none until OSMS collects them.
-  static List<Story> _storiesFor(Session session) => session.signedIn ? const [] : sample.stories;
-
   /// Sidebar taps: research interests live on their own page, everything else
   /// filters the story list (and clears any open story).
   void _selectNav(String id, Session session) {
@@ -104,36 +133,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// The list follows the sidebar: Today is everything, a topic or a source
   /// narrows to its stories, Saved waits for the kept-store to land.
-  List<Story> _visibleStories(Session session) {
-    final stories = _storiesFor(session);
+  List<Story> _visibleStories(List<Story> stories, List<Topic> topics) {
     final nav = _nav;
     if (nav == 'today' || nav == 'saved') return nav == 'today' ? stories : const [];
-    final topics = session.account?.topics ?? sample.topics;
     final topic = topics.where((t) => t.id == nav).firstOrNull;
     if (topic != null) return stories.where((s) => s.topic == topic.name).toList();
     return stories.where((s) => s.sources.any((src) => src.id == nav)).toList();
   }
 
-  String _navTitle(Session session) => switch (_nav) {
+  String _navTitle(List<Topic> topics, List<Source> sources) => switch (_nav) {
     'today' => 'Today',
     'saved' => 'Saved',
     _ =>
-      (session.account?.topics ?? sample.topics).where((t) => t.id == _nav).firstOrNull?.name ??
-          (session.account?.subscriptions ?? sample.followedSources)
-              .where((s) => s.id == _nav)
-              .firstOrNull
-              ?.name ??
+      topics.where((t) => t.id == _nav).firstOrNull?.name ??
+          sources.where((s) => s.id == _nav).firstOrNull?.name ??
           'Today',
   };
 
-  void _openPalette(BuildContext context, Session session) {
-    final sources = session.account?.subscriptions ?? sample.followedSources;
+  void _openPalette(BuildContext context, Session session, StoriesView view, List<Source> sources) {
     CommandPalette.show(context, [
-      for (final s in _storiesFor(session))
+      for (final s in view.stories)
         CommandItem(
           icon: Icons.article_outlined,
           label: s.title,
-          detail: session.signedIn ? s.topic : 'Sample · ${s.topic}',
+          detail: view.samples ? 'Sample · ${s.topic}' : s.topic,
           group: 'Stories',
           onRun: () => _selectStory(s.id),
         ),
@@ -181,10 +204,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final session = ref.watch(sessionProvider).requireValue;
     final account = session.account;
     final user = account?.user;
-    final stories = _visibleStories(session);
-    final briefing = account == null ? sample.briefing : null;
-    // The demo's matched papers, with their reasons, until real matches exist.
-    final research = !session.signedIn && _nav == 'today' ? sample.research : const <Item>[];
+    final loaded = ref.watch(storiesProvider);
+    final view = loaded.value ?? const StoriesView(stories: []);
+    final loading = !loaded.hasValue;
+    // The sample briefing and papers belong to the sample stories; real ones come later.
+    final briefing = account == null && view.samples ? sample.briefing : null;
+    final research = view.samples && _nav == 'today' ? sample.research : const <Item>[];
+    // The demo's sources and topics: the samples', or the seed sources behind real stories.
+    final demoSources = view.samples
+        ? sample.followedSources
+        : {
+            for (final story in view.stories)
+              for (final source in story.sources) source.id: source,
+          }.values.toList();
+    final demoTopics = view.samples
+        ? sample.topics
+        : (ref.watch(onboardingOptionsProvider).value?.topics ?? const <Topic>[]);
+    final navTopics = account?.topics ?? demoTopics;
+    final navSources = account?.subscriptions ?? demoSources;
+    final stories = _visibleStories(view.stories, navTopics);
     final saved = _nav == 'saved';
     final story = stories.where((s) => s.id == _selected).firstOrNull;
     final layout = _layout ?? account?.defaultLayout ?? StoryCardLayout.row;
@@ -195,22 +233,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Widget? banner() => account == null
         ? DemoBanner(
             signInAvailable: session.available && session.providers.any,
-            samples: true,
+            samples: view.samples,
             onCreateAccount: () => context.go('/sign-in?intent=create'),
             onSignIn: () => context.go('/sign-in'),
+          )
+        : view.unavailable
+        ? const QuietNote(
+            icon: Icons.cloud_off_rounded,
+            title: 'Your stories didn’t load',
+            body: 'OSMS couldn’t reach its server. Today tries again every minute.',
           )
         : null;
 
     SourcesSidebar sidebar({bool withSearch = true}) => SourcesSidebar(
-      topics: account?.topics ?? sample.topics,
-      sources: account?.subscriptions ?? sample.followedSources,
+      topics: navTopics,
+      sources: navSources,
       interests: account?.interests ?? const [],
       briefing: withSearch ? briefing : null,
       user: user,
       selected: _nav,
       onSelect: (id) => _selectNav(id, session),
       onSignIn: () => context.go('/sign-in'),
-      onSearch: withSearch ? () => _openPalette(context, session) : null,
+      onSearch: withSearch ? () => _openPalette(context, session, view, navSources) : null,
       onSettings: () => context.go('/settings'),
       onWhatWeKeep: () => context.go('/what-we-keep'),
       onSignOut: _session.signOut,
@@ -220,13 +264,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       sidebar: sidebar(),
       list: StoryList(
         stories: stories,
-        title: _navTitle(session),
+        title: _navTitle(navTopics, navSources),
         selectedId: _selected,
         layout: layout,
         bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,
         banner: banner(),
         sourceCount: sourceCount,
-        onChooseSources: chooseSources,
+        onChooseSources: saved ? null : chooseSources,
+        loading: loading,
         emptyTitle: saved ? 'Nothing saved yet' : null,
         emptyBody: saved ? 'Save a story from its toolbar and it waits for you here.' : null,
         emptyIcon: saved ? Icons.bookmark_outline_rounded : null,
@@ -243,7 +288,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         user: user,
         banner: banner(),
         sourceCount: sourceCount,
-        onChooseSources: chooseSources,
+        onChooseSources: saved ? null : chooseSources,
+        loading: loading,
         emptyTitle: saved ? 'Nothing saved yet' : null,
         emptyBody: saved ? 'Save a story from its toolbar and it waits for you here.' : null,
         onOpen: (s) => _selectStory(s.id),
@@ -283,8 +329,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () => _openPalette(context, session),
-        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () => _openPalette(context, session),
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () =>
+            _openPalette(context, session, view, navSources),
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
+            _openPalette(context, session, view, navSources),
         const SingleActivator(LogicalKeyboardKey.comma, meta: true): () => context.go('/settings'),
       },
       child: Focus(autofocus: true, child: shell),

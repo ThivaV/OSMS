@@ -24,6 +24,7 @@ class StoryList extends StatelessWidget {
     this.emptyTitle,
     this.emptyBody,
     this.emptyIcon,
+    this.loading = false,
     this.banner,
     this.bottomInset = Space.xl,
   });
@@ -53,6 +54,9 @@ class StoryList extends StatelessWidget {
   final String? emptyBody;
   final IconData? emptyIcon;
 
+  /// Stories are on their way: a spinner, never "No stories yet" for a moment.
+  final bool loading;
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -77,7 +81,7 @@ class StoryList extends StatelessWidget {
                       const SizedBox(height: Space.xxs),
                       Text(
                         stories.isEmpty
-                            ? 'No stories yet'
+                            ? (loading ? 'Collecting stories…' : 'No stories yet')
                             : '${plural(stories.length, 'story', 'stories')} from ${plural(items, 'item')}',
                         style: t.caption.copyWith(color: c.textTertiary),
                       ),
@@ -89,7 +93,11 @@ class StoryList extends StatelessWidget {
                     showSelectedIcon: false,
                     segments: const [
                       ButtonSegment(value: StoryCardLayout.row, icon: Icon(Icons.view_list_rounded), tooltip: 'List'),
-                      ButtonSegment(value: StoryCardLayout.card, icon: Icon(Icons.view_agenda_outlined), tooltip: 'Cards'),
+                      ButtonSegment(
+                        value: StoryCardLayout.card,
+                        icon: Icon(Icons.view_agenda_outlined),
+                        tooltip: 'Cards',
+                      ),
                     ],
                     selected: {layout},
                     onSelectionChanged: (s) => onLayoutChanged!(s.first),
@@ -103,7 +111,12 @@ class StoryList extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.md),
             sliver: SliverToBoxAdapter(child: banner),
           ),
-        if (stories.isEmpty)
+        if (stories.isEmpty && loading)
+          const SliverPadding(
+            padding: EdgeInsets.all(Space.xl),
+            sliver: SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
+          )
+        else if (stories.isEmpty)
           SliverPadding(
             padding: const EdgeInsets.all(Space.lg),
             sliver: SliverToBoxAdapter(
@@ -130,7 +143,10 @@ class StoryList extends StatelessWidget {
                   onTap: onSelect == null ? null : () => onSelect!(story),
                 );
                 return layout == StoryCardLayout.card
-                    ? Padding(padding: const EdgeInsets.symmetric(horizontal: Space.sm), child: card)
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+                        child: card,
+                      )
                     : card;
               },
             ),

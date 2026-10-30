@@ -5,6 +5,7 @@ import '../../core/theme/tokens.dart';
 import '../formatting.dart';
 import 'section_header.dart';
 import 'source_chip.dart';
+import 'source_quote.dart';
 
 /// New facts since the reader last read the story. Only facts, never a
 /// re-summary. Sits at the top of the story page.
@@ -107,6 +108,25 @@ class _ClaimRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(claim.text, style: t.body),
+              if (claim.corrects case final before?) ...[
+                const SizedBox(height: Space.xxs),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: 'Corrected  ·  was '),
+                      TextSpan(
+                        text: before,
+                        style: const TextStyle(decoration: TextDecoration.lineThrough),
+                      ),
+                    ],
+                  ),
+                  style: t.caption.copyWith(color: c.textSecondary),
+                ),
+              ],
+              if (claim.quote case final quote?) ...[
+                const SizedBox(height: Space.sm),
+                SourceQuote(quote: quote, language: claim.quoteLanguage ?? 'en', translation: claim.translation),
+              ],
               const SizedBox(height: Space.sm),
               Wrap(
                 spacing: Space.xs,
@@ -120,6 +140,12 @@ class _ClaimRow extends StatelessWidget {
                       onTap: onOpenSource == null ? null : () => onOpenSource!(s),
                     ),
                   if (extra > 0) Text('+$extra', style: t.caption.copyWith(color: c.textSecondary)),
+                  // Corroboration in words, never colour alone.
+                  if (claim.quote != null && claim.singleSource)
+                    Text(
+                      'One source so far',
+                      style: t.caption.copyWith(color: c.textSecondary, fontWeight: FontWeight.w600),
+                    ),
                   Padding(
                     padding: const EdgeInsets.only(left: Space.xs),
                     child: Text(timeAgo(claim.reportedAt), style: t.caption.copyWith(color: c.textTertiary)),

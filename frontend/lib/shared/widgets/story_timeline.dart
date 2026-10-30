@@ -9,10 +9,13 @@ import 'section_header.dart';
 /// How the story developed, oldest first, with a marker where the reader
 /// last left off. Events after it are new.
 class StoryTimeline extends StatelessWidget {
-  const StoryTimeline({super.key, required this.events, this.lastReadAt});
+  const StoryTimeline({super.key, required this.events, this.lastReadAt, this.onOpen});
 
   final List<TimelineEvent> events;
   final DateTime? lastReadAt;
+
+  /// Opens an event's original article. Headlines link to their publisher.
+  final ValueChanged<String>? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +41,7 @@ class StoryTimeline extends StatelessWidget {
               event: sorted[i],
               isNew: firstNew != -1 && i >= firstNew,
               isLast: i == sorted.length - 1,
+              onOpen: onOpen,
             ),
           ],
       ],
@@ -46,11 +50,12 @@ class StoryTimeline extends StatelessWidget {
 }
 
 class _EventRow extends StatelessWidget {
-  const _EventRow({required this.event, required this.isNew, required this.isLast});
+  const _EventRow({required this.event, required this.isNew, required this.isLast, this.onOpen});
 
   final TimelineEvent event;
   final bool isNew;
   final bool isLast;
+  final ValueChanged<String>? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -98,12 +103,35 @@ class _EventRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(event.text, style: t.body),
+                  if (event.correctedFrom case final before?) ...[
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Corrected  ',
+                            style: t.caption.copyWith(color: c.newSignal, fontWeight: FontWeight.w700),
+                          ),
+                          TextSpan(
+                            text: before,
+                            style: t.caption.copyWith(color: c.textSecondary, decoration: TextDecoration.lineThrough),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: Space.xxs),
+                  ],
+                  if (event.url case final url? when onOpen != null)
+                    InkWell(
+                      onTap: () => onOpen!(url),
+                      child: Text(
+                        event.text,
+                        style: t.body.copyWith(decoration: TextDecoration.underline, decorationColor: c.border),
+                      ),
+                    )
+                  else
+                    Text(event.text, style: t.body),
                   const SizedBox(height: Space.xxs),
-                  Text(
-                    meta,
-                    style: t.caption.copyWith(color: isNew ? c.newSignal : c.textTertiary),
-                  ),
+                  Text(meta, style: t.caption.copyWith(color: isNew ? c.newSignal : c.textTertiary)),
                 ],
               ),
             ),
@@ -140,7 +168,9 @@ class _LastReadMarker extends StatelessWidget {
             ),
           ),
           const SizedBox(width: Space.sm),
-          Expanded(child: Container(height: Sizes.hairline, color: c.newSignal.withValues(alpha: 0.4))),
+          Expanded(
+            child: Container(height: Sizes.hairline, color: c.newSignal.withValues(alpha: 0.4)),
+          ),
         ],
       ),
     );

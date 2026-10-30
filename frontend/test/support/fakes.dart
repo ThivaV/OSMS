@@ -101,6 +101,22 @@ class FakeApi extends ApiClient {
 
   @override
   Future<void> deleteMe() async => deleted = true;
+
+  /// The reader's stories from the pipeline; none until a test gives some.
+  List<Story> readerStories = const [];
+
+  /// The demo's real stories; empty means the app shows its labelled samples.
+  List<Story> demo = const [];
+  final List<String> read = [];
+
+  @override
+  Future<List<Story>> stories() async => readerStories;
+
+  @override
+  Future<List<Story>> demoStories() async => demo;
+
+  @override
+  Future<void> markRead(String storyId) async => read.add(storyId);
 }
 
 Future<(FakeAuth, FakeApi)> start(
@@ -108,12 +124,16 @@ Future<(FakeAuth, FakeApi)> start(
   FakeAuth? auth,
   bool onboarded = false,
   List<Source>? subscriptions,
+  List<Story> readerStories = const [],
+  List<Story> demo = const [],
 }) async {
   tester.view.physicalSize = const Size(1440, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final fakeAuth = auth ?? FakeAuth();
-  final fakeApi = FakeApi(fakeAuth, onboarded: onboarded, subscriptions: subscriptions);
+  final fakeApi = FakeApi(fakeAuth, onboarded: onboarded, subscriptions: subscriptions)
+    ..readerStories = readerStories
+    ..demo = demo;
   await tester.pumpWidget(
     ProviderScope(
       overrides: [authClientProvider.overrideWithValue(fakeAuth), apiClientProvider.overrideWithValue(fakeApi)],

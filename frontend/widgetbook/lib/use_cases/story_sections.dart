@@ -4,6 +4,7 @@ import 'package:osms/core/theme/tokens.dart';
 import 'package:osms/features/story_detail/story_detail_view.dart';
 import 'package:osms/shared/widgets/ask_story_box.dart';
 import 'package:osms/shared/widgets/disagreement_panel.dart';
+import 'package:osms/shared/widgets/source_quote.dart';
 import 'package:osms/shared/widgets/story_timeline.dart';
 import 'package:osms/shared/widgets/whats_new_section.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart' as widgetbook;
@@ -31,6 +32,32 @@ Widget whatsNewEmpty(BuildContext context) => Frame(
 Widget whatsNewExtreme(BuildContext context) => Frame(
   maxWidth: _sectionWidth,
   child: WhatsNewSection(claims: fx.extremeStory.whatsNew, since: fx.extremeStory.lastReadAt, onOpenSource: (_) {}),
+);
+
+// ── A source's own words ─────────────────────────────────────────────────────
+
+/// A Danish source in an English story: the original, then a labelled translation.
+@widgetbook.UseCase(name: 'Normal', type: SourceQuote, path: '[Story]')
+Widget sourceQuoteNormal(BuildContext context) => const Frame(
+  maxWidth: _sectionWidth,
+  child: SourceQuote(
+    quote: 'Dansk er det sprog, der er forbedret mest: 9 point.',
+    language: 'da',
+    translation: 'Danish is the language that improved the most: 9 points.',
+  ),
+);
+
+/// Already in the story's language: no translation needed.
+@widgetbook.UseCase(name: 'Empty', type: SourceQuote, path: '[Story]')
+Widget sourceQuoteEmpty(BuildContext context) => const Frame(
+  maxWidth: _sectionWidth,
+  child: SourceQuote(quote: 'Both satellites have now sent their first signals home.', language: 'en'),
+);
+
+@widgetbook.UseCase(name: 'Extreme content', type: SourceQuote, path: '[Story]')
+Widget sourceQuoteExtreme(BuildContext context) => Frame(
+  maxWidth: _sectionWidth,
+  child: SourceQuote(quote: 'விலை ' * 60, language: 'ta', translation: 'The price ' * 60),
 );
 
 // ── Where sources disagree ───────────────────────────────────────────────────

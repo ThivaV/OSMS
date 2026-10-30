@@ -1,10 +1,10 @@
 # OSMS local development: `make up` (or `tilt up`) at the repo root.
 # Tilt UI: http://localhost:10350. Rules: AGENTS.md, "Local development with Tilt".
 #
-# A resource joins when its code exists. Running today: auth (Better Auth), api, app,
-# Widgetbook and the check buttons. Still to come with their code: milvus, glimmer,
-# worker, overnight-agent, eval. SQLite needs no resource: data/osms.db and
-# data/auth.db are files.
+# A resource joins when its code exists. Running today: auth (Better Auth), api, worker
+# (the story pipeline), app, Widgetbook and the check buttons. Still to come with their
+# code: glimmer, overnight-agent, eval. SQLite and Milvus Lite need no resource:
+# data/osms.db, data/auth.db and data/milvus.db are files.
 
 load('ext://uibutton', 'cmd_button')
 
@@ -85,6 +85,32 @@ local_resource(
     labels=['backend'],
     links=[link('http://localhost:8000/docs', 'API docs')],
     readiness_probe=probe(http_get=http_get_action(port=8000, path='/health'), period_secs=5),
+)
+
+# The story pipeline: scheduled fetches, the jobs queue, BGE-M3, Milvus Lite (embedded on
+# data/milvus.db, so this is the only process that opens it), clustering and the agents.
+# Restarts on code or .env changes; a restart loses nothing (the queue is in SQLite).
+local_resource(
+    'worker',
+    serve_cmd='uv run python -m app.worker run',
+    serve_dir='backend',
+    deps=['.env', 'backend/app'],
+    resource_deps=['api'],
+    labels=['backend'],
+)
+cmd_button(
+    'worker:fetch-now',
+    argv=['sh', '-c', 'cd backend && uv run python -m app.worker fetch-now'],
+    resource='worker',
+    icon_name='refresh',
+    text='Fetch now',
+)
+cmd_button(
+    'worker:status',
+    argv=['sh', '-c', 'cd backend && uv run python -m app.worker status'],
+    resource='worker',
+    icon_name='insights',
+    text='Pipeline status',
 )
 
 # ── Frontend ─────────────────────────────────────────────────────────────────

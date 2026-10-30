@@ -28,6 +28,7 @@ class TodayOverview extends StatelessWidget {
     this.onAddSource,
     this.emptyTitle,
     this.emptyBody,
+    this.loading = false,
     this.banner,
   });
 
@@ -52,6 +53,9 @@ class TodayOverview extends StatelessWidget {
   /// Overrides for a filtered empty Today (e.g. Saved, with nothing kept yet).
   final String? emptyTitle;
   final String? emptyBody;
+
+  /// Stories are on their way: a spinner, never "No stories yet" for a moment.
+  final bool loading;
 
   /// Above the greeting, e.g. the demo notice while signed out.
   final Widget? banner;
@@ -79,13 +83,20 @@ class TodayOverview extends StatelessWidget {
         final header = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(longDate(now), style: t.caption.copyWith(color: c.textTertiary, fontWeight: FontWeight.w600)),
+            Text(
+              longDate(now),
+              style: t.caption.copyWith(color: c.textTertiary, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: Space.xs),
             Text(firstName == null ? 'Today' : '${greeting(now)}, $firstName', style: t.title),
             const SizedBox(height: Space.xs),
             Text(
               stories.isEmpty
-                  ? NoStories.summary(sourceCount)
+                  ? (loading
+                        ? 'Collecting stories…'
+                        : emptyTitle != null
+                        ? 'Nothing here yet.'
+                        : NoStories.summary(sourceCount))
                   : '${plural(stories.length, 'story', 'stories')} from ${plural(items, 'item')}'
                         '${withNews.isEmpty ? '' : '  ·  ${withNews.length} with new facts'}',
               style: t.body.copyWith(color: c.textSecondary),
@@ -106,26 +117,29 @@ class TodayOverview extends StatelessWidget {
                     if (banner case final banner?) ...[banner, const SizedBox(height: Space.xl)],
                     header,
                     const SizedBox(height: Space.xl),
-                    Container(
-                      padding: const EdgeInsets.all(Space.xl),
-                      decoration: BoxDecoration(
-                        color: c.surface,
-                        borderRadius: BorderRadius.circular(Radii.lg),
-                        border: Border.all(color: c.border),
+                    if (loading)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(Space.xl),
+                        decoration: BoxDecoration(
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(Radii.lg),
+                          border: Border.all(color: c.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(emptyTitle ?? NoStories.title, style: t.subhead),
+                            const SizedBox(height: Space.xs),
+                            Text(
+                              emptyBody ?? NoStories.body(sourceCount),
+                              style: t.bodySmall.copyWith(color: c.textSecondary),
+                            ),
+                            if (actions.hasActions) ...[const SizedBox(height: Space.lg), actions],
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(emptyTitle ?? NoStories.title, style: t.subhead),
-                          const SizedBox(height: Space.xs),
-                          Text(
-                            emptyBody ?? NoStories.body(sourceCount),
-                            style: t.bodySmall.copyWith(color: c.textSecondary),
-                          ),
-                          if (actions.hasActions) ...[const SizedBox(height: Space.lg), actions],
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -133,7 +147,11 @@ class TodayOverview extends StatelessWidget {
           );
         }
 
-        final lead = _LeadCard(story: stories.first, large: width >= _sideBySideMin, onTap: () => onOpen?.call(stories.first));
+        final lead = _LeadCard(
+          story: stories.first,
+          large: width >= _sideBySideMin,
+          onTap: () => onOpen?.call(stories.first),
+        );
         final briefingTile = briefing == null || briefing!.chapters.isEmpty
             ? null
             : _BriefingTile(briefing: briefing!, onPlay: onPlayBriefing);
@@ -454,10 +472,7 @@ class _ResearchSection extends StatelessWidget {
             trailing: CountPill(count: papers.length),
           ),
           const SizedBox(height: Space.xxs),
-          Text(
-            'From arXiv, matched to your research interests.',
-            style: t.caption.copyWith(color: c.textTertiary),
-          ),
+          Text('From arXiv, matched to your research interests.', style: t.caption.copyWith(color: c.textTertiary)),
           const SizedBox(height: Space.sm),
           for (final (i, p) in papers.take(_shown).indexed) ...[
             if (i > 0) const Divider(),
@@ -507,11 +522,13 @@ class _PaperRow extends StatelessWidget {
                 children: [
                   Text(paper.title ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: t.headlineSmall),
                   const SizedBox(height: Space.xxs),
-                  Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.caption.copyWith(color: c.textTertiary)),
-                  if (reason != null) ...[
-                    const SizedBox(height: Space.xs),
-                    PaperTag(label: reason, emphasis: true),
-                  ],
+                  Text(
+                    meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.caption.copyWith(color: c.textTertiary),
+                  ),
+                  if (reason != null) ...[const SizedBox(height: Space.xs), PaperTag(label: reason, emphasis: true)],
                 ],
               ),
             ),

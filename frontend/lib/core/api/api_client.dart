@@ -88,4 +88,13 @@ class ApiClient {
 
   /// Deletes everything OSMS keeps about the reader. Sign-in deletes the account after.
   Future<void> deleteMe() => _send('DELETE', '/me');
+
+  /// The reader's stories: the ones their sources picked, with what's new since they read each.
+  Future<List<Story>> stories() async => storiesFromJson((await _send('GET', '/stories'))!);
+
+  /// The demo's stories, for signed-out visitors: every seed source, no account needed.
+  Future<List<Story>> demoStories() async => storiesFromJson((await _send('GET', '/demo/stories', signedIn: false))!);
+
+  /// The reader opened the story: what's new starts again from now.
+  Future<void> markRead(String storyId) => _send('POST', '/stories/$storyId/read');
 }

@@ -6,15 +6,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import me
+from app.api import me, stories
 from app.auth.tokens import JwksKeys, TokenVerifier
-from app.config import SEED_OPML, Settings
+from app.config import SEED_OPML, Settings, check_routes
 from app.db.sqlite import make_engine, migrate, session_factory
 from app.services.ingestion.opml import load_seed
 
 
 def create_app(settings: Settings | None = None, verifier: TokenVerifier | None = None) -> FastAPI:
     settings = settings or Settings()
+    # A misconfigured routing table fails here, before any agent decides anything.
+    check_routes(settings.model_routes())
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -33,7 +35,7 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origins,
-        # POST is for Day 8's `POST /stories/{id}/ask`; nothing posts yet.
+        # POST: marking a story read, and Day 8's `POST /stories/{id}/ask`.
         allow_methods=["GET", "PUT", "PATCH", "DELETE", "POST"],
         allow_headers=["Authorization", "Content-Type"],
     )
@@ -43,6 +45,7 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
         return {"ok": True}
 
     app.include_router(me.router)
+    app.include_router(stories.router)
     return app
 
 

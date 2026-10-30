@@ -4,6 +4,7 @@ agents, a bounded tool loop (`run_tool_loop`) for the editor style ones. The
 network client lands Day 5; tests drive this through the fake in
 `app/clients/fake.py`."""
 
+import json
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -16,6 +17,8 @@ from pydantic import BaseModel, ValidationError
 class ToolCall:
     name: str
     arguments: dict[str, Any]
+    #: The provider's id for this call; a tool result answers it by id.
+    id: str = ""
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,10 @@ class ModelStep:
     reason: str = ""
     usage: ModelUsage = field(default_factory=ModelUsage)
     commentary: str | None = None
+    #: The model that actually answered, when the client knows it (a backup, say).
+    model: str | None = None
+    #: True when the route's backup answered instead of its model.
+    fallback: bool = False
 
 
 class ModelClient(Protocol):
@@ -50,9 +57,11 @@ class ModelClient(Protocol):
         self,
         *,
         system: str,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         agent: str,
+        schema: dict[str, Any] | None = None,
+        effort: str | None = None,
     ) -> ModelStep: ...
 
 
@@ -108,11 +117,19 @@ class Runner:
         self.clock = clock
 
     def _call_model(
-        self, spec: AgentSpec, *, system: str, messages: list[dict[str, str]], tools: list[dict[str, Any]]
+        self,
+        spec: AgentSpec,
+        *,
+        system: str,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        schema: dict[str, Any] | None = None,
     ) -> tuple[ModelStep, int]:
         start = self.clock()
         try:
-            step = self.client.step(system=system, messages=messages, tools=tools, agent=spec.name)
+            step = self.client.step(
+                system=system, messages=messages, tools=tools, agent=spec.name, schema=schema, effort=spec.route.effort
+            )
         except Exception as error:
             raise ModelError(str(error)) from error
         latency_ms = max(0, int((self.clock() - start) * 1000))
@@ -132,23 +149,27 @@ class Runner:
 
         log: DecisionLog = self.log
         run_id = log.start_run(agent=spec.name, model=spec.route.model, prompt_version=spec.prompt_version)
-        messages = [{"role": "user", "content": user}]
+        messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
         usage = ModelUsage()
         attempts = 0
+        json_schema = schema.model_json_schema()
+        fallback: str | None = None
         while True:
             attempts += 1
             try:
-                step, latency_ms = self._call_model(spec, system=system, messages=messages, tools=[])
+                step, latency_ms = self._call_model(spec, system=system, messages=messages, tools=[], schema=json_schema)
             except ModelError as error:
                 log.end_run(run_id=run_id, status="failed", stop_reason="error", error=error.detail,
                         sensitive=spec.sensitive)
                 return RunResult("failed", "error", None, usage, run_id)
             usage += step.usage
+            if step.fallback:
+                fallback = step.model
             log.log_step(
                 run_id=run_id,
                 position=attempts - 1,
                 reason=step.reason,
-                model=spec.route.model,
+                model=step.model or spec.route.model,
                 prompt_version=spec.prompt_version,
                 input_tokens=step.usage.input_tokens,
                 output_tokens=step.usage.output_tokens,
@@ -158,19 +179,19 @@ class Runner:
             )
             if step.final is None:
                 log.end_run(run_id=run_id, status="failed", stop_reason="no-final", error="model returned no payload",
-                        sensitive=spec.sensitive)
+                        fallback=fallback, sensitive=spec.sensitive)
                 return RunResult("failed", "no-final", None, usage, run_id)
             try:
                 value = schema.model_validate(step.final)
             except ValidationError as error:
                 if attempts > 1:
                     log.end_run(run_id=run_id, status="failed", stop_reason="invalid-output", error=str(error),
-                        sensitive=spec.sensitive)
+                        fallback=fallback, sensitive=spec.sensitive)
                     return RunResult("failed", "invalid-output", None, usage, run_id)
                 messages.append({"role": "assistant", "content": "Invalid output, retry as JSON matching the schema."})
                 messages.append({"role": "user", "content": f"Validation failed: {error}. Return only the fixed JSON."})
                 continue
-            log.end_run(run_id=run_id, status="ok")
+            log.end_run(run_id=run_id, status="ok", fallback=fallback)
             return RunResult("ok", None, value.model_dump(), usage, run_id)
 
     def run_tool_loop(
@@ -188,7 +209,7 @@ class Runner:
         log: DecisionLog = self.log
         run_id = log.start_run(agent=spec.name, model=spec.route.model, prompt_version=spec.prompt_version)
         started = self.clock()
-        messages = [{"role": "user", "content": user}]
+        messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
         definitions = [tool.definition() for tool in tools.values()]
         usage = ModelUsage()
         position = 0
@@ -210,7 +231,7 @@ class Runner:
                 run_id=run_id,
                 position=position,
                 reason=step.reason,
-                model=spec.route.model,
+                model=step.model or spec.route.model,
                 prompt_version=spec.prompt_version,
                 input_tokens=step.usage.input_tokens,
                 output_tokens=step.usage.output_tokens,
@@ -226,6 +247,16 @@ class Runner:
                     return RunResult("failed", "no-final", None, usage, run_id)
                 log.end_run(run_id=run_id, status="ok")
                 return RunResult("ok", None, step.final, usage, run_id)
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {"id": c.id, "type": "function", "function": {"name": c.name, "arguments": json.dumps(c.arguments)}}
+                        for c in step.tool_calls
+                    ],
+                }
+            )
             for call in step.tool_calls:
                 tool = tools.get(call.name)
                 if tool is None:
@@ -249,7 +280,7 @@ class Runner:
                     sensitive=spec.sensitive,
                 )
                 position += 1
-                messages.append({"role": "tool", "content": f"{tool.name}: {outcome}"})
+                messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(outcome, default=str)})
 
     def _stop(self, log, run_id: int, usage: ModelUsage, reason: str, spec: AgentSpec) -> RunResult:
         log.end_run(run_id=run_id, status="stopped", stop_reason=reason, sensitive=spec.sensitive)

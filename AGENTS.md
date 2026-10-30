@@ -15,7 +15,7 @@ Technically, I’ll cluster articles using multilingual dense and sparse embeddi
 Muse Spark will handle claim extraction, disagreement detection, “what’s new” diffs and the briefing script; Muse Image will generate story cards and timeline visuals. 
 I’ll measure clustering quality on a hand-labelled set of articles.
 
-Muse Spark & SAM 3.1 to generate interactive podcasts.
+Interactive podcasts with Meta AI: Muse Spark writes them, Meta's open speech models (SeamlessM4T v2, MMS-TTS) voice them, Muse Voice Transcribe checks them, and readers can ask the story questions.
 ```
 
 ## 1. What we are building
@@ -117,6 +117,8 @@ editor drives the other models through tools (see *Agents*).
 | **SAM 3.1** (`sam-3-1`) | Meta Model API | Checks every illustration for people, faces, logos and text before anyone sees it, and finds its subject so each card shape crops around it | Illustrations can't ship: the check is required |
 | **Muse Voice Transcribe** (`muse-voice-transcribe-1.0`) | Meta Model API | Podcast episodes, biased towards the source's and story's names; and a check on every briefing, transcribed back and compared with its script | Podcasts can't join stories; a garbled briefing goes out unnoticed |
 | **Muse Code** | CLI on macOS, powered by Muse Spark | Building parts of OSMS from the specs in `docs/specs/`; the README lists which parts | – |
+| **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`) | Open weights (CC-BY-NC 4.0), run by the worker | The podcast's voice in English and Danish (text to speech) | No Danish audio: the briefing is English and Tamil only |
+| **MMS-TTS** (`facebook/mms-tts-tam`, `-eng`) | Open weights (CC-BY-NC 4.0), run by the worker | The podcast's voice in Tamil (SeamlessM4T has no Tamil speech) | No Tamil audio |
 
 **Where OSMS deliberately does not use them**
 
@@ -187,9 +189,28 @@ every action is traceable. Install it with Meta's script (`curl -fsSL
 https://dev.meta.ai/install.sh | bash`) only after reading the script. Its page doesn't
 say it reads `AGENTS.md`, so point it at this file and the task's spec.
 
-**Audio briefing TTS:** Meta Model API has no text-to-speech ("Muse Voice Transcribe does
-not synthesize speech"), so use an open-source TTS and say which in the README. Pick one
-with Danish and Tamil voices and a licence that allows the demo.
+**Podcasts: what Meta AI can make, and what makes each part** (checked Oct 30)
+
+The morning briefing is OSMS's podcast: one chapter per story, in the reader's language,
+every fact cited. Meta Model API has no text-to-speech ("Muse Voice Transcribe does not
+synthesize speech"; custom voices were reported in testing in Sept 2026, not a documented
+API), so the voice comes from Meta's open-weight speech models, run by the worker:
+
+| Part | Made by | Notes |
+|---|---|---|
+| Script | **Muse Spark** (writer agent, editor's checklist) | From the stories' verified facts only, cited; at most two hosts |
+| Voice, English and Danish | **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`) | Text-to-speech through its text-to-speech-translation task with the same source and target language; speech output covers 35 languages, Danish (`dan`) and English included |
+| Voice, Tamil | **MMS-TTS** (`facebook/mms-tts-tam`) | SeamlessM4T outputs Tamil text but not Tamil speech; MMS has no Danish voice (`mms-tts-dan` doesn't exist), so each model covers what the other can't |
+| Check | **Muse Voice Transcribe** (batch `POST /v1/asr/transcribe`, per LiteLLM's Meta docs; confirm on dev.meta.ai) | The audio is transcribed back and compared with the script; a chapter that drifts is remade |
+| Cover art | **Muse Image**, checked by **SAM 3.1** | Like any illustration: no people, faces, logos or text; labelled as one |
+| Intro music (optional) | **MusicGen** (`facebook/musicgen-small`, AudioCraft) | Only if it earns its place (load-bearing, never decorative): one short sting, made once and reused |
+| Questions while listening | **Muse Voice Transcribe** + the ask agent | Post-hackathon; typed "Ask this story" ships first |
+
+SAM 3.1 makes no audio: it finds and outlines things in images and video, so its podcast
+job is checking the cover art. The speech models' weights are **CC-BY-NC 4.0**
+(non-commercial): fine for the hackathon demo; check the hackathon's rules before
+submitting, and never sell the audio. They download on first use (the `models` extra) and
+run on the Mac's GPU, or the deploy machine's.
 
 ---
 
@@ -283,11 +304,17 @@ story's verified claims, never who asked.
 
 ### Runtime
 
-- **One client for every text model:** the OpenAI Python SDK (ask before adding it),
-  pointed at Meta Model API, Baseten, or the Muse Glimmer server (Ollama serves an
-  OpenAI-compatible API). The Responses API for the editor's multi-step loop, Chat
-  Completions with a JSON schema for single calls. Muse Image, SAM 3.1 and Muse Voice
-  Transcribe use their own endpoints, from the docs.
+- **One client for every text model:** OpenAI-compatible Chat Completions over httpx
+  (`backend/app/clients/openai_compat.py`, built Oct 30; no SDK, so the decision log sees
+  exactly what was sent), pointed at Meta Model API, Baseten, or the Muse Glimmer server
+  (Ollama serves an OpenAI-compatible API). JSON-schema structured output and
+  `reasoning_effort` per request; every request passes `assert_no_search` first.
+  `RoutedModels` fails over to the backup only for judge, claims and verifier, and logs
+  the fallback on the run. Muse Image, SAM 3.1 and Muse Voice Transcribe use their own
+  endpoints, from the docs. **Keys:** `META_API_KEY`, `BASETEN_API_KEY` and
+  `BASETEN_BASE_URL` in `.env` (the secret store when deployed). Without them every agent
+  reports unavailable and the pipeline degrades honestly: stories still form from clear
+  matches, titled by their first headline, with no facts.
 - **A routing table in `config.py`:** for each agent, its model id, endpoint and backup.
   Switching the editor to Muse Wonder, or failing over, is configuration, not code.
 - Write our own small agent loop (`agent/runtime.py`) rather than adopt a framework: it
@@ -492,7 +519,9 @@ OSMS pulls everything related to them:
   links and the recipient's address; link to the web version, not the email.
 - **Rule 3 covers every type.** Social and photo platforms mix topics, so seed the demo
   with topic-specific accounts, hashtags and subreddits (e.g. r/MachineLearning,
-  #FlutterDev), and the triage agent checks every item. No editorial cartoons. The demo source list is `backend/seed/sources.opml`,
+  #FlutterDev), and the triage agent checks every item. Until triage lands (Day 7), a word
+  list in `services/triage.py` drops anything that looks political or like an advert, with
+  its reason kept on the item; it errs on the side of dropping. No editorial cartoons. The demo source list is `backend/seed/sources.opml`,
   so it can be reviewed.
 - **Posts, not people.** Store only what the timeline shows (handle, display name, text,
   links). Never analyse or profile the people behind accounts (rule 6).
@@ -529,9 +558,11 @@ sources delivered, each fact dated.
   is a job that retries, so a Milvus Lite outage never loses an item.
 - **Errors back off,** doubling up to a day. A source failing for days is flagged to its
   followers, never silently dropped.
-- **Now, not later:** a new subscription is fetched at once, and **Fetch now** (an API
-  endpoint and a Tilt button) fetches one source or all of them, for testing and the
-  demo.
+- **Now, not later:** a source nobody fetched yet is due at once, so a new subscription is
+  fetched within seconds. **Fetch now** (a Tilt button, `make fetch-now`, or
+  `python -m app.worker fetch-now [ID]`) fetches every followed source, or one, for
+  testing and the demo. It is deliberately not an API endpoint: nobody outside can make
+  OSMS hammer a site.
 - **Durable work:** fetched items become jobs in a `jobs` table in SQLite (status,
   attempts, run after), so a restart loses nothing and failures retry.
 
@@ -791,16 +822,18 @@ folders, photo and comic cards.
     SQLite, and account deletion relies on cascades). Alembic uses `render_as_batch=True`,
     because SQLite can't alter most columns in place. Keep write transactions short: SQLite
     has one writer at a time.
-  - **Milvus Lite** (`data/milvus/`) through pymilvus: dense + sparse vectors (BGE-M3),
-    hybrid search with `RRFRanker` or `WeightedRanker`. Only one process may open its data
-    directory, so it runs in server mode (`milvus-lite server`, `127.0.0.1:19530`) and every
-    backend process connects to that. Only the ingestion worker writes vectors. It has no
-    authentication: never expose its port. Tests use embedded mode on a temporary
-    directory.
+  - **Milvus Lite** (`data/milvus.db`, `OSMS_MILVUS_PATH`) through pymilvus: dense + sparse
+    vectors (BGE-M3), hybrid search with `RRFRanker`, filtered to a time window, then
+    scored by dense cosine. Only one process may open it, and only the worker needs it, so
+    it runs embedded in the worker; the API never opens it (it reads SQLite). Not
+    `MILVUS_URI`: pymilvus reads that name itself on import. It is a file with no
+    authentication: never serve it. Tests use a temporary file.
   - **Scale path (post-hackathon):** PostgreSQL and Milvus Standalone or Zilliz Cloud
     through the same SQLAlchemy and pymilvus code, by changing `DATABASE_URL` and
     `MILVUS_URI`. Keep SQL portable; no SQLite-only tricks outside `db/`.
-- **Embeddings:** BGE-M3 (dense + sparse), multilingual.
+- **Embeddings:** BGE-M3 (dense + sparse), multilingual, through FlagEmbedding on the Mac's GPU
+  (`uv sync --extra models`, about 3 GB with the weights; `make setup` installs it). CI and
+  tests use a stand-in embedder and never download it.
 - **Models and agents:** Muse Spark, Muse Wonder, Muse Image, SAM 3.1 and Muse Voice
   Transcribe through Meta Model API; Muse Spark Open on Baseten; Muse Glimmer through
   Ollama locally (ask before adding it). One OpenAI-compatible client for every text
@@ -850,7 +883,7 @@ osms/
 │   │   ├── app.dart           # theme, routing (go_router), where a reader may go
 │   │   ├── core/
 │   │   │   ├── api/           # auth_client (web: cookie; macOS: Keychain), api_client, json
-│   │   │   ├── session/       # Session and Account (Riverpod): who is reading, their picks
+│   │   │   ├── session/       # Session and Account (Riverpod): who is reading, their picks; stories.dart
 │   │   │   ├── config/        # service URLs (--dart-define), languages
 │   │   │   ├── models/        # User, Source, Item, Story, Briefing, ResearchInterest (research.dart), ...
 │   │   │   ├── theme/         # design tokens: colours, type scale, spacing, radii
@@ -864,7 +897,7 @@ osms/
 │   │   │   ├── briefing/      # audio briefing player
 │   │   │   ├── sources/       # add (link, handle, OPML), manage sources, interests_editor.dart
 │   │   │   └── settings/      # language (EN/DA/TA), theme, view mode, delete account
-│   │   ├── shared/widgets/    # StoryCard, ItemCard, SourceChip, WhatsNewSection, ...
+│   │   ├── shared/widgets/    # StoryCard, ItemCard, SourceChip, WhatsNewSection, SourceQuote, ...
 │   │   └── sample/            # FAKE stories, sources, people (invented, .example), for
 │   │                          # Widgetbook, tests, and the signed-out demo's labelled samples
 │   ├── test/                  # palettes' contrast, the sign-in and onboarding flows
@@ -883,45 +916,53 @@ osms/
 │   ├── Dockerfile             # deploy image only; local development needs no Docker
 │   ├── app/
 │   │   ├── main.py
+│   │   ├── worker.py          # the story pipeline's process: schedule, queue, agents (`make worker`)
 │   │   ├── config.py          # reads env vars; model routing: agent → model id, endpoint, backup
 │   │   ├── auth/              # tokens.py: verify Better Auth's JWTs against its JWKS
-│   │   ├── api/               # routes: me, onboarding, interests, settings (+ stories, items, briefing, sources)
+│   │   ├── api/               # routes: me, onboarding, interests, settings, stories, demo stories (+ items, briefing, sources)
 │   │   ├── schemas/           # Pydantic models: strict inputs, capped sizes
 │   │   ├── db/
-│   │   │   ├── models.py      # readers and their picks (users, topics, sources, subscriptions, interests)
+│   │   │   ├── models.py      # readers and picks; items, jobs, stories, claims (dated history), read state
 │   │   │   ├── sqlite.py      # engine and sessions: WAL, busy timeout, foreign keys on
-│   │   │   ├── milvus.py      # collections, hybrid search, via the Milvus Lite server
+│   │   │   ├── milvus.py      # the vector index: hybrid search in a time window, embedded in the worker
 │   │   │   └── migrations/
 │   │   ├── services/
 │   │   │   ├── accounts.py    # readers: first sign-in, onboarding, settings, deletion
 │   │   │   ├── ingestion/     # one pipeline for every source type
 │   │   │   │   ├── scheduler.py   # fetch what someone follows; new subscriptions at once
-│   │   │   │   ├── fetcher.py     # polite HTTP + link safety checks
+│   │   │   │   ├── fetcher.py     # polite HTTP; every redirect and resolved address re-checked
+│   │   │   │   ├── safety.py      # link safety (no network) and untrusted OPML
 │   │   │   │   ├── discovery.py   # link or handle → source type + feed URL
 │   │   │   │   ├── opml.py        # OPML import (also loads onboarding topics)
 │   │   │   │   ├── connections.py # platform OAuth, encrypted tokens (post-hackathon)
 │   │   │   │   └── adapters/      # one file per source type: feed, arxiv, youtube, mastodon, ...
+│   │   │   ├── pipeline.py    # the jobs: fetch → process → index and cluster → claims → write
+│   │   │   ├── jobs.py        # the queue in SQLite: deduped, retried, safe across restarts
 │   │   │   ├── interests.py   # research interests: arXiv queries, backfill, related-by-meaning matches
+│   │   │   ├── language.py    # Danish, English or Tamil
+│   │   │   ├── names.py       # the names an item mentions, until triage lists them
 │   │   │   ├── embeddings.py  # BGE-M3 dense + sparse
-│   │   │   ├── clustering.py  # incremental story assignment
-│   │   │   ├── triage.py      # Muse Glimmer: rule 3, noise, language and kind, for every item
+│   │   │   ├── clustering.py  # incremental story assignment (the Oct 30 rule; thresholds yours)
+│   │   │   ├── triage.py      # rule 3 and noise: a word list now; Muse Glimmer on Day 7
 │   │   │   ├── judge.py       # Muse Spark Open: same event or not? (Muse Spark as backup)
-│   │   │   ├── claims.py      # claim extraction (Muse Spark)
-│   │   │   ├── diff.py        # what's new since last read
-│   │   │   ├── disagreements.py
+│   │   │   ├── claims.py      # claim extraction with quotes and translations (Muse Spark)
+│   │   │   ├── verifier.py    # the critic: keeps, repeats, corrections, disagreements
+│   │   │   ├── writer.py      # story titles and cited summaries, never overwritten
+│   │   │   ├── stories.py     # stories as a reader sees them; what's new since last read
 │   │   │   ├── transcribe.py  # Muse Voice Transcribe, biased towards source and story names
 │   │   │   ├── visuals.py     # Muse Image illustrations in one house style; SAM 3.1 check and crops
 │   │   │   └── briefing.py    # script + audio; Muse Voice Transcribe checks the audio
 │   │   ├── agent/             # the agents (see *Agents*)
 │   │   │   ├── runtime.py     # our agent loop: tools, budgets, structured output, retries
+│   │   │   ├── kit.py         # what the pipeline's agents share; source text as quoted data
 │   │   │   ├── tools.py       # typed tools over SQLite and Milvus Lite
 │   │   │   ├── interest.py    # the interest agent: keywords → search plan, borderline papers
 │   │   │   ├── editor.py      # the overnight run; verifier and writer are its specialists
 │   │   │   ├── ask.py         # ask this story: a typed question → an answer from verified claims
 │   │   │   ├── decision_log.py
 │   │   │   ├── guardrails.py  # frozen: change only with the author
-│   │   │   └── prompts/       # one file per agent, versioned
-│   │   └── clients/           # Meta Model API (text, image, transcription, segmentation), Baseten, Glimmer
+│   │   │   └── prompts/       # judge.md, claims.md, verifier.md, writer.md: a `version:` line each
+│   │   └── clients/           # openai_compat.py: every text model, routed with backups; fake.py for tests
 │   ├── seed/
 │   │   ├── sources.opml       # one folder per onboarding topic; public feeds and arXiv categories, non-political
 │   │   └── visual-style/      # OSMS's own reference images for Muse Image's house style
@@ -1079,9 +1120,9 @@ readable line length (~65–75 characters) in the reading view.
 | 1 | Oct 27 | Ingestion: RSS, newsletters (dedicated inbox), article store. Agents 101 |
 | 2 | Oct 28 | SQLite schema + Alembic; BGE-M3 → Milvus Lite (server mode); hand-label 150–200 articles for eval. Agents 102 |
 | 3 | Oct 29 | **Done:** sign-in (Better Auth: Google + dev links), accounts API, the web app wired end to end (sign-up, onboarding, settings, interests, deletion). **Oct 30:** the macOS app built (debug and release) and tested in its sandbox against the real sign-in service and API (`make test-macos`): sign-in in the browser, the desktop hand-off, onboarding, Today, Settings, deletion; menu bar and window. Signed-in readers get an empty Today, never samples, until real stories exist |
-| 4 | Oct 30 | **From here, one real story end to end first, then papers, the briefing and illustrations** (decided Oct 30). Danish and English feeds in tech, science and business that cover the same companies, in the seed list; the generic feed adapter, fetcher (link safety, polite fetching), scheduler and jobs queue; items stored; start hand-labelling 150–200 items as they arrive. Fireworks session |
-| 5 | Oct 31 | BGE-M3 → Milvus Lite (server mode), each item saved first and indexed by a job that retries; incremental clustering (close in meaning, time and names joins; other similar pairs go to the judge agent, Muse Spark Open; unsure stays apart); agent runtime (tools, structured output, budgets, decision log); model clients, routing table and backups; first eval numbers |
-| 6 | Nov 1 | Claims agent (each claim with its quote in the source's language, and the model and prompt version) and verifier agent; the dated story history: what's new, disagreements, corrections in the timeline; writer agent: story titles and cited summaries; quotes with labelled translations; real stories replace the empty Today; agent task set in `eval/agents/` |
+| 4 | Oct 30 | **Built Oct 30** (one real story end to end first, then papers, the briefing and illustrations: decided Oct 30). 16 Danish and English feeds in the seed list (tech, science, business; same companies in both languages); the generic feed adapter (RSS, Atom, JSON Feed), the fetcher (conditional requests, per-host gaps, 3 s for arXiv, back-off, redirect and DNS re-checks, size caps), the scheduler (adaptive interval, arXiv daily), the jobs queue, an interim rule-3 word list until triage. **Still yours:** hand-label 150–200 items (`eval/labels/`). Fireworks session |
+| 5 | Oct 31 | **Built Oct 30:** BGE-M3 → Milvus Lite (embedded in the worker), each item saved first and indexed by a job that retries; incremental clustering with the Oct 30 rule (provisional thresholds in `services/clustering.py`, yours to set with the eval); the judge agent (Muse Spark Open, Muse Spark as backup); the model client and routing table with backups and the route check at startup; `make eval` exports predictions. **Needs:** your labels for the first eval numbers; `META_API_KEY` (and Baseten for the judge) for real model calls |
+| 6 | Nov 1 | **Built Oct 30:** claims agent (each claim with its quote in the source's language, an English translation, and the model and prompt version) and verifier agent (relations new, repeat, corrects, conflicts; unsure cases at maximum effort); the dated story history; what's new per reader, disagreements, corrections in the timeline; writer agent: titles and cited summaries; the stories API (`/stories`, `/demo/stories`, read state) and the app wired to it (quotes with labelled translations, "One source so far", corrections struck through, links to originals). **Still to do:** the agent task set in `eval/agents/` |
 | 7 | Nov 2 | **arXiv:** category feeds, interest queries, 30-day backfill, related-by-meaning matches, one rate-limited client; label paper examples; the interest agent. Editor agent (overnight run, decision log) and briefing script + open-source TTS, checked with Muse Voice Transcribe; editor on Muse Spark vs Muse Wonder (the task set decides). Muse Image illustrations in one house style, checked and cropped with SAM 3.1. Triage agent (Muse Glimmer), names included. Google consent screen for any Google account; Google sign-in on the macOS app checked by hand |
 | 8 | Nov 3 | Ask this story; the "How OSMS decided" view; Muse Voice Transcribe for podcasts, newsletters (dedicated inbox), adding sources from the app (link, handle, OPML import), YouTube/Mastodon/Bluesky/Reddit adapters, language toggle; hardening, deploy (one backend machine with a disk; Muse Glimmer on a GPU or a hosted provider), the replayable demo set and fallback data; README comparison table (dense, sparse, hybrid, hybrid + judge); Harness² run if time allows (stretch); **feature freeze** |
 | 9 | Nov 4 | 3-min demo video, showing real model calls and what each changed; submit (deadline 03:00 Nov 5, Danish time); post on X |
@@ -1211,17 +1252,16 @@ deploys stay on Modal and the static host. Install with `brew install tilt`.
 ### Resources
 
 Add each resource when its code lands; never point Tilt at a stub. Today the Tiltfile has
-`auth`, `api`, `app`, `widgetbook-gen`, `widgetbook` and the three check buttons; the
-other backend rows arrive with their code. Each Flutter resource also has a `-reload` companion that hot-reloads
+`auth`, `api`, `worker`, `app`, `app-macos`, `widgetbook-gen`, `widgetbook` and the three
+check buttons; `glimmer`, `overnight-agent` and `eval` arrive with their code. Each Flutter resource also has a `-reload` companion that hot-reloads
 it whenever a file under its `lib/` is saved, and a **Hot restart** button.
 
 | Resource | Group | Runs | Port | Starts |
 |---|---|---|---|---|
-| `milvus` | data | `milvus-lite server --data-dir data/milvus --port 19530` | 19530 | on `tilt up` |
 | `glimmer` | models | `ollama serve` with Muse Glimmer, for the triage agent (only when it runs locally) | 11434 | on `tilt up` |
 | `auth` | backend | Better Auth, `npm start` in `auth/` (restarts when its code or `.env` changes) | 3000 | on `tilt up` |
-| `api` | backend | `uv run uvicorn app.main:app --reload` | 8000 | after `auth` (and `milvus`, once it exists) |
-| `worker` | backend | Scheduled checks, the jobs queue, embeddings, judge, claims and verifier agents, the daily arXiv run; **Fetch now** and **arXiv now** buttons (arXiv now still keeps arXiv's rate limit) | – | after `api` |
+| `api` | backend | `uv run uvicorn app.main:app --reload` | 8000 | after `auth` |
+| `worker` | backend | `uv run python -m app.worker run`: scheduled checks, the jobs queue, BGE-M3, Milvus Lite (embedded), clustering, the judge, claims, verifier and writer agents; **Fetch now** and **Pipeline status** buttons. The daily arXiv run is part of its schedule. | – | after `api` |
 | `overnight-agent` | backend | One run of the editor and writer agents, on the models in the routing table; decision log in Tilt | – | button |
 | `app` | frontend | `flutter run -d web-server` | 8080 | on `tilt up` |
 | `app-macos` | frontend | `flutter run -d macos` (needs Xcode); a window, hot-reloaded on save | – | button |
@@ -1232,9 +1272,9 @@ it whenever a file under its `lib/` is saved, and a **Hot restart** button.
 | `flutter-checks` | checks | `make check-flutter` (analyze and test, both projects) | – | button |
 | `eval` | checks | `python run_eval.py` and the agent task set, with the model comparison | – | button |
 
-SQLite needs no resource: it is a file (`data/osms.db`), migrated by Alembic when the API
-starts. Milvus Lite allows one process per data directory, so it gets its own resource in
-server mode and every backend process connects to it.
+SQLite and Milvus Lite need no resource: they are files (`data/osms.db`, `data/milvus.db`).
+Alembic migrates SQLite when the API or the worker starts; Milvus Lite allows one process,
+and only the worker opens it.
 
 ### Rules
 
@@ -1293,6 +1333,10 @@ make test-macos                            # with make up running: the real macO
 make widgetbook                            # Widgetbook alone, in Chrome
 make auth                                  # sign-in (Better Auth) alone: http://localhost:3000
 make api                                   # the API alone: http://localhost:8000
+make worker                                # the story pipeline alone: fetch, embed, cluster, facts
+make fetch-now                             # every followed source now (the worker fetches them)
+make pipeline-status                       # what is stored, clustered and queued
+make eval                                  # score today's clustering against eval/labels/
 make up                                    # everything at once with Tilt (http://localhost:10350)
 make ci                                    # start everything, wait until healthy, exit
 make status                                # what is running, on its own and in Tilt
@@ -1300,11 +1344,11 @@ make stop-app                              # stop one thing, on its own or in Ti
 make stop-widgetbook
 make stop-auth
 make stop-api
+make stop-worker
 make stop                                  # stop everything at once
 make check                                 # analyze + test everything (check-flutter, -backend, -auth)
 
 # local services without Tilt
-milvus-lite server --data-dir data/milvus --port 19530   # vectors (localhost only)
 ollama serve                               # Muse Glimmer for triage (localhost only; model tag from its docs)
 sqlite3 data/osms.db                       # look inside the database (data/auth.db: sign-in)
 

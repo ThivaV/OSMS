@@ -44,6 +44,33 @@ class Settings(BaseSettings):
     glimmer_base_url: str = Field("http://127.0.0.1:11434", validation_alias="GLIMMER_BASE_URL")
     baseten_base_url: str = Field("", validation_alias="BASETEN_BASE_URL")
 
+    # Keys come from .env locally and the secret store when deployed; never logged.
+    # Without them the agents are unavailable and the pipeline degrades: stories still
+    # form from clear matches, titled by their first headline, with no facts.
+    meta_api_key: str = Field("", validation_alias="META_API_KEY", repr=False)
+    baseten_api_key: str = Field("", validation_alias="BASETEN_API_KEY", repr=False)
+    glimmer_api_key: str = Field("", validation_alias="GLIMMER_API_KEY", repr=False)
+
+    # Milvus Lite, embedded on a file only the worker opens. Not `MILVUS_URI`: pymilvus
+    # reads that name itself when imported and wants a server address there.
+    milvus_uri: str = Field(str(REPO_ROOT / "data" / "milvus.db"), validation_alias="OSMS_MILVUS_PATH")
+
+    def endpoint_for(self, model: str) -> str:
+        """Where a pinned model lives: a backup runs on its own provider."""
+        return {
+            SPARK_ID: META_API_URL,
+            WONDER_ID: META_API_URL,
+            SPARK_OPEN_ID: self.baseten_base_url,
+            GLIMMER_MODEL: self.glimmer_base_url,
+        }.get(model, "")
+
+    def key_for(self, endpoint: str) -> str:
+        if endpoint == META_API_URL:
+            return self.meta_api_key
+        if endpoint and endpoint == self.baseten_base_url:
+            return self.baseten_api_key
+        return self.glimmer_api_key
+
     @property
     def jwks_url(self) -> str:
         return f"{self.auth_url}/api/auth/jwks"

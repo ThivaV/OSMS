@@ -17,6 +17,7 @@ import 'package:osms/core/theme/palettes.dart';
 import 'package:osms/features/onboarding/onboarding_flow.dart';
 import 'package:osms/features/search/command_palette.dart';
 import 'package:osms/features/stories/today_overview.dart';
+import 'package:osms/shared/widgets/source_quote.dart';
 import 'package:osms/shared/widgets/pill_nav.dart';
 import 'package:osms/features/settings/settings_page.dart';
 import 'package:osms/features/settings/theme_picker.dart';
@@ -138,6 +139,9 @@ final Map<String, Widget Function()> _sections = {
   'Account signed out': () => const AccountRow(),
   'Account long name': () => const AccountRow(user: fx.longUser),
   'Demo banner': () => const DemoBanner(),
+  'Source quote translated': () => const SourceQuote(quote: 'Prisen er 7.999 kr.', language: 'da', translation: 'The price is 7,999 kroner.'),
+  'Source quote in English': () => const SourceQuote(quote: 'It costs \$999.', language: 'en'),
+  'Source quote extreme': () => SourceQuote(quote: 'விலை ' * 60, language: 'ta', translation: 'The price ' * 60),
   'Demo banner with samples': () => const DemoBanner(samples: true),
   'Demo banner, sign-in down': () => const DemoBanner(signInAvailable: false),
   'Demo banner with samples, sign-in down': () => const DemoBanner(signInAvailable: false, samples: true),

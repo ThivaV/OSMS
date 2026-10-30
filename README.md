@@ -45,8 +45,18 @@ Oct 27 – Nov 4, 2026.
   validation, `make eval-test`), and ingestion safety (fail-closed URLs,
   hostile-OPML refusal, seed languages). Specs: `agent-runtime.md`,
   `eval-harness.md`, `ingestion-safety.md`.
-- [ ] Ingestion, clustering + judge, agents, arXiv matching, briefing audio,
-  illustrations — in build-plan order (see AGENTS.md).
+- [x] **The story pipeline, one real story end to end (Oct 30, Days 4–6):** 16 Danish and
+  English feeds next to the arXiv categories; a polite, safe fetcher and an adaptive
+  scheduler; a jobs queue in SQLite; BGE-M3 vectors in Milvus Lite; clustering by the
+  author's rule (close in meaning, time and names; the judge decides the rest); the
+  claims, verifier and writer agents on Muse Spark with the judge on Muse Spark Open,
+  through one OpenAI-compatible client with backups; dated story history with
+  corrections; the stories API; and the app showing real stories with each fact's quote
+  in its language and a labelled translation. The first real run collected 1,695 items
+  and grouped 496 news items into 464 stories, 21 with two or more items. Facts and
+  summaries need `META_API_KEY`. Spec: `docs/specs/story-pipeline.md`.
+- [ ] arXiv matching, the briefing (podcast) audio, illustrations, triage on Muse
+  Glimmer — in build-plan order (see AGENTS.md).
 
 ## How judging maps to the repo
 
@@ -71,6 +81,8 @@ and a different model checks every generated output before a reader sees it.
 | Muse Image | One illustration per story |
 | SAM 3.1 | Checks and crops each illustration |
 | Muse Voice Transcribe | Podcast episodes, and a check on the briefing audio |
+| SeamlessM4T v2 (open weights) | The briefing's voice in English and Danish |
+| MMS-TTS (open weights) | The briefing's voice in Tamil |
 | Muse Code | Parts of the build (listed below) |
 
 Details and diagrams: [docs/architecture.md](docs/architecture.md).
@@ -118,6 +130,9 @@ its own, and never overwrites a value you set.
 ```bash
 make auth                   # sign-in (Better Auth) on http://localhost:3000
 make api                    # the API on http://localhost:8000 (docs at /docs)
+make worker                 # the story pipeline: fetch, embed, cluster, facts
+make fetch-now              # fetch every followed source now
+make pipeline-status        # what the pipeline has stored, clustered and queued
 make app                    # the app in Chrome, on http://localhost:8080
 make app DEVICE=macos       # the macOS desktop app (needs XCode)
 make app DEVICE=web-server  # the app as a local web server, no browser opened
@@ -125,7 +140,11 @@ make widgetbook             # the component catalogue in Chrome
 ```
 
 The app needs `auth` and `api` running to sign in; without them it shows the demo and
-says sign-in is unavailable.
+says sign-in is unavailable. Real stories need the `worker`: its first run fetches every
+seed source and embeds the news with BGE-M3 (`make setup` installs it; the model, about
+2.3 GB, downloads on first use). For facts, disagreements and summaries, put
+`META_API_KEY` in `.env` (and `BASETEN_API_KEY` + `BASETEN_BASE_URL` for the judge on
+Muse Spark Open); without keys, stories still form from clear matches, with no facts.
 
 ### The macOS app
 
@@ -223,6 +242,7 @@ Every target wraps a plain command, for example:
 ```bash
 cd auth && npm start
 cd backend && uv run uvicorn app.main:app --reload
+cd backend && uv run python -m app.worker run
 cd frontend && flutter run -d chrome --web-port=8080
 cd frontend/widgetbook && dart run build_runner build && flutter run -d chrome
 cd frontend && flutter analyze && flutter test

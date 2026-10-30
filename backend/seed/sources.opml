@@ -3,7 +3,11 @@
      Public feed URLs only, all non-political (technology, AI research, science,
      business/product news). This is the only OPML file in the repo.
      arXiv category feeds update once a day; arXiv allows one request every three
-     seconds across all of OSMS, so the fetcher reads them one at a time. -->
+     seconds across all of OSMS, so the fetcher reads them one at a time.
+     Danish and English feeds cover the same companies, launches and research, so the
+     same event arrives in both languages. Each says its language (language="da").
+     They carry headlines and excerpts only; OSMS links to the article. Until the triage
+     agent lands, a word list drops obviously political items (rule 3). -->
 <opml version="2.0">
   <head>
     <title>OSMS seed sources</title>
@@ -14,20 +18,37 @@
       <outline type="rss" text="arXiv cs.CL: Computation and Language" title="arXiv cs.CL: Computation and Language" xmlUrl="https://rss.arxiv.org/rss/cs.CL" htmlUrl="https://arxiv.org/list/cs.CL/recent"/>
       <outline type="rss" text="arXiv cs.LG: Machine Learning" title="arXiv cs.LG: Machine Learning" xmlUrl="https://rss.arxiv.org/rss/cs.LG" htmlUrl="https://arxiv.org/list/cs.LG/recent"/>
       <outline type="rss" text="arXiv cs.IR: Information Retrieval" title="arXiv cs.IR: Information Retrieval" xmlUrl="https://rss.arxiv.org/rss/cs.IR" htmlUrl="https://arxiv.org/list/cs.IR/recent"/>
+      <outline type="rss" text="The Verge: AI" title="The Verge: AI" xmlUrl="https://www.theverge.com/rss/ai-artificial-intelligence/index.xml" htmlUrl="https://www.theverge.com/ai-artificial-intelligence" language="en"/>
+      <outline type="rss" text="TechCrunch: AI" title="TechCrunch: AI" xmlUrl="https://techcrunch.com/category/artificial-intelligence/feed/" htmlUrl="https://techcrunch.com/category/artificial-intelligence/" language="en"/>
     </outline>
     <outline text="Developer tools" title="Developer tools" description="Languages, frameworks, releases">
       <outline type="rss" text="arXiv cs.SE: Software Engineering" title="arXiv cs.SE: Software Engineering" xmlUrl="https://rss.arxiv.org/rss/cs.SE" htmlUrl="https://arxiv.org/list/cs.SE/recent"/>
       <outline type="rss" text="arXiv cs.PL: Programming Languages" title="arXiv cs.PL: Programming Languages" xmlUrl="https://rss.arxiv.org/rss/cs.PL" htmlUrl="https://arxiv.org/list/cs.PL/recent"/>
+      <outline type="rss" text="Computerworld Danmark" title="Computerworld Danmark" xmlUrl="https://www.computerworld.dk/rss/all" htmlUrl="https://www.computerworld.dk/" language="da"/>
+      <outline type="rss" text="Ars Technica: Biz &amp; IT" title="Ars Technica: Biz &amp; IT" xmlUrl="https://feeds.arstechnica.com/arstechnica/technology-lab" htmlUrl="https://arstechnica.com/information-technology/" language="en"/>
     </outline>
     <outline text="Science" title="Science" description="Biology, physics, materials">
       <outline type="rss" text="arXiv q-bio.BM: Biomolecules" title="arXiv q-bio.BM: Biomolecules" xmlUrl="https://rss.arxiv.org/rss/q-bio.BM" htmlUrl="https://arxiv.org/list/q-bio.BM/recent"/>
       <outline type="rss" text="arXiv cond-mat.mtrl-sci: Materials Science" title="arXiv cond-mat.mtrl-sci: Materials Science" xmlUrl="https://rss.arxiv.org/rss/cond-mat.mtrl-sci" htmlUrl="https://arxiv.org/list/cond-mat.mtrl-sci/recent"/>
       <outline type="rss" text="arXiv quant-ph: Quantum Physics" title="arXiv quant-ph: Quantum Physics" xmlUrl="https://rss.arxiv.org/rss/quant-ph" htmlUrl="https://arxiv.org/list/quant-ph/recent"/>
+      <outline type="rss" text="Ingeniøren" title="Ingeniøren" xmlUrl="https://ing.dk/rss" htmlUrl="https://ing.dk/" language="da"/>
+      <outline type="rss" text="DR Viden" title="DR Viden" xmlUrl="https://www.dr.dk/nyheder/service/feeds/viden" htmlUrl="https://www.dr.dk/nyheder/viden" language="da"/>
+      <outline type="rss" text="ScienceDaily" title="ScienceDaily" xmlUrl="https://www.sciencedaily.com/rss/all.xml" htmlUrl="https://www.sciencedaily.com/" language="en"/>
+      <outline type="rss" text="Phys.org" title="Phys.org" xmlUrl="https://phys.org/rss-feed/" htmlUrl="https://phys.org/" language="en"/>
     </outline>
     <outline text="Space" title="Space" description="Launches, missions, astronomy">
       <outline type="rss" text="arXiv astro-ph.EP: Earth and Planetary Astrophysics" title="arXiv astro-ph.EP: Earth and Planetary Astrophysics" xmlUrl="https://rss.arxiv.org/rss/astro-ph.EP" htmlUrl="https://arxiv.org/list/astro-ph.EP/recent"/>
       <outline type="rss" text="arXiv astro-ph.IM: Astrophysics Instrumentation" title="arXiv astro-ph.IM: Astrophysics Instrumentation" xmlUrl="https://rss.arxiv.org/rss/astro-ph.IM" htmlUrl="https://arxiv.org/list/astro-ph.IM/recent"/>
+      <outline type="rss" text="Space.com" title="Space.com" xmlUrl="https://www.space.com/feeds.xml" htmlUrl="https://www.space.com/" language="en"/>
+      <outline type="rss" text="Phys.org: Space" title="Phys.org: Space" xmlUrl="https://phys.org/rss-feed/space-news/" htmlUrl="https://phys.org/space-news/" language="en"/>
     </outline>
-    <outline text="Startups and product" title="Startups and product" description="Funding, launches, product news"/>
+    <outline text="Startups and product" title="Startups and product" description="Funding, launches, product news">
+      <outline type="rss" text="Mobilsiden" title="Mobilsiden" xmlUrl="https://mobilsiden.dk/feed/" htmlUrl="https://mobilsiden.dk/" language="da"/>
+      <outline type="rss" text="Recordere.dk" title="Recordere.dk" xmlUrl="https://www.recordere.dk/feed/" htmlUrl="https://www.recordere.dk/" language="da"/>
+      <outline type="rss" text="9to5Mac" title="9to5Mac" xmlUrl="https://9to5mac.com/feed/" htmlUrl="https://9to5mac.com/" language="en"/>
+      <outline type="rss" text="GSMArena" title="GSMArena" xmlUrl="https://www.gsmarena.com/rss-news-reviews.php3" htmlUrl="https://www.gsmarena.com/" language="en"/>
+      <outline type="rss" text="Engadget" title="Engadget" xmlUrl="https://www.engadget.com/rss.xml" htmlUrl="https://www.engadget.com/" language="en"/>
+      <outline type="rss" text="TechCrunch: Startups" title="TechCrunch: Startups" xmlUrl="https://techcrunch.com/category/startups/feed/" htmlUrl="https://techcrunch.com/category/startups/" language="en"/>
+    </outline>
   </body>
 </opml>

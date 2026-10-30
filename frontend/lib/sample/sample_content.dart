@@ -215,6 +215,9 @@ final halcyon = Story(
       text: 'Lumen Labs published per-language scores. Danish improved the most, by 9 points.',
       sources: const [teknologiposten, inferenceBrief, kodehjornet],
       reportedAt: ago(h: 5),
+      quote: 'Dansk er det sprog, der er forbedret mest: 9 point.',
+      quoteLanguage: 'da',
+      translation: 'Danish is the language that improved the most: 9 points.',
     ),
   ],
   disagreements: const [
@@ -310,6 +313,8 @@ final kestrel = Story(
       text: 'Both satellites have sent their first signals.',
       sources: const [orbitalWeekly],
       reportedAt: ago(m: 40),
+      quote: 'Both satellites have now sent their first signals home.',
+      quoteLanguage: 'en',
     ),
   ],
   disagreements: const [
@@ -330,6 +335,14 @@ final kestrel = Story(
     TimelineEvent(id: 'k-t1', at: ago(d: 1, h: 2), text: 'Launch window confirmed.', kind: ItemKind.article, sourceCount: 2),
     TimelineEvent(id: 'k-t2', at: ago(h: 6), text: 'Lift-off and booster landing.', kind: ItemKind.video, sourceCount: 5),
     TimelineEvent(id: 'k-t3', at: ago(m: 40), text: 'Satellites send first signals.', kind: ItemKind.article, sourceCount: 1),
+    TimelineEvent(
+      id: 'k-t4',
+      at: ago(m: 20),
+      text: 'Orbital Weekly corrected the landing time: 14:06 UTC',
+      kind: ItemKind.article,
+      sourceCount: 1,
+      correctedFrom: '14:02 UTC',
+    ),
   ],
 );
 
