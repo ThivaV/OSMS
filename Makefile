@@ -1,12 +1,17 @@
 # OSMS developer commands. `make` (or `make help`) lists them.
 # Every target wraps a plain command; see AGENTS.md, "Common commands".
-# More backend targets (worker, ...) arrive with their code.
+# A target joins when its code exists (still to come: the eval's agent task set).
 
 FLUTTER ?= flutter
 DART ?= dart
 TILT ?= tilt
 NPM ?= npm
 UV ?= uv
+OLLAMA ?= ollama
+
+# Muse Glimmer for the triage agent: these weights, under the name OSMS asks Ollama for.
+GLIMMER_GGUF := hf.co/meta-models/Muse-Glimmer-30B-GGUF:Q4_K_M
+GLIMMER_NAME := muse-glimmer-30b
 
 APP_DIR := frontend
 WIDGETBOOK_DIR := frontend/widgetbook
@@ -26,6 +31,7 @@ WIDGETBOOK_PID := $(RUN_DIR)/widgetbook.pid
 AUTH_PID := $(RUN_DIR)/auth.pid
 API_PID := $(RUN_DIR)/api.pid
 WORKER_PID := $(RUN_DIR)/worker.pid
+GLIMMER_PID := $(RUN_DIR)/glimmer.pid
 TILT_PID := $(RUN_DIR)/tilt.pid
 
 # Tilt never sends usage data from this project.
@@ -39,18 +45,9 @@ TILT_RUN := KUBECONFIG="$(TILT_KUBECONFIG)" $(TILT)
 # True while a Tilt session answers on its API (http://localhost:10350).
 tilt_up = command -v $(TILT) >/dev/null && $(TILT_RUN) get session >/dev/null 2>&1
 
-# $(call stop_pid,label,pid file,command): SIGINT (like Ctrl+C) to a process make
-# started, only while that pid still belongs to the expected command.
-stop_pid = pid=$$(cat "$(2)" 2>/dev/null); \
-  if [ -n "$$pid" ] && ps -p "$$pid" -o command= 2>/dev/null | grep -q "$(3)"; then \
-    kill -INT "$$pid" && echo "$(1): stopped"; \
-  else echo "$(1): not running"; fi; rm -f "$(2)"
-
-# $(call show_pid,label,pid file,command)
-show_pid = pid=$$(cat "$(2)" 2>/dev/null); \
-  if [ -n "$$pid" ] && ps -p "$$pid" -o command= 2>/dev/null | grep -q "$(3)"; then \
-    echo "$(1): running (pid $$pid)"; \
-  else echo "$(1): not running"; fi
+# OSMS's processes however they were started (make, Tilt, a terminal, another tool):
+# only ones running a service's program from inside this repo, and Ollama's server.
+PROCESSES := sh scripts/processes.sh
 
 # $(call tilt_disable,label,resources): stop resources inside the running Tilt session.
 # Turn them back on from the Tilt UI, or with `tilt enable <resources>`.
@@ -60,7 +57,7 @@ tilt_disable = if $(tilt_up); then \
 
 .DEFAULT_GOAL := help
 .PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
-  stop-api stop-worker worker fetch-now briefing pipeline-status eval stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
+  stop-api stop-worker stop-glimmer worker glimmer glimmer-model fetch-now briefing illustrations pipeline-status eval stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
   check-flutter check-backend check-auth eval-test clean _run-dir _need-tilt
 
 help: ## List the commands
@@ -70,12 +67,13 @@ help: ## List the commands
 
 ##@ Set up
 
-tools: ## Check that Flutter, Node, uv, Tilt and (for DEVICE=macos) Xcode are installed
+tools: ## Check that Flutter, Node, uv, Tilt, (for DEVICE=macos) Xcode and (for triage) Ollama are installed
 	@command -v $(FLUTTER) >/dev/null && echo "ok      flutter" || echo "missing flutter: brew install --cask flutter"
 	@command -v node >/dev/null && echo "ok      node" || echo "missing node (24 or newer): brew install node"
 	@command -v $(UV) >/dev/null && echo "ok      uv" || echo "missing uv: brew install uv"
 	@command -v $(TILT) >/dev/null && echo "ok      tilt" || echo "missing tilt: brew install tilt"
 	@xcodebuild -version >/dev/null 2>&1 && echo "ok      Xcode" || echo "missing Xcode: only for DEVICE=macos, from the App Store"
+	@command -v $(OLLAMA) >/dev/null && echo "ok      ollama" || echo "missing ollama: only for triage on Muse Glimmer (without it, a word list): brew install ollama"
 
 env: ## Create .env from .env.example with a fresh sign-in secret (never overwrites a value)
 	@if [ -f .env ]; then echo ".env: exists, values kept"; else cp .env.example .env && echo ".env: created"; fi
@@ -106,14 +104,23 @@ api: _run-dir ## Run the API on http://localhost:8000, reloading on save; stop w
 	@cd $(BACKEND_DIR) && sh -c 'echo $$$$ > "$(API_PID)"; \
 	  exec $(UV) run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000'
 
-worker: _run-dir ## Run the story pipeline: fetch, embed, cluster, facts; stop with Ctrl+C or make stop-worker
+worker: _run-dir ## Run the story pipeline: fetch, triage, cluster, facts, briefings; stop with Ctrl+C or make stop-worker
 	@cd $(BACKEND_DIR) && sh -c 'echo $$$$ > "$(WORKER_PID)"; exec $(UV) run python -m app.worker run'
+
+glimmer: _run-dir ## Run Ollama for the triage agent on 127.0.0.1:11434; stop with Ctrl+C or make stop-glimmer
+	@sh -c 'echo $$$$ > "$(GLIMMER_PID)"; exec env OLLAMA_HOST=127.0.0.1:11434 $(OLLAMA) serve'
+
+glimmer-model: ## Download Muse Glimmer into Ollama, once (18 GB; needs make glimmer running)
+	$(OLLAMA) pull $(GLIMMER_GGUF) && $(OLLAMA) cp $(GLIMMER_GGUF) $(GLIMMER_NAME)
 
 fetch-now: ## Fetch every followed source now (the worker runs the fetches)
 	cd $(BACKEND_DIR) && $(UV) run python -m app.worker fetch-now
 
 briefing: ## Make the demo's morning briefing now (the worker makes it; READER=<id> for a reader's)
 	cd $(BACKEND_DIR) && $(UV) run python -m app.worker briefing $(if $(READER),--reader $(READER))
+
+illustrations: ## Queue illustrations for stories that earned one (LIMIT=10; each is a few paid calls)
+	cd $(BACKEND_DIR) && $(UV) run python -m app.worker illustrations-backlog --limit $(or $(LIMIT),10)
 
 pipeline-status: ## What the pipeline has stored, clustered and queued
 	cd $(BACKEND_DIR) && $(UV) run python -m app.worker status
@@ -129,44 +136,45 @@ ci: _need-tilt ## Start everything with Tilt, wait until it is all healthy, then
 ##@ Stop and status
 
 stop-app: ## Stop the app (web or macOS), whether it runs on its own or in Tilt
-	@$(call stop_pid,app (on its own),$(APP_PID),flutter)
 	@$(call tilt_disable,app,app app-reload app-macos app-macos-reload)
+	@$(PROCESSES) stop app
+	@rm -f "$(APP_PID)"
 
 stop-widgetbook: ## Stop Widgetbook, whether it runs on its own or in Tilt
-	@$(call stop_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
 	@$(call tilt_disable,widgetbook,widgetbook widgetbook-reload widgetbook-gen)
+	@$(PROCESSES) stop widgetbook
+	@rm -f "$(WIDGETBOOK_PID)"
 
 stop-auth: ## Stop sign-in, whether it runs on its own or in Tilt
-	@$(call stop_pid,auth (on its own),$(AUTH_PID),npm)
 	@$(call tilt_disable,auth,auth)
+	@$(PROCESSES) stop auth
+	@rm -f "$(AUTH_PID)"
 
 stop-api: ## Stop the API, whether it runs on its own or in Tilt
-	@$(call stop_pid,api (on its own),$(API_PID),uvicorn)
 	@$(call tilt_disable,api,api)
+	@$(PROCESSES) stop api
+	@rm -f "$(API_PID)"
 
 stop-worker: ## Stop the story pipeline, whether it runs on its own or in Tilt
-	@$(call stop_pid,worker (on its own),$(WORKER_PID),app.worker)
 	@$(call tilt_disable,worker,worker)
+	@$(PROCESSES) stop worker milvus
+	@rm -f "$(WORKER_PID)"
 
-stop: ## Stop everything at once: the app, Widgetbook, sign-in, the API and the whole Tilt session
-	@$(call stop_pid,app (on its own),$(APP_PID),flutter)
-	@$(call stop_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
-	@$(call stop_pid,auth (on its own),$(AUTH_PID),npm)
-	@$(call stop_pid,api (on its own),$(API_PID),uvicorn)
-	@$(call stop_pid,worker (on its own),$(WORKER_PID),app.worker)
-	@$(call stop_pid,Tilt and everything in it,$(TILT_PID),tilt)
-	@rm -f "$(RUN_DIR)"/tilt-*.pid
+stop-glimmer: ## Stop Ollama (Muse Glimmer), whether it runs on its own or in Tilt
+	@$(call tilt_disable,glimmer,glimmer)
+	@$(PROCESSES) stop glimmer
+	@rm -f "$(GLIMMER_PID)"
+
+stop: ## Stop everything of OSMS's, however it was started: Tilt, the app, Widgetbook, sign-in, the API, the worker, Ollama
+	@$(PROCESSES) stop
+	@rm -f "$(RUN_DIR)"/*.pid
 	@if command -v $(TILT) >/dev/null; then mkdir -p "$(RUN_DIR)" && : > "$(TILT_KUBECONFIG)" && \
 	  $(TILT_RUN) down >/dev/null 2>&1 || true; fi
 
 down: stop
 
-status: ## Show what is running
-	@$(call show_pid,app (on its own),$(APP_PID),flutter)
-	@$(call show_pid,widgetbook (on its own),$(WIDGETBOOK_PID),flutter)
-	@$(call show_pid,auth (on its own),$(AUTH_PID),npm)
-	@$(call show_pid,api (on its own),$(API_PID),uvicorn)
-	@$(call show_pid,worker (on its own),$(WORKER_PID),app.worker)
+status: ## Show what of OSMS's is running, however it was started, and Tilt's resources
+	@$(PROCESSES) list
 	@if $(tilt_up); then \
 	  echo "Tilt: running at http://localhost:10350"; \
 	  $(TILT_RUN) get uiresources -o \
@@ -188,9 +196,11 @@ build-macos: ## Build the macOS app (needs Xcode): frontend/build/macos/Build/Pr
 # How test-macos reads the sign-in log: Tilt's by default.
 AUTH_LOG ?= env KUBECONFIG=$(TILT_KUBECONFIG) $(TILT) logs auth
 
-test-macos: ## With `make up` running: the real macOS app against sign-in and the API (opens a window)
+# One file at a time: run back to back, flutter can't attach to the relaunched app.
+test-macos: ## With `make up` running: the real macOS app end to end, and its briefing audio (opens a window)
 	@cookie=$$(AUTH_LOG="$(AUTH_LOG)" sh $(AUTH_DIR)/scripts/dev-session.sh macos-test@users.example) && \
-	  cd $(APP_DIR) && $(FLUTTER) test integration_test -d macos --dart-define=OSMS_TEST_SESSION_COOKIE="$$cookie"
+	  cd $(APP_DIR) && for test in integration_test/*_test.dart; do \
+	    $(FLUTTER) test "$$test" -d macos --dart-define=OSMS_TEST_SESSION_COOKIE="$$cookie" || exit 1; done
 
 check: check-flutter check-backend check-auth ## Analyze and test everything
 

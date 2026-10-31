@@ -31,12 +31,17 @@ and illustrations.
     items keep their reason.
   - `index-item`: BGE-M3 dense + sparse into Milvus Lite, then the clustering decision.
   - `claims-item`: the claims agent, quotes checked against the item, then the verifier.
-  - `write-story`: the writer agent, a new summary row when facts changed.
+  - `write-story`: the writer agent, a new summary row when facts changed; a story with
+    three sources then gets an `illustrate-story` job (Muse Image, checked by SAM 3.1).
+  - Since Oct 31 also `make-briefing` (`docs/specs/morning-briefing.md`).
 - **Tables** (migration `0003`): `items`, `jobs`, `stories`, `story_summaries`, `claims`
   (dated history: corrections supersede, nothing is overwritten), `disagreements`,
-  `read_state`; fetch state on `sources`.
+  `read_state`; fetch state on `sources`. Later: `0004` briefings, `0005` each agent
+  run's subject, `0006` interest searches and matches, `0007` story illustrations.
 - **API:** `GET /stories`, `GET /stories/{id}`, `POST /stories/{id}/read` (signed in);
-  `GET /demo/stories`, `GET /demo/stories/{id}` (public, the seed sources).
+  `GET /demo/stories`, `GET /demo/stories/{id}` (public, the seed sources). Since Oct 31:
+  `.../ask` (`docs/specs/ask-story.md`), `.../decisions` (How OSMS decided), and
+  `GET /visuals/{name}` for illustrations.
 - **App:** Today reads the API (refreshing every minute and when the app comes back to
   the front); signed out, real demo stories replace the samples once they exist. The story
   page shows each fact's quote in its language with "Translated by OSMS", "One source so
@@ -77,4 +82,5 @@ and illustrations.
 ## Not yet
 
 - The agent task set in `eval/agents/`; your labels and the first eval numbers.
-- Real model calls: they need `META_API_KEY` (and Baseten for the judge).
+- Baseten for the judge: until the account is approved, Muse Spark judges (its backup).
+  Real Muse Spark calls run since Oct 31: facts, summaries, Ask, the briefing.

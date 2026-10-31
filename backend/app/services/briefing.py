@@ -47,7 +47,7 @@ class _Pick(BaseModel):
 class EditorOut(BaseModel):
     model_config = ConfigDict(extra="ignore", title="briefing_picks")
 
-    picks: list[_Pick] = Field(default_factory=list, max_length=8)
+    picks: list[_Pick] = Field(min_length=1, max_length=8)  # required: see writer.WriterOut
 
 
 class _Sentence(BaseModel):
@@ -62,13 +62,13 @@ class _Chapter(BaseModel):
 
     story_id: int
     title: str = Field(min_length=1, max_length=160)
-    sentences: list[_Sentence] = Field(default_factory=list, max_length=5)
+    sentences: list[_Sentence] = Field(min_length=1, max_length=5)
 
 
 class ScriptOut(BaseModel):
     model_config = ConfigDict(extra="ignore", title="briefing_script")
 
-    chapters: list[_Chapter] = Field(default_factory=list, max_length=MAX_CHAPTERS)
+    chapters: list[_Chapter] = Field(min_length=1, max_length=MAX_CHAPTERS)
 
 
 @dataclass

@@ -3,7 +3,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import Field
 
 from app.api.deps import Db, Kit, Reader
@@ -49,9 +49,9 @@ def update_settings(changes: SettingsIn, reader: Reader, db: Db) -> MeOut:
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-def delete_me(reader: Reader, db: Db) -> Response:
+def delete_me(reader: Reader, db: Db, request: Request) -> Response:
     """Deletes the reader's OSMS data. The app then deletes the sign-in account itself."""
-    accounts.delete_reader(db, reader)
+    accounts.delete_reader(db, reader, briefings_dir=request.app.state.briefings_dir)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

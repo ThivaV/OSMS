@@ -20,7 +20,7 @@ class _SentenceOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     text: str = Field(min_length=1, max_length=600)
-    claim_ids: list[int] = Field(default_factory=list, max_length=8)
+    claim_ids: list[int] = Field(min_length=1, max_length=8)  # required: see writer.WriterOut
 
 
 class AskOut(BaseModel):

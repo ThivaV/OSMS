@@ -11,8 +11,9 @@ those land with their agents. AGENTS.md §4 (*Techniques*, *Runtime*,
 - An `AgentSpec`: agent name, route, step limit, token budget, time limit,
   prompt version (run bounds, tunable; not clustering thresholds).
 - A `ModelClient`: one method returning a normalized step (tool calls or a
-  final payload, usage, optional commentary). The network client (OpenAI SDK)
-  lands Day 5; tests use the fake in `app/clients/fake.py`.
+  final payload, usage, optional commentary). The network clients: httpx with no
+  SDK (`app/clients/openai_compat.py`, since Oct 30) and, for local Muse Glimmer,
+  Ollama's raw API (`app/clients/ollama.py`, Oct 31); tests use fakes.
 - Typed tools: name, OpenAI-style definition, a `call(args)` that validates
   with Pydantic. Plain code over SQLite and Milvus Lite; only the fetcher
   reaches the web, write tools touch only OSMS's own tables.

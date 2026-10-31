@@ -24,8 +24,11 @@ AGENTS.md *Podcasts* sets what makes each part.
 - API: `GET /briefings/latest` (signed in, only the reader's own), `GET /demo/briefing`,
   `GET /briefings/{id}/audio?expires=&signature=` (signed for 12 hours with a key that
   lives as long as the API process; byte ranges for seeking).
-- App: the floating bar and the full player play the real audio (just_audio); samples
-  and Widgetbook keep simulated playback.
+- App: the floating bar and the full player play the real audio (just_audio), on the
+  web (an `<audio>` element) and on macOS (AVPlayer, with App Transport Security's
+  local-networking exception for plain http to localhost); samples and Widgetbook keep
+  simulated playback.
+- Deleting an account deletes its briefings and their audio files.
 
 ## Steps
 
@@ -64,5 +67,9 @@ AGENTS.md *Podcasts* sets what makes each part.
 - `make check-backend`: `tests/test_briefing.py` (cited script, drift remade then left
   out, no checker → no briefing, the similarity measure, the signed URL and byte ranges,
   rule 7, the daily schedule).
-- `make check-flutter`: the demo briefing plays its audio and jumps by chapter.
+- `make check-flutter`: the demo briefing plays its audio and jumps by chapter (a fake
+  player).
+- `make test-macos`: the real macOS app plays, seeks and pauses a briefing served from
+  localhost with byte ranges (`integration_test/briefing_audio_test.dart`). The same
+  check passed in Chrome on Oct 31.
 - By hand: `make briefing`, wait for the worker, open the app signed out and press play.

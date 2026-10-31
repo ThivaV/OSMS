@@ -69,7 +69,8 @@ research interests. "Delete my account" removes everything. Open source througho
   sign-in and the API, keeps a session in the Keychain, listens on 127.0.0.1, signs in
   through the real desktop hand-off (a development session stands in for Google), then
   onboards, reaches an empty Today and Settings, and deletes its account. Saves
-  screenshots.
+  screenshots. Since Oct 31 the same target also plays a briefing in the real app
+  (`integration_test/briefing_audio_test.dart`), one test file at a time.
 - By hand: `make up`, open http://localhost:8080, **Create an account**, then
   **Email me a sign-in link** and open the link from the `auth` log. On macOS, **Continue
   with Google** in the app.

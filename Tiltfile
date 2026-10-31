@@ -1,10 +1,10 @@
 # OSMS local development: `make up` (or `tilt up`) at the repo root.
 # Tilt UI: http://localhost:10350. Rules: AGENTS.md, "Local development with Tilt".
 #
-# A resource joins when its code exists. Running today: auth (Better Auth), api, worker
-# (the story pipeline), app, Widgetbook and the check buttons. Still to come with their
-# code: glimmer, overnight-agent, eval. SQLite and Milvus Lite need no resource:
-# data/osms.db, data/auth.db and data/milvus.db are files.
+# A resource joins when its code exists. Running today: glimmer (Ollama, when installed),
+# auth (Better Auth), api, worker (the story pipeline, with Fetch now, Make briefing now and
+# Pipeline status buttons), app, Widgetbook and the check buttons. Still to come with its
+# code: eval. SQLite needs no resource; Milvus Lite runs as the worker's child process.
 
 load('ext://uibutton', 'cmd_button')
 
@@ -62,6 +62,23 @@ def flutter_web(name, project_dir, port, watch, resource_deps=[]):
         icon_name='restart_alt',
     )
 
+# ── Models ───────────────────────────────────────────────────────────────────
+
+# Muse Glimmer for the triage agent: Ollama, on 127.0.0.1 only. Only when Ollama is
+# installed (without it the worker triages with its word list); an Ollama already running
+# (the menu-bar app, say) is reused rather than fought over the port. Its model, once:
+# `make glimmer-model`.
+HAS_OLLAMA = str(local('command -v ollama || true', quiet=True)).strip() != ''
+if HAS_OLLAMA:
+    local_resource(
+        'glimmer',
+        serve_cmd='if curl -sf http://127.0.0.1:11434/api/version >/dev/null; then ' +
+                  'echo "Ollama is already running on 127.0.0.1:11434: using it"; exec tail -f /dev/null; ' +
+                  'else OLLAMA_HOST=127.0.0.1:11434 exec ollama serve; fi',
+        labels=['models'],
+        readiness_probe=probe(http_get=http_get_action(port=11434, path='/api/version'), period_secs=5),
+    )
+
 # ── Backend ──────────────────────────────────────────────────────────────────
 
 # Sign-in: Better Auth (Node). Restarts when its code or .env changes.
@@ -87,15 +104,16 @@ local_resource(
     readiness_probe=probe(http_get=http_get_action(port=8000, path='/health'), period_secs=5),
 )
 
-# The story pipeline: scheduled fetches, the jobs queue, BGE-M3, Milvus Lite (embedded on
-# data/milvus.db, so this is the only process that opens it), clustering and the agents.
-# Restarts on code or .env changes; a restart loses nothing (the queue is in SQLite).
+# The story pipeline: scheduled fetches, the jobs queue, triage, BGE-M3, Milvus Lite (a
+# child process on 127.0.0.1, the only one that opens data/milvus.db), clustering, the
+# agents, the morning briefing and illustrations. Restarts on code or .env changes; a
+# restart loses nothing (the queue is in SQLite). It checks for Glimmer when it starts.
 local_resource(
     'worker',
     serve_cmd='uv run python -m app.worker run',
     serve_dir='backend',
     deps=['.env', 'backend/app'],
-    resource_deps=['api'],
+    resource_deps=['api'] + (['glimmer'] if HAS_OLLAMA else []),
     labels=['backend'],
 )
 cmd_button(

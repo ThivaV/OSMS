@@ -14,7 +14,9 @@ Existing components in `frontend/lib/`, fixtures in
 
 1. `StoryVisual`: new `isIllustration` flag. When true, a small
    "Illustration" pill sits bottom-left over the art (spec: Muse Image art is
-   always labelled; the drawn threads stay the unlabeled fallback).
+   always labelled; the drawn threads stay the unlabeled fallback). Since Oct 31,
+   `imageUrl` and `focus` show the checked illustration itself, cropped around its
+   subject, with the drawn art while it loads and if it can't.
 2. `ItemCard` thumbnails: stop reusing the multi-thread `StoryVisual` for a
    single item. Neutral `surfaceSunken` placeholder with the kind glyph (play
    overlay + duration for video/episode). Honest until real thumbnails arrive

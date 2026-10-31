@@ -241,3 +241,18 @@ def test_briefings_are_scheduled_once_each_morning(memory_db) -> None:
     memory_db.commit()
     assert schedule_briefings(memory_db, morning + timedelta(hours=1)) == 0
     assert sorted(memory_db.scalars(select(Job.ref).where(Job.kind == "make-briefing"))) == ["ada", "demo"]
+
+
+def test_deleting_an_account_deletes_its_briefings_audio(client, auth, settings, made) -> None:
+    client.get("/me", headers=auth("ada"))
+    with client.app.state.sessions() as db:
+        demo = db.get(Briefing, made)
+        settings.briefings_dir.mkdir(parents=True, exist_ok=True)
+        (settings.briefings_dir / "ada.wav").write_bytes(b"RIFF")
+        db.add(Briefing(user_id="ada", language="en", chapters=demo.chapters, audio_path="ada.wav", duration_ms=1))
+        db.commit()
+    assert client.delete("/me", headers=auth("ada")).status_code == 204
+    assert not (settings.briefings_dir / "ada.wav").exists()
+    assert (settings.briefings_dir / demo.audio_path).exists()  # the demo's stays
+    with client.app.state.sessions() as db:
+        assert db.scalar(select(Briefing).where(Briefing.user_id == "ada")) is None

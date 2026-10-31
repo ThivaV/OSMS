@@ -59,23 +59,33 @@ other source.
   match records the words, per reader (`interest_matches`, migration `0006`).
 - `GET /me/research`: the reader's papers from the last two weeks, each with its words;
   the app's "New research for you" shows them signed in.
-- **Not yet:** related by meaning (needs your threshold), the interest agent's
-  suggestions and rule-3 flags, the cap on borderline papers, the sidebar's "N new",
+- The interest agent (Muse Spark, no backup, keywords redacted from the decision log):
+  related terms, categories and rule-3 flags as the reader types
+  (`POST /me/interests/suggest`, rate-limited); suggestions also pass the rule-3 word
+  list; flags accumulate on screen and are never searched or stored.
+- Interests saved before searches existed get theirs when the worker starts.
+- **Not yet:** related by meaning (needs your threshold), the borderline yes/no and its
+  daily cap, the paper count before saving, the sidebar's "N new",
   authors and categories on the card, and one connection across processes (the API
   never calls arXiv today, so the worker's client is the only one).
 
 ## Steps
 
-1. `adapters/arxiv.py`: parse category feeds and API results into `Item`s of kind
-   `paper`; one rate-limited arXiv client in the fetcher.
+1. Parse category feeds and API results into `Item`s of kind `paper` (done: the generic
+   `adapters/feed.py` handles both); one rate-limited arXiv client in the fetcher (done:
+   3 s per arXiv host).
 2. `services/interests.py`: build the query from a plan (quoted phrases in `ti:` and
    `abs:`, joined with `OR`, `AND cat:` when categories are picked, sorted by
    `submittedDate`), share identical queries, run the daily update and the 30-day
-   backfill, record matches with reasons.
+   backfill, record matches with reasons. (Done Oct 31, without plans: an interest's own
+   words and accepted terms are its search.)
 3. Related by meaning: embed papers and interests with BGE-M3, hybrid search per
    interest, apply the threshold, send borderline papers (capped) to the interest agent.
-4. `agent/interest.py` and its prompt: keywords → plan; yes or no on borderline papers.
-5. API routes for interests; wire the app's `InterestsEditor`, Today section and sidebar.
+4. The interest agent and its prompt (`services/interest_agent.py`,
+   `prompts/interest.md`): keywords → suggestions (done Oct 31); yes or no on borderline
+   papers (not yet).
+5. API routes for interests; wire the app's `InterestsEditor` (done), Today section
+   (done) and the sidebar's "N new" (not yet).
 
 ## How to test
 

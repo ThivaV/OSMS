@@ -26,7 +26,9 @@ class WriterOut(BaseModel):
     model_config = ConfigDict(extra="ignore", title="story_summary")
 
     title: str = Field(min_length=1, max_length=160)
-    points: list[PointOut] = Field(default_factory=list, max_length=6)
+    # Required with at least one: given a default, the schema made it optional and Muse Spark
+    # answered with a title and no points (Oct 31).
+    points: list[PointOut] = Field(min_length=1, max_length=6)
 
 
 def latest_summary(db: Session, story_id: int) -> StorySummary | None:

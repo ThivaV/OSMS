@@ -36,7 +36,7 @@ Oct 27 – Nov 4, 2026.
   (Today, topic, source, Saved); ⌘K hover/keyboard polish; the demo Today shows
   "New research for you". The wire contract (`AskRequest`/`AskResponse`, cited
   sentences enforced) lives in `backend/app/schemas/ask.py` with tests; the ask
-  agent and route land Day 8, so asking today ends in the spec'd unavailable state.
+  agent and its routes followed on Oct 31.
 - [x] **Architecture hardening (Oct 30):** the agent loop (`call_once` +
   bounded tool loop, fake models, no framework), frozen guardrails as code
   (backup matrix, no search grounding, log scrubbing with value redaction),
@@ -55,8 +55,25 @@ Oct 27 – Nov 4, 2026.
   in its language and a labelled translation. The first real run collected 1,695 items
   and grouped 496 news items into 464 stories, 21 with two or more items. Facts and
   summaries need `META_API_KEY`. Spec: `docs/specs/story-pipeline.md`.
-- [ ] arXiv matching, the briefing (podcast) audio, illustrations, triage on Muse
-  Glimmer — in build-plan order (see AGENTS.md).
+- [x] **Days 7–8, built Oct 31, on the web and macOS apps alike:**
+  - **Triage on Muse Glimmer**, local through Ollama: rule 3, noise, language and names
+    for every item; what it is unsure about goes to Muse Spark, and a word list stands in
+    without it.
+  - **The morning briefing, OSMS's podcast:** the editor picks the stories, the writer
+    scripts them with every sentence citing a checked fact, SeamlessM4T v2 (English,
+    Danish) and MMS-TTS (Tamil) voice them, and Muse Voice Transcribe checks every chapter
+    before anyone hears it. The app plays it. Spec: `docs/specs/morning-briefing.md`.
+  - **Papers:** each research interest becomes one shared arXiv search, fetched daily with
+    a 30-day backfill; new papers reach "New research for you" with the words they
+    matched; the interest agent suggests related terms and flags political keywords as
+    you type.
+  - **Ask this story**, end to end, answered from the story's checked facts.
+  - **How OSMS decided:** every model call behind a story, with what it changed.
+  - **Illustrations:** Muse Image in one house style, checked by SAM 3.1 for people,
+    faces, logos and text, cropped around its subject and labelled.
+- [ ] Still to do: related-by-meaning papers, adding sources from the app, the language
+  toggle, podcasts, the editor's review loop and the Muse Wonder trial, deployment, the
+  demo's fallback data (see AGENTS.md, *Build plan*).
 
 ## How judging maps to the repo
 
@@ -69,21 +86,21 @@ Oct 27 – Nov 4, 2026.
 
 ## Which Meta models do what
 
-The plan; each line is marked as it lands. Muse Spark agents make the judgement calls,
-and a different model checks every generated output before a reader sees it.
+Muse Spark agents make the judgement calls, and a different model checks every generated
+output before a reader sees it.
 
-| Model | What OSMS uses it for |
-|---|---|
-| Muse Spark | The interest, claims, verifier, editor and writer agents |
-| Muse Spark Open (open weights, Baseten) | The judge: are two items about the same event? |
-| Muse Glimmer (open weights, local) | Triage of every incoming item |
-| Muse Wonder | The overnight editor, if our agent tests favour it |
-| Muse Image | One illustration per story |
-| SAM 3.1 | Checks and crops each illustration |
-| Muse Voice Transcribe | Podcast episodes, and a check on the briefing audio |
-| SeamlessM4T v2 (open weights) | The briefing's voice in English and Danish |
-| MMS-TTS (open weights) | The briefing's voice in Tamil |
-| Muse Code | Parts of the build (listed below) |
+| Model | What OSMS uses it for | Status |
+|---|---|---|
+| Muse Spark | The interest, claims, verifier, editor, writer and ask agents | In use |
+| Muse Spark Open (open weights, Baseten) | The judge: are two items about the same event? | Built; Muse Spark judges until the Baseten account is approved |
+| Muse Glimmer (open weights, local) | Triage of every incoming item | In use, through Ollama |
+| Muse Wonder | The overnight editor, if our agent tests favour it | Not yet |
+| Muse Image | One illustration per story | In use, from three sources |
+| SAM 3.1 | Checks and crops each illustration | In use |
+| Muse Voice Transcribe | A check on the briefing audio; podcast episodes later | In use for the check (English, Tamil) |
+| SeamlessM4T v2 (open weights) | The briefing's voice in English and Danish | In use |
+| MMS-TTS (open weights) | The briefing's voice in Tamil | In use |
+| Muse Code | Parts of the build (listed below) | |
 
 Details and diagrams: [docs/architecture.md](docs/architecture.md).
 
@@ -98,9 +115,11 @@ metadata and links to each paper on arXiv; it is not endorsed by arXiv.
 
 ## How to run
 
-Everything runs through `make` from the repo root. `make` on its own lists every command.
-Today that is the app (web; macOS with Xcode), sign-in, the API and the Widgetbook
-component catalogue. The story pipeline arrives during the hackathon.
+Step by step, with and without Tilt: **[SETUP.md](SETUP.md)**.
+
+Everything runs through `make` from the repo root. `make` on its own lists every command:
+the app (web; macOS with Xcode), sign-in, the API, the story pipeline (the worker),
+Ollama for triage, and the Widgetbook component catalogue.
 
 ### What you need
 
@@ -112,6 +131,7 @@ component catalogue. The story pipeline arrives during the hackathon.
 | Google Chrome | running in the browser | |
 | [Tilt](https://tilt.dev) | running everything at once | `brew install tilt` |
 | XCode | only for the macOS desktop app | App Store |
+| [Ollama](https://ollama.com) | only for triage on Muse Glimmer (18 GB; without it, a word list) | `brew install ollama` |
 
 `make tools` tells you what is missing.
 
@@ -130,8 +150,12 @@ its own, and never overwrites a value you set.
 ```bash
 make auth                   # sign-in (Better Auth) on http://localhost:3000
 make api                    # the API on http://localhost:8000 (docs at /docs)
-make worker                 # the story pipeline: fetch, embed, cluster, facts
+make worker                 # the story pipeline: fetch, triage, cluster, facts, briefings
+make glimmer                # Ollama for the triage agent (Muse Glimmer), on 127.0.0.1:11434
+make glimmer-model          # once: download Muse Glimmer into Ollama (18 GB)
 make fetch-now              # fetch every followed source now
+make briefing               # the demo's morning briefing now (READER=<id> for a reader's)
+make illustrations          # illustrate stories that earned one (LIMIT=10; paid calls)
 make pipeline-status        # what the pipeline has stored, clustered and queued
 make app                    # the app in Chrome, on http://localhost:8080
 make app DEVICE=macos       # the macOS desktop app (needs XCode)
@@ -145,6 +169,9 @@ seed source and embeds the news with BGE-M3 (`make setup` installs it; the model
 2.3 GB, downloads on first use). For facts, disagreements and summaries, put
 `META_API_KEY` in `.env` (and `BASETEN_API_KEY` + `BASETEN_BASE_URL` for the judge on
 Muse Spark Open); without keys, stories still form from clear matches, with no facts.
+The same key gives Ask, the briefing and illustrations. The briefing's voices (about
+9.5 GB) download on its first run. Triage uses Muse Glimmer when `make glimmer` is running
+and the model is in Ollama, and a word list otherwise.
 
 ### The macOS app
 
@@ -155,7 +182,7 @@ the command line tools) and runs on macOS 12 or later.
 make up                     # sign-in and the API (and the web app)
 make app DEVICE=macos       # then the desktop app; or the app-macos button in Tilt
 make build-macos            # a release build: frontend/build/macos/Build/Products/Release/OSMS.app
-make test-macos             # with make up running: the real app, end to end (opens a window)
+make test-macos             # with make up running: the real app end to end, and its briefing audio (opens a window)
 ```
 
 On the desktop, sign in with **Continue with Google**: it opens your default browser,
@@ -187,7 +214,9 @@ its terminal to open it):
 
 Saving a file hot-reloads whatever it belongs to. Each Flutter part also has a **Hot
 restart** button, and **flutter-checks**, **backend-checks** and **auth-checks** run the
-tests on demand. The first start takes a minute or two while Flutter compiles.
+tests on demand. The worker has **Fetch now**, **Make briefing now** and **Pipeline
+status** buttons. With Ollama installed, Tilt also runs `glimmer` (or uses the Ollama
+already running). The first start takes a minute or two while Flutter compiles.
 
 ### Signing in locally
 
@@ -207,15 +236,20 @@ tests on demand. The first start takes a minute or two while Flutter compiles.
 ### Stop and check what's running
 
 ```bash
-make status           # what is running, on its own and in Tilt
+make status           # what of OSMS's is running, however it was started
 make stop-app         # stop the app, wherever it runs
 make stop-widgetbook  # stop Widgetbook, wherever it runs
 make stop-auth        # stop sign-in, wherever it runs
 make stop-api         # stop the API, wherever it runs
+make stop-worker      # stop the story pipeline, wherever it runs
+make stop-glimmer     # stop Ollama (Muse Glimmer), wherever it runs
 make stop             # stop everything at once, including Tilt
 ```
 
-A part stopped inside Tilt can be turned back on from the dashboard.
+These find OSMS's processes however they were started (by make, in a terminal, by Tilt):
+only ones running an OSMS service from inside this repo, and Ollama's server. They never
+touch your shells, editors or other projects. A part stopped inside Tilt can be turned
+back on from the dashboard.
 
 ### Checks
 
@@ -243,9 +277,12 @@ Every target wraps a plain command, for example:
 cd auth && npm start
 cd backend && uv run uvicorn app.main:app --reload
 cd backend && uv run python -m app.worker run
+cd backend && uv run python -m app.worker briefing
+OLLAMA_HOST=127.0.0.1:11434 ollama serve
 cd frontend && flutter run -d chrome --web-port=8080
 cd frontend/widgetbook && dart run build_runner build && flutter run -d chrome
 cd frontend && flutter analyze && flutter test
+sh scripts/processes.sh list    # what is running; `stop` stops it all
 ```
 
 ### Good to know

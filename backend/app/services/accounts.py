@@ -2,12 +2,13 @@
 Every function takes the signed-in reader; none takes a user id from a request."""
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.tokens import Claims
-from app.db.models import Interest, Source, Subscription, Topic, User
+from app.db.models import Briefing, Interest, Source, Subscription, Topic, User
 from app.schemas.account import (
     LANGUAGES,
     InterestIn,
@@ -147,7 +148,11 @@ def update_settings(db: Session, user: User, changes: SettingsIn) -> User:
     return user
 
 
-def delete_reader(db: Session, user: User) -> None:
-    """Remove the reader and everything they own. Shared sources stay."""
+def delete_reader(db: Session, user: User, *, briefings_dir: Path | None = None) -> None:
+    """Remove the reader and everything they own, their briefings' audio files included.
+    Shared sources stay."""
+    audio = [b.audio_path for b in db.scalars(select(Briefing).where(Briefing.user_id == user.id)) if b.audio_path]
     db.delete(user)
     db.commit()
+    for name in audio if briefings_dir else []:
+        (briefings_dir / name).unlink(missing_ok=True)

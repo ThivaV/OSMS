@@ -142,3 +142,14 @@ def test_the_backlog_lists_stories_that_earned_an_illustration(memory_db) -> Non
     memory_db.commit()
     assert illustration_backlog(memory_db, 10) == [four.id, three.id]
     assert illustration_backlog(memory_db, 1) == [four.id]
+
+
+def test_the_web_app_may_load_illustrations(client, settings) -> None:
+    """Flutter web fetches images, so another origin needs CORS (an <img> wouldn't)."""
+    settings.visuals_dir.mkdir(parents=True, exist_ok=True)
+    name = "1" * 32 + ".webp"
+    (settings.visuals_dir / name).write_bytes(WEBP)
+    served = client.get(f"/visuals/{name}", headers={"Origin": "http://localhost:8080"})
+    assert served.headers["access-control-allow-origin"] == "http://localhost:8080"
+    other = client.get(f"/visuals/{name}", headers={"Origin": "https://elsewhere.example"})
+    assert "access-control-allow-origin" not in other.headers
