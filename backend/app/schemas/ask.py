@@ -8,6 +8,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.schemas.account import Strict
+from app.schemas.stories import StorySourceOut
 
 # One typed sentence, capped like the app's field. Blank counts as missing.
 Question = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=280)]
@@ -27,6 +28,8 @@ class CitedSentence(BaseModel):
 
     text: Sentence
     claim_ids: Annotated[list[ClaimId], Field(min_length=1, max_length=20)]
+    #: The sources behind those facts, for the sentence's chips (publisher first).
+    sources: list["StorySourceOut"] = []
 
 
 class AskResponse(BaseModel):

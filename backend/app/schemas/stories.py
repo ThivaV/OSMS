@@ -72,6 +72,10 @@ class StoryOut(BaseModel):
     languages: list[str]
     visual_seed: int
     has_illustration: bool = False
+    #: Relative to the API: `/visuals/<name>.webp`; a checked Muse Image illustration.
+    illustration_url: str | None = None
+    #: Where its subject is, 0–1 from the left and top, so each card shape crops around it.
+    illustration_focus: list[float] | None = None
     last_read_at: datetime | None
     whats_new: list[ClaimOut]
     disagreements: list[DisagreementOut]
@@ -82,3 +86,21 @@ class StoryOut(BaseModel):
 
 class StoriesOut(BaseModel):
     stories: list[StoryOut]
+
+
+class PaperOut(BaseModel):
+    """A paper for the reader's research interests, with the words that brought it."""
+
+    id: str
+    title: str
+    abstract: str
+    url: str | None
+    published_at: datetime
+    source: StorySourceOut
+    paper_id: str | None = None
+    version: int | None = None
+    matched_terms: list[str]
+
+
+class ResearchOut(BaseModel):
+    papers: list[PaperOut]

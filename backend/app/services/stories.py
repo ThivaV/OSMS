@@ -73,6 +73,13 @@ def _topics_by_source(db: Session, source_ids: set[int]) -> dict[int, str]:
     return {source_id: name for source_id, name in rows}
 
 
+def _illustration(story: Story) -> dict:
+    record = story.illustration or {}
+    if record.get("status") != "ready" or not record.get("path"):
+        return {}
+    return {"has_illustration": True, "illustration_url": f"/visuals/{record['path']}", "illustration_focus": record.get("focus")}
+
+
 def story_out(db: Session, story: Story, *, followed: set[int], read_at: datetime | None) -> StoryOut:
     items: list[Item] = []
     links: set[str] = set()
@@ -188,6 +195,7 @@ def story_out(db: Session, story: Story, *, followed: set[int], read_at: datetim
         kind_counts=dict(Counter(i.kind for i in items)),
         languages=languages,
         visual_seed=story.id,
+        **_illustration(story),
         last_read_at=since,
         whats_new=whats_new,
         disagreements=disagreements,

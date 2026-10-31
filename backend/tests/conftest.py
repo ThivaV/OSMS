@@ -1,9 +1,16 @@
 """Test helpers: a throwaway database, and API tokens signed with a test key the way
 the Better Auth service signs them (EdDSA, issuer, audience, 15 minutes)."""
 
+import os
 import time
 from collections.abc import Callable, Iterator
-from typing import Any
+from typing import Any, ClassVar
+
+# Tests never reach a real model. pymilvus loads the repo's .env into the environment
+# when it is imported (python-dotenv), but never over a variable already set: blank the
+# keys first, and every Settings below ignores the .env file too.
+for _key in ("META_API_KEY", "BASETEN_API_KEY", "BASETEN_BASE_URL", "GLIMMER_API_KEY", "GLIMMER_BASE_URL"):
+    os.environ[_key] = ""
 
 import jwt
 import pytest
@@ -52,13 +59,27 @@ Auth = Callable[[str], dict[str, str]]
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
-    return Settings(database_url=f"sqlite:///{tmp_path / 'osms.db'}")
+    return Settings(_env_file=None, database_url=f"sqlite:///{tmp_path / 'osms.db'}", OSMS_BRIEFINGS_DIR=tmp_path / "briefings", OSMS_VISUALS_DIR=tmp_path / "visuals")
+
+
+class NoModels:
+    """No agent is configured: what the API sees without keys."""
+
+    routes: ClassVar[dict] = {}
+
+    def available(self, agent: str) -> bool:
+        return False
 
 
 @pytest.fixture
-def client(settings: Settings) -> Iterator[TestClient]:
+def models():
+    return NoModels()
+
+
+@pytest.fixture
+def client(settings: Settings, models) -> Iterator[TestClient]:
     verifier = TokenVerifier(issuer=ISSUER, audience=AUDIENCE, keys=StaticKeys(KEY.public_key()))
-    with TestClient(create_app(settings, verifier)) as test_client:
+    with TestClient(create_app(settings, verifier, models=models)) as test_client:
         yield test_client
 
 

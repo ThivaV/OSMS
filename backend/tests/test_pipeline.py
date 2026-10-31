@@ -8,13 +8,14 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.agent.decision_log import DecisionLog
 from app.agent.kit import AgentKit
 from app.agent.runtime import ModelRoute, ModelStep, ModelUsage, Runner
 from app.db.milvus import VectorIndex
 from app.db.models import AgentRun, Claim, Disagreement, Item, Source, Story, StorySummary, Topic, TopicSource
-from app.services import jobs, stories
+from app.services import decisions, jobs, stories
 from app.services.embeddings import Embedding
 from app.services.ingestion.fetcher import Fetcher
 from app.services.pipeline import Pipeline
@@ -89,7 +90,11 @@ def _pipeline(db, tmp_path, client, *, available: bool) -> Pipeline:
         return httpx.Response(200, content=FEEDS[request.url.host])
 
     fetcher = Fetcher(httpx.Client(transport=httpx.MockTransport(handler)), resolver=lambda h, p: ["93.184.216.34"], sleep=lambda s: None)
-    kit = AgentKit(runner=Runner(client, DecisionLog(db)), routes=ROUTES, available={a: available for a in ROUTES})
+    # As in the worker: the decision log writes on its own connection, so a job that held
+    # SQLite's write lock across a model call would stall it ("database is locked").
+    log = DecisionLog(Session(db.get_bind()))
+    # Triage has its own tests (test_triage.py): here the word list stands in, as without Ollama.
+    kit = AgentKit(runner=Runner(client, log), routes=ROUTES, available={a: available and a != "triage" for a in ROUTES})
     return Pipeline(
         fetcher=fetcher,
         embedder_factory=TopicEmbedder,
@@ -187,6 +192,13 @@ def test_two_languages_one_story_with_checked_facts(seeded, tmp_path) -> None:
     assert all(e.url for e in story.timeline)
     # Every agent call is in the decision log, none of it with the reader's data.
     assert {r.agent for r in db.scalars(select(AgentRun))} == {"claims", "verifier", "writer"}
+    # How OSMS decided: each run on the story it was about, with what it changed.
+    decided = decisions.story_decisions(db, fold["da-fold"].story_id)
+    assert [d.agent for d in decided] == ["claims", "verifier", "claims", "verifier", "writer"]
+    assert decided[0].source == "Bytebladet" and decided[0].outcome == "2 facts found"
+    assert decided[1].outcome == "2 kept" and decided[-1].outcome == f"Wrote “{summary.title}”"
+    assert all(d.agent != "claims" or d.about for d in decided)
+    assert [d.agent for d in decisions.story_decisions(db, kestrel.story_id)] == ["claims"]
 
     # Bytebladet corrects its battery figure: the old fact stays, struck through.
     FEEDS["bytebladet.example"] = rss(
@@ -223,3 +235,15 @@ def test_without_model_keys_stories_form_and_say_only_what_is_known(seeded, tmp_
     assert fold.summary == "Reported by 2 sources in Danish and English."
     assert fold.whats_new == [] and fold.summary_points == []
     assert len(db.scalars(select(Story)).all()) == 2
+
+
+def test_the_vector_index_reopens_after_a_restart(tmp_path) -> None:
+    path = str(tmp_path / "milvus.db")
+    first = VectorIndex(path, dim=3)
+    first.upsert(1, Embedding(dense=[1.0, 0.0, 0.0], sparse={1: 0.5}), 1_000)
+    first.client.release_collection("items")  # What a new process finds; this one would keep it loaded.
+    first.close()
+    again = VectorIndex(path, dim=3)
+    found = again.neighbours(Embedding(dense=[1.0, 0.1, 0.0], sparse={1: 0.5}), since_ts=0, until_ts=2_000, exclude=2)
+    assert [n.item_id for n in found] == [1]
+    again.close()

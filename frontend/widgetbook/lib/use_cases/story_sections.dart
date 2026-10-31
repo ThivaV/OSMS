@@ -3,6 +3,7 @@ import 'package:osms/core/models/models.dart';
 import 'package:osms/core/theme/tokens.dart';
 import 'package:osms/features/story_detail/story_detail_view.dart';
 import 'package:osms/shared/widgets/ask_story_box.dart';
+import 'package:osms/shared/widgets/decision_log.dart';
 import 'package:osms/shared/widgets/disagreement_panel.dart';
 import 'package:osms/shared/widgets/source_quote.dart';
 import 'package:osms/shared/widgets/story_timeline.dart';
@@ -95,6 +96,20 @@ Widget timelineExtreme(BuildContext context) => Frame(
   maxWidth: _sectionWidth,
   child: StoryTimeline(events: fx.extremeStory.timeline, lastReadAt: fx.extremeStory.lastReadAt),
 );
+
+// ── How OSMS decided ─────────────────────────────────────────────────────────
+
+@widgetbook.UseCase(name: 'Decisions', type: DecisionLogSection, path: '[Story]')
+Widget decisionsShown(BuildContext context) =>
+    Frame(maxWidth: _sectionWidth, child: DecisionLogSection(decisions: fx.halcyonDecisions));
+
+@widgetbook.UseCase(name: 'Before loading', type: DecisionLogSection, path: '[Story]')
+Widget decisionsBeforeLoading(BuildContext context) =>
+    Frame(maxWidth: _sectionWidth, child: DecisionLogSection(load: () async => fx.halcyonDecisions));
+
+@widgetbook.UseCase(name: 'None yet', type: DecisionLogSection, path: '[Story]')
+Widget decisionsNone(BuildContext context) =>
+    const Frame(maxWidth: _sectionWidth, child: DecisionLogSection(decisions: []));
 
 // ── Ask this story ───────────────────────────────────────────────────────────
 // A state machine, so one use case per state rather than the usual trilogy.

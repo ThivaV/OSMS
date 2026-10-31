@@ -1,6 +1,7 @@
 """The names an item mentions (companies, products, places), for clustering: two items
-join a story without the judge only when they share one. Until the triage agent lists
-names (Day 7), this heuristic does: words written like names, never ordinary words.
+join a story without the judge only when they share one. When the triage agent can't list
+names, this heuristic does: words written like names, never
+ordinary words.
 
 Kept lowercase, so "OpenAI" in a Danish and an English headline match."""
 
@@ -40,6 +41,20 @@ def _looks_like_a_name(token: str, sentence_start: bool) -> bool:
     if any(ch.isupper() for ch in token[1:]):
         return True  # iPhone, OpenAI, YouTube
     return token[0].isupper() and not sentence_start
+
+
+def from_listed(listed: list[str], *, limit: int = 20) -> list[str]:
+    """Names the triage agent listed ("iPhone 17 Pro"), as the tokens clustering compares
+    ("iphone", "pro"), so its items still match items named by the heuristic."""
+    found: list[str] = []
+    for name in listed:
+        for token in _TOKEN.findall(name):
+            lower = token.lower()
+            if len(token) >= 2 and not token.isdigit() and lower not in _NOT_NAMES and lower not in found:
+                found.append(lower)
+                if len(found) >= limit:
+                    return found
+    return found
 
 
 def names(title: str, text: str = "", *, limit: int = 20) -> list[str]:

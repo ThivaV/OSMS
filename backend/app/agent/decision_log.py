@@ -17,10 +17,17 @@ class DecisionLog:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def start_run(self, *, agent: str, model: str, prompt_version: str = "v1") -> int:
-        run = AgentRun(agent=agent, model=model, prompt_version=prompt_version, status="running")
+    def _commit(self) -> None:
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()  # One failed write must not poison every run after it.
+            raise
+
+    def start_run(self, *, agent: str, model: str, prompt_version: str = "v1", subject: str | None = None) -> int:
+        run = AgentRun(agent=agent, model=model, prompt_version=prompt_version, subject=subject, status="running")
         self.db.add(run)
-        self.db.commit()
+        self._commit()
         return run.id
 
     def log_step(
@@ -64,7 +71,7 @@ class DecisionLog:
         self.db.add(step)
         run.input_tokens += input_tokens
         run.output_tokens += output_tokens
-        self.db.commit()
+        self._commit()
         return step.id
 
     def end_run(
@@ -85,4 +92,4 @@ class DecisionLog:
         run.fallback = fallback
         run.error = scrub_payload(error, sensitive=sensitive, max_str=MAX_LOG_STR) if error else None
         run.ended_at = datetime.now(UTC)
-        self.db.commit()
+        self._commit()

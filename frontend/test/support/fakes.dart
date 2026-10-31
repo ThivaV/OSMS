@@ -1,5 +1,6 @@
 // Fake sign-in and API clients, and a helper that starts the app with them.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:osms/app.dart';
 import 'package:osms/core/api/api_client.dart';
 import 'package:osms/core/api/auth_client.dart';
+import 'package:osms/core/audio/briefing_playback.dart';
 import 'package:osms/core/models/models.dart';
 import 'package:osms/core/session/account.dart';
 import 'package:osms/core/session/session.dart';
@@ -117,6 +119,74 @@ class FakeApi extends ApiClient {
 
   @override
   Future<void> markRead(String storyId) async => read.add(storyId);
+
+  /// What the interest agent suggests; records the keywords it was asked about.
+  InterestSuggestions suggestions = const InterestSuggestions();
+  final List<List<String>> suggestedFor = [];
+
+  @override
+  Future<InterestSuggestions> suggestInterest(List<String> keywords) async {
+    suggestedFor.add(keywords);
+    return suggestions;
+  }
+
+  /// The reader's matched papers.
+  List<Item> papers = const [];
+
+  @override
+  Future<List<Item>> research() async => papers;
+
+  /// The latest briefing, signed in or the demo's; null before the first.
+  Briefing? latestBriefing;
+
+  @override
+  Future<Briefing?> briefing({bool demo = false}) async => latestBriefing;
+
+  /// What [ask] answers; null fails like an unavailable service. Records each question.
+  AskResult? answer;
+  final List<(String, String, bool)> asked = [];
+
+  @override
+  Future<AskResult> ask(String storyId, String question, {bool demo = false}) async {
+    asked.add((storyId, question, demo));
+    return answer ?? (throw const ApiException('The answer service is unavailable right now.', status: 503));
+  }
+}
+
+/// Plays nothing: records what the player asked for.
+class FakePlayback implements BriefingPlayback {
+  FakePlayback(this.url);
+
+  final String url;
+  final calls = <String>[];
+  final _state = ValueNotifier(const PlaybackState());
+
+  @override
+  ValueListenable<PlaybackState> get state => _state;
+
+  @override
+  Future<void> play() async {
+    calls.add('play');
+    _state.value = _state.value.copyWith(playing: true);
+  }
+
+  @override
+  Future<void> pause() async {
+    calls.add('pause');
+    _state.value = _state.value.copyWith(playing: false);
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    calls.add('seek ${position.inMilliseconds}');
+    _state.value = _state.value.copyWith(position: position);
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async => calls.add('speed $speed');
+
+  @override
+  void dispose() => calls.add('dispose');
 }
 
 Future<(FakeAuth, FakeApi)> start(
@@ -126,6 +196,8 @@ Future<(FakeAuth, FakeApi)> start(
   List<Source>? subscriptions,
   List<Story> readerStories = const [],
   List<Story> demo = const [],
+  Briefing? briefing,
+  List<FakePlayback>? players,
 }) async {
   tester.view.physicalSize = const Size(1440, 900);
   tester.view.devicePixelRatio = 1;
@@ -133,10 +205,19 @@ Future<(FakeAuth, FakeApi)> start(
   final fakeAuth = auth ?? FakeAuth();
   final fakeApi = FakeApi(fakeAuth, onboarded: onboarded, subscriptions: subscriptions)
     ..readerStories = readerStories
-    ..demo = demo;
+    ..demo = demo
+    ..latestBriefing = briefing;
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [authClientProvider.overrideWithValue(fakeAuth), apiClientProvider.overrideWithValue(fakeApi)],
+      overrides: [
+        authClientProvider.overrideWithValue(fakeAuth),
+        apiClientProvider.overrideWithValue(fakeApi),
+        briefingPlaybackProvider.overrideWithValue((url) {
+          final player = FakePlayback(url);
+          players?.add(player);
+          return player;
+        }),
+      ],
       child: const OsmsApp(),
     ),
   );
@@ -149,5 +230,4 @@ Future<void> tapText(WidgetTester tester, String text) async {
   await tester.pumpAndSettle();
 }
 
-void go(WidgetTester tester, String path) =>
-    GoRouter.of(tester.element(find.byType(Navigator).first)).go(path);
+void go(WidgetTester tester, String path) => GoRouter.of(tester.element(find.byType(Navigator).first)).go(path);

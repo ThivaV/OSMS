@@ -110,8 +110,28 @@ class Interest(Base):
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
     related_terms: Mapped[list[str]] = mapped_column(JSON, default=list)
     categories: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # The arXiv search for these words: one shared source per distinct query, fetched daily.
+    query_url: Mapped[str | None] = mapped_column(String(2000), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class InterestMatch(Base):
+    """A paper that reached a reader through one of their interests, and why. Personal:
+    never logged, never shown to anyone else (rule 7)."""
+
+    __tablename__ = "interest_matches"
+    __table_args__ = (UniqueConstraint("interest_id", "item_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    interest_id: Mapped[int] = mapped_column(ForeignKey("interests.id", ondelete="CASCADE"), index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id", ondelete="CASCADE"), index=True)
+    # The interest's words the paper uses, in the reader's own spelling.
+    matched_terms: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    item: Mapped["Item"] = relationship()
 
 
 class AgentRun(Base):
@@ -125,6 +145,9 @@ class AgentRun(Base):
     agent: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(64))
     prompt_version: Mapped[str] = mapped_column(String(32), default="v1")
+    # What the run decided about: "story:<id>" or "item:<id>", for "How OSMS decided".
+    # Never a reader: runs about a reader (ask, editor, briefing) have none.
+    subject: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(16))  # running, ok, failed, stopped
     stop_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
     fallback: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -215,6 +238,9 @@ class Story(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    # Its Muse Image illustration, once tried: {"status": "ready" | "drawn art", "path",
+    # "focus": [x, y], "model", "checked_by", "attempts", "flagged", "at"}.
+    illustration: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     items: Mapped[list[Item]] = relationship(order_by="Item.published_at", viewonly=True)
 
@@ -232,6 +258,28 @@ class StorySummary(Base):
     model: Mapped[str] = mapped_column(String(64), default="")
     prompt_version: Mapped[str] = mapped_column(String(32), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Briefing(Base):
+    """One morning briefing: a reader's, or the demo's (no `user_id`), in one language.
+    One chapter per story, every sentence citing kept facts; the audio is one file,
+    each chapter checked by transcribing it back before anyone hears it."""
+
+    __tablename__ = "briefings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True)
+    language: Mapped[str] = mapped_column(String(8))
+    intro: Mapped[str] = mapped_column(Text, default="")
+    # [{"story_id", "title", "sentences": [{"text", "claim_ids"}], "new_fact_count",
+    #   "start_ms", "duration_ms", "check": {"by", "similarity", "attempts"}}]
+    chapters: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    # Relative to the briefings directory; None when no chapter passed its check.
+    audio_path: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    model: Mapped[str] = mapped_column(String(64), default="")
+    prompt_version: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class Claim(Base):

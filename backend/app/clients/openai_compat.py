@@ -15,7 +15,9 @@ import httpx
 from app.agent.guardrails import assert_no_search, backup_allowed
 from app.agent.runtime import ModelError, ModelRoute, ModelStep, ModelUsage, ToolCall
 
-TIMEOUT_S = 120.0
+# The verifier at high or maximum effort can think for over two minutes (seen Oct 31);
+# a timeout there wastes a paid call and retries the whole job.
+TIMEOUT_S = 300.0
 
 
 class ChatEndpoint:
@@ -153,10 +155,28 @@ class RoutedModels:
             )
 
 
+def triage_escalation(settings, models: RoutedModels) -> RoutedModels:
+    """The triage agent on Muse Spark, for the items it is unsure about. Its own small
+    table: the main one has exactly one route per agent (guardrails)."""
+    return RoutedModels({"triage": settings.triage_escalation_route()}, models.endpoints, {})
+
+
+def local_model_ready(base_url: str, model: str, *, http: httpx.Client | None = None) -> bool:
+    """Whether a local server (Ollama) is up and has the model, so a stopped server or a
+    model not pulled yet reads as unavailable instead of failing on every item."""
+    try:
+        response = (http or httpx.Client(timeout=3.0)).get(f"{base_url.rstrip('/')}/models")
+        ids = {str(m.get("id", "")) for m in response.json().get("data", [])}
+    except (httpx.HTTPError, ValueError, AttributeError):
+        return False
+    return model in ids or f"{model}:latest" in ids
+
+
 def models_from_settings(settings) -> RoutedModels:
     """Build the routing table's clients. An endpoint without a key (or a URL) is left
     out, so its agents report unavailable instead of failing on every call."""
-    from app.config import check_routes
+    from app.clients.ollama import OllamaEndpoint
+    from app.config import GLIMMER_MODEL, check_routes
 
     routes = settings.model_routes()
     check_routes(routes)
@@ -167,7 +187,9 @@ def models_from_settings(settings) -> RoutedModels:
                 continue
             key = settings.key_for(url)
             local = url.startswith(("http://127.0.0.1", "http://localhost"))
-            if key or local:
+            if local and model == GLIMMER_MODEL:
+                endpoints[url] = OllamaEndpoint(url)  # Glimmer's own turn format; see clients/ollama.py
+            elif key or local:
                 endpoints[url] = ChatEndpoint(url, key)
     backups = {r.backup: settings.endpoint_for(r.backup) for r in routes.values() if r.backup}
     return RoutedModels(routes, endpoints, backups)

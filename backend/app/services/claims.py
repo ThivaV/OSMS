@@ -56,7 +56,7 @@ def extract(db: Session, kit: AgentKit, item: Item) -> list[Claim] | None:
         return None
     prompt = load("claims")
     result = kit.runner.call_once(
-        kit.spec("claims", prompt_version=prompt.version, max_steps=2, token_budget=12_000),
+        kit.spec("claims", prompt_version=prompt.version, max_steps=2, token_budget=12_000, subject=f"item:{item.id}"),
         system=prompt.text,
         user=quoted_item(
             "item",

@@ -26,6 +26,7 @@ import 'package:osms/features/sources/interests_editor.dart';
 import 'package:osms/features/sources/sources_sidebar.dart';
 import 'package:osms/features/stories/story_list.dart';
 import 'package:osms/features/story_detail/story_detail_view.dart';
+import 'package:osms/shared/widgets/decision_log.dart';
 import 'package:osms/shared/widgets/disagreement_panel.dart';
 import 'package:osms/shared/widgets/item_card.dart';
 import 'package:osms/shared/widgets/source_chip.dart';
@@ -142,6 +143,28 @@ final Map<String, Widget Function()> _sections = {
   'Source quote translated': () => const SourceQuote(quote: 'Prisen er 7.999 kr.', language: 'da', translation: 'The price is 7,999 kroner.'),
   'Source quote in English': () => const SourceQuote(quote: 'It costs \$999.', language: 'en'),
   'Source quote extreme': () => SourceQuote(quote: 'விலை ' * 60, language: 'ta', translation: 'The price ' * 60),
+  'Decisions': () => DecisionLogSection(decisions: fx.halcyonDecisions),
+  'Decisions none yet': () => const DecisionLogSection(decisions: []),
+  'Decisions before loading': () => DecisionLogSection(load: () async => fx.halcyonDecisions),
+  'Decisions extreme': () => DecisionLogSection(
+    decisions: [
+      for (var i = 0; i < 12; i++)
+        Decision(
+          id: 'x$i',
+          agent: ['triage', 'judge', 'claims', 'verifier', 'writer', 'an-agent-with-a-long-name'][i % 6],
+          model: 'muse-spark-open-1026',
+          fallback: i.isEven ? 'muse-spark-1.3' : null,
+          at: DateTime(2026, 10, 31, 6, i),
+          latency: Duration(milliseconds: 900 * i),
+          inputTokens: 100000 * i,
+          outputTokens: 9999,
+          about: 'A headline long enough to need two lines and then some more ' * 4,
+          source: 'A source with a very long name indeed',
+          reason: 'Because the two items report the same launch on the same day with the same names. ' * 6,
+          outcome: 'Wrote “${'a long title ' * 12}”',
+        ),
+    ],
+  ),
   'Demo banner with samples': () => const DemoBanner(samples: true),
   'Demo banner, sign-in down': () => const DemoBanner(signInAvailable: false),
   'Demo banner with samples, sign-in down': () => const DemoBanner(signInAvailable: false, samples: true),

@@ -6,6 +6,7 @@ import '../../core/theme/tokens.dart';
 import '../../shared/formatting.dart';
 import '../../shared/widgets/ask_story_box.dart';
 import '../../shared/widgets/citation_chip.dart';
+import '../../shared/widgets/decision_log.dart';
 import '../../shared/widgets/disagreement_panel.dart';
 import '../../shared/widgets/glass.dart';
 import '../../shared/widgets/new_facts_badge.dart';
@@ -31,6 +32,7 @@ class StoryDetailView extends StatefulWidget {
     this.askUnavailable = false,
     this.askSuggestions = const [],
     this.onAsk,
+    this.loadDecisions,
   });
 
   final Story story;
@@ -45,6 +47,9 @@ class StoryDetailView extends StatefulWidget {
   final bool askUnavailable;
   final List<String> askSuggestions;
   final ValueChanged<String>? onAsk;
+
+  /// "How OSMS decided", loaded when the reader opens it; null hides it (samples).
+  final Future<List<Decision>> Function()? loadDecisions;
 
   @override
   State<StoryDetailView> createState() => _StoryDetailViewState();
@@ -143,6 +148,8 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                           threads: story.sources.length,
                           aspectRatio: 2.6,
                           isIllustration: story.hasIllustration,
+                          imageUrl: story.illustrationUrl,
+                          focus: story.illustrationFocus,
                         ),
                       ),
                       const SizedBox(height: Space.xl),
@@ -204,6 +211,10 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                         runSpacing: Space.sm,
                         children: [for (final s in sources) SourceChip(source: s, onTap: () {})],
                       ),
+                      if (widget.loadDecisions != null) ...[
+                        const SizedBox(height: Space.xxl),
+                        DecisionLogSection(load: widget.loadDecisions),
+                      ],
                       const SizedBox(height: Space.xxl),
                       KeyedSubtree(
                         key: _ask,

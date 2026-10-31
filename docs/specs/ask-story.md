@@ -1,4 +1,4 @@
-# Spec: Ask this story (Oct 30)
+# Spec: Ask this story (Oct 30; built Oct 31)
 
 **Goal:** a reader types a question on a story page and gets an answer drawn
 only from that story's verified claims, each sentence cited — or "Not reported
@@ -22,10 +22,11 @@ spec makes it buildable.
   **thinking**, **answered** (every sentence cited), **not reported** ("Not
   reported yet" + what the story does cover), **unavailable** (the answer
   service failed; ask again).
-- Backend (when it lands): `POST /stories/{id}/ask` with `AskRequest`, answered
-  by the ask agent on Muse Spark with no backup (the question is reader data).
-  Until then the app shows thinking, then unavailable — a spec'd state, never a
-  faked answer.
+- Backend (built Oct 31): `POST /stories/{id}/ask` (signed in, only stories from
+  the reader's sources: anything else is a 404) and `POST /demo/stories/{id}/ask`
+  (signed out, the demo's stories), answered by the ask agent on Muse Spark with
+  no backup (the question is reader data). No key: 503, which the app shows as
+  unavailable. The invented samples can't be asked: the box says so.
 
 ## Rules
 
@@ -39,7 +40,8 @@ spec makes it buildable.
 - **No search grounding**, no contributor variants (reader data), frozen.
 - Suggested questions come from the story (its disagreements, its timeline),
   never from the reader's history.
-- Rate-limited per reader; over the limit reads as unavailable.
+- Rate-limited: 12 questions per reader per 10 minutes, 6 per address for the
+  demo (`api/stories.py`); over the limit (429) reads as unavailable.
 
 ## Steps
 
@@ -49,14 +51,20 @@ spec makes it buildable.
 3. Story page: the box after Every source, toolbar jump button (speech icon).
 4. `schemas/ask.py`: `AskRequest`/`AskResponse` with the cite-every-sentence
    invariant validated; tests on fakes.
-5. `agent/ask.py` + prompt (Day 8, with the backend): claims-only context,
-   structured output, citation check before responding.
+5. `services/ask.py` + `prompts/ask.md` (built Oct 31): kept, current claims only,
+   structured output, sentences citing no known claim dropped; the question
+   redacted from the decision log; the routes in `api/stories.py`.
+6. App (built Oct 31): `ApiClient.ask`, wired in the home screen; an answer to a
+   story the reader has since left is ignored.
 
 ## How to test
 
 - `flutter analyze` + `flutter test` in both projects; new use cases render at
   every width and theme.
-- Backend: over-long/empty questions refused; a response with an uncited
-  sentence fails validation; a second reader's question never touches the
-  first reader's data (nothing is stored at all).
+- Backend (`tests/test_ask.py`, `tests/test_ask_api.py`): over-long/empty
+  questions refused; uncited sentences dropped; "Not reported yet"; the question
+  never reaches the decision log; a reader can't ask a story outside their
+  sources; the rate limit; no agent → 503.
+- App (`test/stories_test.dart`): a reader's and the demo's questions reach the
+  right route; a failure offers to ask again.
 - By hand in Widgetbook: each of the five states, then the toolbar jump.

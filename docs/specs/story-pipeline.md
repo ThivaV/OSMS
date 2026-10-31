@@ -18,14 +18,17 @@ and illustrations.
 ## Outputs
 
 - **Worker** (`python -m app.worker run`, `make worker`, Tilt's `worker`): one process,
-  one job at a time, Milvus Lite embedded on `data/milvus.db`.
+  one job at a time; Milvus Lite (`data/milvus.db`) in a child process it starts on
+  `127.0.0.1` (faiss and torch can't share a process on macOS). A job never holds
+  SQLite's write lock across a model call: the decision log writes on its own connection.
   - `fetch-source`: conditional GET (ETag/Last-Modified), per-host gaps (3 s for arXiv),
     every redirect and resolved address re-checked, 5 MB cap; RSS, Atom and JSON Feed to
     plain-text excerpts (never full articles); new or changed items saved first. The
     source is rescheduled: half its usual gap (5 min–6 h, ±10%), arXiv daily after
     05:15 UTC, errors doubling up to a day.
-  - `process-item`: rule 3 and noise (a word list until the triage agent, Day 7; dropped
-    items keep their reason), language, names.
+  - `process-item`: the triage agent (Muse Glimmer; unsure items to Muse Spark; the word
+    list without them, and as a rule-3 tripwire): rule 3, noise, language, names. Dropped
+    items keep their reason.
   - `index-item`: BGE-M3 dense + sparse into Milvus Lite, then the clustering decision.
   - `claims-item`: the claims agent, quotes checked against the item, then the verifier.
   - `write-story`: the writer agent, a new summary row when facts changed.
@@ -75,4 +78,3 @@ and illustrations.
 
 - The agent task set in `eval/agents/`; your labels and the first eval numbers.
 - Real model calls: they need `META_API_KEY` (and Baseten for the judge).
-- Triage on Muse Glimmer (Day 7) in place of the word list; names from triage.

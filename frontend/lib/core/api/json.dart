@@ -120,6 +120,68 @@ Claim claimFromJson(Json j) => Claim(
   corrects: j['corrects'] as String?,
 );
 
+Duration _ms(Object? value) => Duration(milliseconds: (value as num).toInt());
+
+Briefing briefingFromJson(Json j) => Briefing(
+  id: j['id'] as String,
+  date: _time(j['created_at']),
+  audioUrl: j['audio_url'] as String,
+  total: _ms(j['duration_ms']),
+  chapters: [
+    for (final c in _list(j['chapters']))
+      BriefingChapter(
+        storyId: c['story_id'] as String,
+        title: c['title'] as String,
+        start: _ms(c['start_ms']),
+        duration: _ms(c['duration_ms']),
+        newFactCount: (c['new_fact_count'] as num?)?.toInt() ?? 0,
+        sentences: [
+          for (final s in _list(c['sentences']))
+            SummaryPoint(text: s['text'] as String, sources: _sources(s['sources'])),
+        ],
+      ),
+  ],
+);
+
+/// A paper for the reader's research interests, with the words that brought it.
+Item paperFromJson(Json j) => Item(
+  id: j['id'] as String,
+  source: storySourceFromJson(j['source'] as Json),
+  kind: ItemKind.paper,
+  publishedAt: _time(j['published_at']),
+  title: j['title'] as String,
+  text: j['abstract'] as String,
+  url: j['url'] as String?,
+  hasThumbnail: false,
+  paperId: j['paper_id'] as String?,
+  version: (j['version'] as num?)?.toInt(),
+  matchedTerms: [for (final t in (j['matched_terms'] as List?) ?? const []) t as String],
+);
+
+Decision decisionFromJson(Json j) => Decision(
+  id: j['id'] as String,
+  agent: j['agent'] as String,
+  model: j['model'] as String,
+  fallback: j['fallback'] as String?,
+  at: _time(j['at']),
+  latency: j['latency_ms'] == null ? null : _ms(j['latency_ms']),
+  inputTokens: (j['input_tokens'] as num?)?.toInt() ?? 0,
+  outputTokens: (j['output_tokens'] as num?)?.toInt() ?? 0,
+  about: j['about'] as String?,
+  source: j['source'] as String?,
+  reason: j['reason'] as String?,
+  outcome: j['outcome'] as String?,
+);
+
+/// An answer from the story's checked facts: each sentence with the sources behind it.
+AskResult askResultFromJson(Json j) => AskResult(
+  question: j['question'] as String,
+  reported: j['reported'] == true,
+  segments: [
+    for (final s in _list(j['sentences'])) SummaryPoint(text: s['text'] as String, sources: _sources(s['sources'])),
+  ],
+);
+
 Disagreement disagreementFromJson(Json j) => Disagreement(
   id: j['id'] as String,
   topic: j['topic'] as String,
@@ -139,7 +201,16 @@ TimelineEvent timelineEventFromJson(Json j) => TimelineEvent(
   correctedFrom: j['corrected_from'] as String?,
 );
 
-Story storyFromJson(Json j) => Story(
+/// An illustration's address: the API sends it relative to itself.
+String? _illustrationUrl(Object? path, Uri? base) =>
+    path is String ? (base == null ? path : base.resolve(path).toString()) : null;
+
+Alignment _focus(Object? value) {
+  final xy = value is List && value.length == 2 ? value.cast<num>() : null;
+  return xy == null ? Alignment.center : Alignment(xy[0] * 2 - 1, xy[1] * 2 - 1);
+}
+
+Story storyFromJson(Json j, {Uri? base}) => Story(
   id: j['id'] as String,
   title: j['title'] as String,
   summary: (j['summary'] as String?) ?? '',
@@ -157,6 +228,8 @@ Story storyFromJson(Json j) => Story(
   languages: _strings(j['languages']),
   visualSeed: (j['visual_seed'] as num?)?.toInt() ?? 0,
   hasIllustration: j['has_illustration'] == true,
+  illustrationUrl: _illustrationUrl(j['illustration_url'], base),
+  illustrationFocus: _focus(j['illustration_focus']),
   lastReadAt: j['last_read_at'] == null ? null : _time(j['last_read_at']),
   whatsNew: _list(j['whats_new']).map(claimFromJson).toList(),
   disagreements: _list(j['disagreements']).map(disagreementFromJson).toList(),
@@ -164,4 +237,4 @@ Story storyFromJson(Json j) => Story(
   why: _strings(j['why']),
 );
 
-List<Story> storiesFromJson(Json j) => _list(j['stories']).map(storyFromJson).toList();
+List<Story> storiesFromJson(Json j, {Uri? base}) => [for (final s in _list(j['stories'])) storyFromJson(s, base: base)];

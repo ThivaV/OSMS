@@ -106,6 +106,13 @@ cmd_button(
     text='Fetch now',
 )
 cmd_button(
+    'worker:briefing',
+    argv=['sh', '-c', 'cd backend && uv run python -m app.worker briefing'],
+    resource='worker',
+    icon_name='podcasts',
+    text='Make briefing now',
+)
+cmd_button(
     'worker:status',
     argv=['sh', '-c', 'cd backend && uv run python -m app.worker status'],
     resource='worker',

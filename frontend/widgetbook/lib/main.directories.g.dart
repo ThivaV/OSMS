@@ -373,6 +373,24 @@ final directories = <_widgetbook.WidgetbookNode>[
         ],
       ),
       _widgetbook.WidgetbookComponent(
+        name: 'DecisionLogSection',
+        useCases: [
+          _widgetbook.WidgetbookUseCase(
+            name: 'Before loading',
+            builder: _osms_widgetbook_use_cases_story_sections
+                .decisionsBeforeLoading,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Decisions',
+            builder: _osms_widgetbook_use_cases_story_sections.decisionsShown,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'None yet',
+            builder: _osms_widgetbook_use_cases_story_sections.decisionsNone,
+          ),
+        ],
+      ),
+      _widgetbook.WidgetbookComponent(
         name: 'DisagreementPanel',
         useCases: [
           _widgetbook.WidgetbookUseCase(

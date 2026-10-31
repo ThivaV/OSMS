@@ -12,15 +12,18 @@ still form from clear matches, there are no facts, and nothing pretends otherwis
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.agent.kit import AgentKit
 from app.db.milvus import VectorIndex
-from app.db.models import Claim, Item, Source, Story
+from app.db.models import Claim, Item, Source, Story, User
+from app.services import briefing as briefing_service
 from app.services import claims as claims_agent
-from app.services import jobs
+from app.services import interests as research
+from app.services import jobs, visuals
 from app.services import judge as judge_agent
 from app.services import verifier as verifier_agent
 from app.services import writer as writer_agent
@@ -31,14 +34,15 @@ from app.services.ingestion.adapters.feed import UnsafeFeed, parse_feed
 from app.services.ingestion.fetcher import Fetcher, FetchError
 from app.services.ingestion.safety import UnsafeUrl
 from app.services.language import detect
-from app.services.names import names as find_names
-from app.services.triage import prefilter
+from app.services.speech import Checker, Voice
+from app.services.triage import triage
 
 #: Kinds that join stories. Papers wait for paper labels in the eval; photos and comics
 #: are timeline-only (AGENTS.md, *Source types*).
 CLUSTER_KINDS = frozenset({"article", "episode", "post", "video"})
 #: A first fetch doesn't drag in a source's distant past.
 MAX_AGE = timedelta(days=14)
+PAPER_MAX_AGE = timedelta(days=30)  # an interest's first search is its 30-day backfill
 MAX_ENTRIES = 200
 
 
@@ -56,10 +60,20 @@ class Pipeline:
     embedder_factory: Callable[[], Embedder]
     index_factory: Callable[[int], VectorIndex]
     kit: AgentKit
+    #: The triage agent on Muse Spark, for what Glimmer is unsure about.
+    escalation: AgentKit | None = None
+    #: The briefing's voice and its checks, loaded on the first briefing.
+    voice_factory: Callable[[], Voice] | None = None
+    checkers_factory: Callable[[Voice], list[Checker]] = lambda voice: []
+    briefings_dir: Path = Path("data/briefings")
+    #: Muse Image and SAM 3.1; None without a key, and the cards keep their drawn art.
+    media: visuals.Media | None = None
+    visuals_dir: Path = Path("data/visuals")
     thresholds: Thresholds = field(default_factory=Thresholds)
     clock: Callable[[], datetime] = lambda: datetime.now(UTC)
     _embedder: Embedder | None = None
     _index: VectorIndex | None = None
+    _voice: Voice | None = None
 
     @property
     def embedder(self) -> Embedder:
@@ -74,13 +88,19 @@ class Pipeline:
         return self._index
 
     def handle(self, db: Session, kind: str, ref: str) -> None:
+        if kind == "make-briefing":  # ref: a reader's id, or "demo"
+            self.make_briefing(db, ref)
+            return
         handler = {
             "fetch-source": self.fetch_source,
             "process-item": self.process_item,
             "index-item": self.index_item,
             "claims-item": self.claims_item,
             "write-story": self.write_story,
-        }[kind]
+            "illustrate-story": self.illustrate_story,
+        }.get(kind)
+        if handler is None:
+            raise ValueError(f"unknown job kind {kind!r}")
         handler(db, int(ref))
 
     # ── 1. Coming in ──────────────────────────────────────────────────────────
@@ -109,7 +129,7 @@ class Pipeline:
             published.append(when)
             item = db.scalar(select(Item).where(Item.source_id == source.id, Item.guid == entry.guid))
             if item is None:
-                if now - when > MAX_AGE:
+                if now - when > (PAPER_MAX_AGE if entry.kind == "paper" else MAX_AGE):
                     continue
                 item = Item(
                     source_id=source.id,
@@ -141,11 +161,15 @@ class Pipeline:
         item = db.get(Item, item_id)
         if item is None:
             return
-        if reason := prefilter(item.title, item.text):
-            item.status, item.drop_reason = "dropped", reason
+        triaged = triage(self.kit, self.escalation, item)
+        if triaged.drop_reason:
+            item.status, item.drop_reason = "dropped", triaged.drop_reason
             db.commit()
             return
-        item.names = find_names(item.title, item.text)
+        item.names = triaged.names
+        if triaged.language:
+            item.language = triaged.language
+        research.match_paper(db, item)
         if item.kind in CLUSTER_KINDS:
             item.vector_status = "pending"
             jobs.enqueue(db, "index-item", item.id)
@@ -161,6 +185,7 @@ class Pipeline:
         published = _aware(item.published_at)
         self.index.upsert(item.id, embedding, int(published.timestamp()))
         item.vector_status = "indexed"
+        db.commit()  # Before the judge: no write lock held across a model call.
         if item.story_id is None:
             self._assign(db, item, embedding, published)
         db.commit()
@@ -211,6 +236,7 @@ class Pipeline:
         for claim in stale:  # Extracted from text the source has since changed.
             claim.status, claim.verifier_reason = "dropped", "the source changed the item"
         proposed = [c for c in proposed if c not in stale]
+        db.commit()  # No write lock held across a model call: the decision log needs it.
         if not proposed:
             extracted = claims_agent.extract(db, self.kit, item)
             if extracted is None:
@@ -219,6 +245,8 @@ class Pipeline:
                     raise AgentUnavailable("claims agent failed")
                 return  # No key: nothing to do until one is configured.
             proposed = extracted
+            # Proposed facts are invisible until the verifier keeps them; a retry reuses them.
+            db.commit()
         if not verifier_agent.verify(db, self.kit, item, proposed):
             db.commit()
             if self.kit.can("verifier"):
@@ -230,9 +258,33 @@ class Pipeline:
             jobs.enqueue(db, "write-story", story.id)
         db.commit()
 
+    # ── 4. The morning briefing ───────────────────────────────────────────────
+
+    def make_briefing(self, db: Session, ref: str) -> None:
+        """`ref` is a reader's id, or "demo"."""
+        user = None if ref == "demo" else db.get(User, ref)
+        if (ref != "demo" and user is None) or self.voice_factory is None:
+            return
+        if self._voice is None:
+            self._voice = self.voice_factory()
+        briefing_service.make(
+            db, self.kit, self._voice, self.checkers_factory(self._voice), user=user, out_dir=self.briefings_dir
+        )
+
     def write_story(self, db: Session, story_id: int) -> None:
         story = db.get(Story, story_id)
         if story is None:
             return
         writer_agent.write(db, self.kit, story)
+        sources = db.scalar(
+            select(func.count(func.distinct(Item.source_id))).where(Item.story_id == story.id, Item.status != "dropped")
+        )
+        if self.media is not None and story.illustration is None and (sources or 0) >= visuals.ILLUSTRATE_AT_SOURCES:
+            jobs.enqueue(db, "illustrate-story", story.id)
         db.commit()
+
+    def illustrate_story(self, db: Session, story_id: int) -> None:
+        story = db.get(Story, story_id)
+        if story is None or story.illustration is not None or self.media is None:
+            return
+        visuals.illustrate(db, self.media, story, self.visuals_dir, log=self.kit.runner.log)

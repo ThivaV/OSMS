@@ -90,11 +90,59 @@ class ApiClient {
   Future<void> deleteMe() => _send('DELETE', '/me');
 
   /// The reader's stories: the ones their sources picked, with what's new since they read each.
-  Future<List<Story>> stories() async => storiesFromJson((await _send('GET', '/stories'))!);
+  Future<List<Story>> stories() async => storiesFromJson((await _send('GET', '/stories'))!, base: base);
 
   /// The demo's stories, for signed-out visitors: every seed source, no account needed.
-  Future<List<Story>> demoStories() async => storiesFromJson((await _send('GET', '/demo/stories', signedIn: false))!);
+  Future<List<Story>> demoStories() async =>
+      storiesFromJson((await _send('GET', '/demo/stories', signedIn: false))!, base: base);
 
   /// The reader opened the story: what's new starts again from now.
   Future<void> markRead(String storyId) => _send('POST', '/stories/$storyId/read');
+
+  /// The reader's latest briefing, or the demo's signed out; null before the first.
+  Future<Briefing?> briefing({bool demo = false}) async {
+    try {
+      return briefingFromJson((await _send('GET', demo ? '/demo/briefing' : '/briefings/latest', signedIn: !demo))!);
+    } on ApiException catch (error) {
+      if (error.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// The interest agent's related terms, categories and rule-3 flags for keywords being
+  /// edited. Nothing is stored.
+  Future<InterestSuggestions> suggestInterest(List<String> keywords) async {
+    final j = (await _send('POST', '/me/interests/suggest', body: {'keywords': keywords}))!;
+    List<String> strings(Object? v) => [for (final s in (v as List?) ?? const []) s as String];
+    return InterestSuggestions(
+      relatedTerms: strings(j['related_terms']),
+      categories: strings(j['categories']),
+      flagged: strings(j['flagged']),
+    );
+  }
+
+  /// New arXiv papers for the reader's research interests.
+  Future<List<Item>> research() async => [
+    for (final p in ((await _send('GET', '/me/research'))!['papers'] as List).cast<Json>()) paperFromJson(p),
+  ];
+
+  /// How OSMS decided: the model decisions behind a story the reader can see.
+  Future<List<Decision>> decisions(String storyId, {bool demo = false}) async => [
+    for (final d
+        in ((await _send('GET', '${demo ? '/demo' : ''}/stories/$storyId/decisions', signedIn: !demo))!['decisions']
+                as List)
+            .cast<Json>())
+      decisionFromJson(d),
+  ];
+
+  /// Ask this story: answered from its checked facts only, or "Not reported yet".
+  /// Signed out, the demo's stories answer the same way. Nothing is stored.
+  Future<AskResult> ask(String storyId, String question, {bool demo = false}) async => askResultFromJson(
+    (await _send(
+      'POST',
+      '${demo ? '/demo' : ''}/stories/$storyId/ask',
+      body: {'question': question},
+      signedIn: !demo,
+    ))!,
+  );
 }

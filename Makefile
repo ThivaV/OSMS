@@ -60,7 +60,7 @@ tilt_disable = if $(tilt_up); then \
 
 .DEFAULT_GOAL := help
 .PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
-  stop-api stop-worker worker fetch-now pipeline-status eval stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
+  stop-api stop-worker worker fetch-now briefing pipeline-status eval stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
   check-flutter check-backend check-auth eval-test clean _run-dir _need-tilt
 
 help: ## List the commands
@@ -111,6 +111,9 @@ worker: _run-dir ## Run the story pipeline: fetch, embed, cluster, facts; stop w
 
 fetch-now: ## Fetch every followed source now (the worker runs the fetches)
 	cd $(BACKEND_DIR) && $(UV) run python -m app.worker fetch-now
+
+briefing: ## Make the demo's morning briefing now (the worker makes it; READER=<id> for a reader's)
+	cd $(BACKEND_DIR) && $(UV) run python -m app.worker briefing $(if $(READER),--reader $(READER))
 
 pipeline-status: ## What the pipeline has stored, clustered and queued
 	cd $(BACKEND_DIR) && $(UV) run python -m app.worker status

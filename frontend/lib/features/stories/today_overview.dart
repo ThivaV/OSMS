@@ -263,6 +263,8 @@ class _LeadCard extends StatelessWidget {
                 threads: story.sources.length,
                 aspectRatio: large ? 2.2 : 16 / 9,
                 isIllustration: story.hasIllustration,
+                imageUrl: story.illustrationUrl,
+                focus: story.illustrationFocus,
               ),
               Padding(
                 padding: EdgeInsets.all(large ? Space.xl : Space.lg),

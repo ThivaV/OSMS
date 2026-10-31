@@ -63,3 +63,19 @@ different model before a reader sees it. AGENTS.md (*Meta models*, *Agents*) has
 - Briefing check: a fake transcript that drifts from the script remakes that chapter only.
 - No request ever enables search grounding or uses a `-contributor` id for reader data
   (asserted on the fake client).
+
+## Confirmed against the live API (Oct 31)
+
+- **Muse Image** (`POST /v1/images/generations`): `model`, `prompt`, `n`, `size`,
+  `response_format: "b64_json"`, `output_format: "png" | "webp"`. It refuses
+  `enable_image_search` as an unknown parameter: there is no image search to turn off.
+  Asked for `1024x1024`, it returned 1600×1600 (PNG about 3 MB, WebP about 0.5 MB, in
+  12–19 s). The response is `{"data": [{"b64_json"}], "output_format", "usage", ...}`.
+- **SAM 3.1** (`POST /v1/responses`, model `sam-3.1`): one noun phrase and one image (a
+  PNG or WebP data URL) per request; the answer is in `output[0].content[0].text`, one
+  record per match, `<|box;x1;y1;x2;y2;w;h;c|><|mask;...|>`, empty when nothing matches.
+  `metadata.include_confidence: "true"` adds `c`. 3–4 s per call.
+- **Muse Voice Transcribe** (`POST /v1/asr/transcribe`): multipart `request` (JSON) and
+  `audio` (16 kHz mono 16-bit WAV); `languageBias` takes names (`["English"]`,
+  `["Tamil"]`); answers `transcript`, `audioDurationMs`. English and Tamil worked on our
+  own generated speech; Danish isn't supported.

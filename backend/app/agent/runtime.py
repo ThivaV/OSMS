@@ -99,6 +99,8 @@ class AgentSpec:
     # Values that must never reach the decision log (the keywords being
     # worked on, the question being answered): redacted even from free text.
     sensitive: tuple[str, ...] = ()
+    # What the run decides about ("story:12", "item:345"); never a reader.
+    subject: str | None = None
 
 
 @dataclass(frozen=True)
@@ -148,7 +150,7 @@ class Runner:
         from app.agent.decision_log import DecisionLog
 
         log: DecisionLog = self.log
-        run_id = log.start_run(agent=spec.name, model=spec.route.model, prompt_version=spec.prompt_version)
+        run_id = log.start_run(agent=spec.name, model=spec.route.model, prompt_version=spec.prompt_version, subject=spec.subject)
         messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
         usage = ModelUsage()
         attempts = 0
@@ -207,7 +209,7 @@ class Runner:
         from app.agent.decision_log import DecisionLog
 
         log: DecisionLog = self.log
-        run_id = log.start_run(agent=spec.name, model=spec.route.model, prompt_version=spec.prompt_version)
+        run_id = log.start_run(agent=spec.name, model=spec.route.model, prompt_version=spec.prompt_version, subject=spec.subject)
         started = self.clock()
         messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
         definitions = [tool.definition() for tool in tools.values()]

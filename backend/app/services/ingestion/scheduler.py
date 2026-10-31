@@ -15,7 +15,7 @@ from datetime import UTC, datetime, time, timedelta
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Source, Subscription, TopicSource
+from app.db.models import Interest, Source, Subscription, TopicSource
 
 MIN_INTERVAL = timedelta(minutes=5)
 MAX_INTERVAL = timedelta(hours=6)
@@ -30,10 +30,14 @@ def _aware(moment: datetime | None) -> datetime | None:
 
 
 def followed_sources(db: Session) -> list[Source]:
-    """Sources someone follows, plus the demo's (every seed source)."""
+    """Sources someone follows, the demo's (every seed source), and the arXiv searches
+    of everyone's research interests."""
     followed = select(Subscription.source_id)
     seeded = select(TopicSource.source_id)
-    return list(db.scalars(select(Source).where(or_(Source.id.in_(followed), Source.id.in_(seeded)))))
+    searches = select(Interest.query_url).where(Interest.query_url.is_not(None))
+    return list(
+        db.scalars(select(Source).where(or_(Source.id.in_(followed), Source.id.in_(seeded), Source.feed_url.in_(searches))))
+    )
 
 
 def due_sources(db: Session, now: datetime) -> list[Source]:
@@ -70,7 +74,7 @@ def after_success(
 ) -> None:
     rng = rng or random.Random()
     source.last_fetched_at, source.error_count, source.last_error = now, 0, None
-    if source.type == "arxiv":
+    if source.type.startswith("arxiv"):  # category feeds and interest searches alike
         source.next_fetch_at = next_arxiv_run(now)
         return
     if published:

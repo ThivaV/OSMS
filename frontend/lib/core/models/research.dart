@@ -28,6 +28,17 @@ const arxivCategories = [
 ];
 
 /// What the reader typed and picked in the interests editor, before it is saved.
+/// The interest agent's help with keywords being edited.
+class InterestSuggestions {
+  const InterestSuggestions({this.relatedTerms = const [], this.categories = const [], this.flagged = const []});
+
+  final List<String> relatedTerms;
+  final List<String> categories;
+
+  /// Keywords outside rule 3: shown struck through, never searched.
+  final List<String> flagged;
+}
+
 class InterestDraft {
   const InterestDraft({required this.keywords, this.relatedTerms = const [], this.categories = const []});
 

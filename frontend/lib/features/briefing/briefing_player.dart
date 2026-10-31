@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/audio/briefing_playback.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
 import '../../shared/formatting.dart';
@@ -9,12 +10,20 @@ import '../../shared/widgets/section_header.dart';
 const _speeds = [1.0, 1.25, 1.5, 2.0, 0.75];
 
 /// The morning briefing: one chapter per story. The progress bar is split
-/// into one segment per chapter. Playback is simulated until audio exists.
+/// into one segment per chapter. With [playback] it plays the briefing's audio;
+/// without (samples, Widgetbook) playback is simulated.
 class BriefingPlayer extends StatefulWidget {
-  const BriefingPlayer({super.key, required this.briefing, this.initialChapter = 0, this.initialProgress = 0.35});
+  const BriefingPlayer({
+    super.key,
+    required this.briefing,
+    this.playback,
+    this.initialChapter = 0,
+    this.initialProgress = 0.35,
+  });
 
   /// Null until the first briefing has been made.
   final Briefing? briefing;
+  final BriefingPlayback? playback;
   final int initialChapter;
 
   /// Progress through the current chapter, 0–1.
@@ -30,17 +39,45 @@ class _BriefingPlayerState extends State<BriefingPlayer> {
   bool _playing = false;
   int _speed = 0;
 
-  void _jump(int chapter) => setState(() {
-    _chapter = chapter.clamp(0, widget.briefing!.chapters.length - 1);
-    _progress = 0;
-  });
+  void _jump(int chapter) {
+    final index = chapter.clamp(0, widget.briefing!.chapters.length - 1);
+    final playback = widget.playback;
+    if (playback != null) {
+      playback.seek(widget.briefing!.startOf(index));
+    } else {
+      setState(() {
+        _chapter = index;
+        _progress = 0;
+      });
+    }
+  }
+
+  void _back(Duration position) {
+    final playback = widget.playback;
+    if (playback != null) {
+      playback.seek(position < const Duration(seconds: 15) ? Duration.zero : position - const Duration(seconds: 15));
+    } else {
+      setState(() => _progress = (_progress - 0.1).clamp(0, 1));
+    }
+  }
+
+  void _toggle(bool playing) {
+    final playback = widget.playback;
+    if (playback == null) {
+      setState(() => _playing = !_playing);
+    } else {
+      playing ? playback.pause() : playback.play();
+    }
+  }
+
+  void _nextSpeed() {
+    setState(() => _speed = (_speed + 1) % _speeds.length);
+    widget.playback?.setSpeed(_speeds[_speed]);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    final t = context.text;
     final briefing = widget.briefing;
-
     if (briefing == null || briefing.chapters.isEmpty) {
       return const QuietNote(
         icon: Icons.wb_twilight_rounded,
@@ -48,11 +85,36 @@ class _BriefingPlayerState extends State<BriefingPlayer> {
         body: 'Every morning at 07:00, OSMS reads you the stories that changed overnight, one chapter per story.',
       );
     }
+    final playback = widget.playback;
+    if (playback == null) {
+      final elapsed = briefing.startOf(_chapter) + briefing.chapters[_chapter].duration * _progress;
+      return _player(context, briefing, _chapter, _progress, elapsed, _playing, failed: false);
+    }
+    return ValueListenableBuilder(
+      valueListenable: playback.state,
+      builder: (context, state, _) {
+        final chapter = briefing.chapterAt(state.position);
+        final into = state.position - briefing.startOf(chapter);
+        final length = briefing.chapters[chapter].duration.inMilliseconds;
+        final progress = length == 0 ? 0.0 : (into.inMilliseconds / length).clamp(0.0, 1.0);
+        return _player(context, briefing, chapter, progress, state.position, state.playing, failed: state.failed);
+      },
+    );
+  }
 
+  Widget _player(
+    BuildContext context,
+    Briefing briefing,
+    int chapter,
+    double progress,
+    Duration elapsed,
+    bool playing, {
+    required bool failed,
+  }) {
+    final c = context.colors;
+    final t = context.text;
     final chapters = briefing.chapters;
-    final current = chapters[_chapter];
-    final before = chapters.take(_chapter).fold(Duration.zero, (sum, ch) => sum + ch.duration);
-    final elapsed = before + current.duration * _progress;
+    final current = chapters[chapter];
     final remaining = briefing.duration - elapsed;
 
     return Container(
@@ -73,11 +135,11 @@ class _BriefingPlayerState extends State<BriefingPlayer> {
             style: t.caption.copyWith(color: c.textTertiary),
           ),
           const SizedBox(height: Space.lg),
-          Text('Chapter ${_chapter + 1} of ${chapters.length}', style: t.caption.copyWith(color: c.textTertiary)),
+          Text('Chapter ${chapter + 1} of ${chapters.length}', style: t.caption.copyWith(color: c.textTertiary)),
           const SizedBox(height: Space.xs),
           Text(current.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: t.headline),
           const SizedBox(height: Space.lg),
-          _ChapterBar(chapters: chapters, current: _chapter, progress: _progress, onChapter: _jump),
+          _ChapterBar(chapters: chapters, current: chapter, progress: progress, onChapter: _jump),
           const SizedBox(height: Space.xs),
           Row(
             children: [
@@ -86,30 +148,37 @@ class _BriefingPlayerState extends State<BriefingPlayer> {
               Text('−${playerTime(remaining)}', style: t.caption.copyWith(color: c.textSecondary)),
             ],
           ),
+          if (failed) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              'The briefing’s audio isn’t available right now. Try again in a moment.',
+              style: t.caption.copyWith(color: c.textSecondary),
+            ),
+          ],
           const SizedBox(height: Space.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
                 tooltip: 'Back 15 seconds',
-                onPressed: () => setState(() => _progress = (_progress - 0.1).clamp(0, 1)),
+                onPressed: () => _back(elapsed),
                 icon: const Icon(Icons.replay_rounded),
               ),
               IconButton(
                 tooltip: 'Previous story',
-                onPressed: _chapter == 0 ? null : () => _jump(_chapter - 1),
+                onPressed: chapter == 0 ? null : () => _jump(chapter - 1),
                 icon: const Icon(Icons.skip_previous_rounded),
               ),
               const SizedBox(width: Space.sm),
-              _PlayButton(playing: _playing, onPressed: () => setState(() => _playing = !_playing)),
+              _PlayButton(playing: playing, onPressed: () => _toggle(playing)),
               const SizedBox(width: Space.sm),
               IconButton(
                 tooltip: 'Next story',
-                onPressed: _chapter == chapters.length - 1 ? null : () => _jump(_chapter + 1),
+                onPressed: chapter == chapters.length - 1 ? null : () => _jump(chapter + 1),
                 icon: const Icon(Icons.skip_next_rounded),
               ),
               TextButton(
-                onPressed: () => setState(() => _speed = (_speed + 1) % _speeds.length),
+                onPressed: _nextSpeed,
                 style: TextButton.styleFrom(foregroundColor: c.textSecondary),
                 child: Text('${_speeds[_speed]}×'.replaceAll('.0×', '×')),
               ),
@@ -122,8 +191,8 @@ class _BriefingPlayerState extends State<BriefingPlayer> {
             _ChapterRow(
               index: i,
               chapter: chapters[i],
-              current: i == _chapter,
-              playing: i == _chapter && _playing,
+              current: i == chapter,
+              playing: i == chapter && playing,
               onTap: () => _jump(i),
             ),
         ],
@@ -348,9 +417,19 @@ class BriefingMiniPlayer extends StatelessWidget {
 /// The floating player: a glass capsule over the bottom of the story list (and
 /// above the tab bar on phones). Title, exact time left, play and skip.
 class BriefingFloatingBar extends StatefulWidget {
-  const BriefingFloatingBar({super.key, required this.briefing, this.chapter = 0, this.progress = 0.35, this.onOpen});
+  const BriefingFloatingBar({
+    super.key,
+    required this.briefing,
+    this.playback,
+    this.chapter = 0,
+    this.progress = 0.35,
+    this.onOpen,
+  });
 
   final Briefing briefing;
+
+  /// The briefing's audio; without it (samples, Widgetbook) playback is simulated.
+  final BriefingPlayback? playback;
   final int chapter;
   final double progress;
   final VoidCallback? onOpen;
@@ -367,13 +446,50 @@ class _BriefingFloatingBarState extends State<BriefingFloatingBar> {
 
   @override
   Widget build(BuildContext context) {
+    final briefing = widget.briefing;
+    if (briefing.chapters.isEmpty) return const SizedBox.shrink();
+    final playback = widget.playback;
+    if (playback == null) {
+      final chapter = _chapter.clamp(0, briefing.chapters.length - 1);
+      final elapsed = briefing.startOf(chapter) + briefing.chapters[chapter].duration * widget.progress;
+      return _bar(
+        context,
+        chapter,
+        elapsed,
+        _playing,
+        onToggle: () => setState(() => _playing = !_playing),
+        onNext: () => setState(() => _chapter++),
+      );
+    }
+    return ValueListenableBuilder(
+      valueListenable: playback.state,
+      builder: (context, state, _) {
+        final chapter = briefing.chapterAt(state.position);
+        return _bar(
+          context,
+          chapter,
+          state.position,
+          state.playing,
+          onToggle: state.playing ? playback.pause : playback.play,
+          onNext: () => playback.seek(briefing.startOf(chapter + 1)),
+        );
+      },
+    );
+  }
+
+  Widget _bar(
+    BuildContext context,
+    int chapter,
+    Duration elapsed,
+    bool playing, {
+    required VoidCallback onToggle,
+    required VoidCallback onNext,
+  }) {
     final c = context.colors;
     final t = context.text;
     final chapters = widget.briefing.chapters;
-    if (chapters.isEmpty) return const SizedBox.shrink();
-    final current = chapters[_chapter.clamp(0, chapters.length - 1)];
-    final before = chapters.take(_chapter).fold(Duration.zero, (sum, ch) => sum + ch.duration);
-    final left = widget.briefing.duration - (before + current.duration * widget.progress);
+    final current = chapters[chapter];
+    final left = widget.briefing.duration - elapsed;
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: Sizes.sheetMaxWidth),
@@ -384,17 +500,17 @@ class _BriefingFloatingBarState extends State<BriefingFloatingBar> {
           child: Row(
             children: [
               Tooltip(
-                message: _playing ? 'Pause' : 'Play',
+                message: playing ? 'Pause' : 'Play',
                 child: Material(
                   color: c.accent,
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
-                    onTap: () => setState(() => _playing = !_playing),
+                    onTap: onToggle,
                     child: SizedBox.square(
                       dimension: BriefingFloatingBar.height - Space.sm * 2,
                       child: Icon(
-                        _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
                         color: c.onAccent,
                         size: Sizes.iconLg,
                       ),
@@ -430,7 +546,7 @@ class _BriefingFloatingBarState extends State<BriefingFloatingBar> {
               IconButton(
                 tooltip: 'Next story',
                 visualDensity: VisualDensity.compact,
-                onPressed: _chapter >= chapters.length - 1 ? null : () => setState(() => _chapter++),
+                onPressed: chapter >= chapters.length - 1 ? null : onNext,
                 icon: const Icon(Icons.skip_next_rounded),
               ),
             ],

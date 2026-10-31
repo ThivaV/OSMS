@@ -128,7 +128,7 @@ def _json_feed(body: bytes, source_type: str) -> tuple[FeedMeta, list[Entry]]:
             except ValueError:
                 published = None
         guid = str(raw.get("id") or link or hashlib.sha256(f"{title}\n{text}".encode()).hexdigest())[:1000]
-        kind = "paper" if source_type == "arxiv" else ("post" if not title else "article")
+        kind = "paper" if source_type.startswith("arxiv") else ("post" if not title else "article")
         entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=published, kind=kind))
     meta = FeedMeta(title=plain_text(str(feed.get("title") or ""), MAX_TITLE), language=normalise(feed.get("language")), ttl_minutes=None)
     return meta, entries
@@ -155,12 +155,12 @@ def parse_feed(body: bytes, *, source_type: str = "feed") -> tuple[FeedMeta, lis
         content = raw.get("content") or []
         body_html = (content[0].get("value") if content else None) or raw.get("summary", "")
         text = plain_text(body_html)
-        if source_type == "arxiv":
+        if source_type.startswith("arxiv"):
             text = _ARXIV_PREFIX.sub("", text)
         link = _safe_link(raw.get("link"))
         guid = (raw.get("id") or link or hashlib.sha256(f"{title}\n{text}".encode()).hexdigest())[:1000]
         if not title and not text:
             continue
-        kind = "paper" if source_type == "arxiv" else ("post" if not title else "article")
+        kind = "paper" if source_type.startswith("arxiv") else ("post" if not title else "article")
         entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=_published(raw), kind=kind))
     return meta, entries

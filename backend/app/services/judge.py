@@ -34,7 +34,7 @@ def same_event(kit: AgentKit, a: Item, b: Item) -> bool | None:
         return None
     prompt = load("judge")
     result = kit.runner.call_once(
-        kit.spec("judge", prompt_version=prompt.version, max_steps=2, token_budget=6_000),
+        kit.spec("judge", prompt_version=prompt.version, max_steps=2, token_budget=6_000, subject=f"item:{a.id}"),
         system=prompt.text,
         user=f"{_quoted('A', a)}\n\n{_quoted('B', b)}",
         schema=JudgeVerdict,

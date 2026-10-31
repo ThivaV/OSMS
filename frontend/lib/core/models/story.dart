@@ -1,3 +1,5 @@
+import 'package:flutter/painting.dart' show Alignment;
+
 import 'item.dart';
 import 'source.dart';
 
@@ -99,6 +101,8 @@ class Story {
     required this.languages,
     required this.visualSeed,
     this.hasIllustration = false,
+    this.illustrationUrl,
+    this.illustrationFocus = Alignment.center,
     this.lastReadAt,
     this.summaryPoints = const [],
     this.whatsNew = const [],
@@ -131,6 +135,12 @@ class Story {
   /// Shows the mandated "Illustration" label over the art.
   final bool hasIllustration;
 
+  /// The checked illustration itself; null until there is one (the drawn art stays).
+  final String? illustrationUrl;
+
+  /// Where its subject is, so every card shape crops around it.
+  final Alignment illustrationFocus;
+
   /// When the reader last opened it. Null if never.
   final DateTime? lastReadAt;
 
@@ -156,6 +166,8 @@ class Story {
     languages: languages,
     visualSeed: visualSeed,
     hasIllustration: hasIllustration ?? this.hasIllustration,
+    illustrationUrl: illustrationUrl,
+    illustrationFocus: illustrationFocus,
     lastReadAt: lastReadAt ?? this.lastReadAt,
     summaryPoints: summaryPoints,
     whatsNew: whatsNew ?? this.whatsNew,

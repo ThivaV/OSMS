@@ -8,8 +8,18 @@ import '../../core/theme/tokens.dart';
 /// One thread per source, all converging into a single story thread.
 /// Deterministic per [seed]. Generated illustrations set [isIllustration] so
 /// the required "Illustration" label shows; the fallback never carries it.
+/// With [imageUrl], the illustration itself shows, cropped at [focus]; the
+/// drawn art stands in while it loads and if it can't.
 class StoryVisual extends StatelessWidget {
-  const StoryVisual({super.key, required this.seed, this.threads = 7, this.aspectRatio = 16 / 9, this.isIllustration = false});
+  const StoryVisual({
+    super.key,
+    required this.seed,
+    this.threads = 7,
+    this.aspectRatio = 16 / 9,
+    this.isIllustration = false,
+    this.imageUrl,
+    this.focus = Alignment.center,
+  });
 
   final int seed;
 
@@ -19,6 +29,8 @@ class StoryVisual extends StatelessWidget {
 
   /// True for Muse Image art. Shows the small mandated label.
   final bool isIllustration;
+  final String? imageUrl;
+  final Alignment focus;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +47,24 @@ class StoryVisual extends StatelessWidget {
         ),
       ),
     );
+    final url = imageUrl;
     if (!isIllustration) return ExcludeSemantics(child: art);
+    if (url == null) return _labelled(context, art);
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        alignment: focus,
+        frameBuilder: (context, image, frame, sync) =>
+            frame == null && !sync ? ExcludeSemantics(child: art) : _labelled(context, SizedBox.expand(child: image)),
+        errorBuilder: (context, error, stack) => ExcludeSemantics(child: art),
+      ),
+    );
+  }
+
+  Widget _labelled(BuildContext context, Widget art) {
+    final c = context.colors;
     final t = context.text;
     return Semantics(
       image: true,

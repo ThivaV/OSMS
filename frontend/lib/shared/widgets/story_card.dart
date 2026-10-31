@@ -74,6 +74,8 @@ class _CardLayout extends StatelessWidget {
               threads: story.sources.length,
               aspectRatio: 2.2,
               isIllustration: story.hasIllustration,
+              imageUrl: story.illustrationUrl,
+              focus: story.illustrationFocus,
             ),
             Padding(
               padding: const EdgeInsets.all(Space.lg),

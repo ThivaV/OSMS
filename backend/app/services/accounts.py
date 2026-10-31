@@ -21,6 +21,7 @@ from app.schemas.account import (
     SuggestionOut,
     TopicOut,
 )
+from app.services import interests as research
 
 # Recording "last seen" on every request would make every read a write.
 LAST_SEEN_EVERY = timedelta(hours=1)
@@ -122,6 +123,7 @@ def complete_onboarding(db: Session, user: User, picks: OnboardingIn) -> User:
     added = wanted - {s.source_id for s in kept}
     user.subscriptions = kept + [Subscription(source_id=i) for i in sorted(added)]
     _replace_interests(user, picks.interests)
+    research.sync_sources(db, user)
     user.onboarded_at = user.onboarded_at or datetime.now(UTC)
     db.commit()
     return user
@@ -129,6 +131,7 @@ def complete_onboarding(db: Session, user: User, picks: OnboardingIn) -> User:
 
 def replace_interests(db: Session, user: User, interests: list[InterestIn]) -> User:
     _replace_interests(user, interests)
+    research.sync_sources(db, user)
     db.commit()
     return user
 

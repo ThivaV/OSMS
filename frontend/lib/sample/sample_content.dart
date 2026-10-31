@@ -766,6 +766,72 @@ final extremeItems = [
   ),
 ];
 
+// ── How OSMS decided ─────────────────────────────────────────────────────────
+
+/// The model decisions behind Halcyon-2's story, oldest first. Invented, like the rest.
+final halcyonDecisions = [
+  Decision(
+    id: 'd1',
+    agent: 'triage',
+    model: 'muse-glimmer-30b',
+    at: DateTime.now().subtract(const Duration(hours: 5)),
+    latency: const Duration(milliseconds: 2400),
+    inputTokens: 410,
+    outputTokens: 60,
+    about: 'Halcyon-2 tops multilingual benchmarks',
+    source: 'The Model Desk',
+    reason: 'A model release with benchmark results: AI research, not an advert.',
+    outcome: 'Kept',
+  ),
+  Decision(
+    id: 'd2',
+    agent: 'judge',
+    model: 'muse-spark-open-1026',
+    fallback: 'muse-spark-1.3',
+    at: DateTime.now().subtract(const Duration(hours: 4, minutes: 50)),
+    latency: const Duration(milliseconds: 3100),
+    inputTokens: 980,
+    outputTokens: 70,
+    about: 'Dansk sprogmodel slår rekorder',
+    source: 'Bytebladet',
+    reason: 'Both report the Halcyon-2 release and its Danish benchmark results.',
+  ),
+  Decision(
+    id: 'd3',
+    agent: 'claims',
+    model: 'muse-spark-1.3',
+    at: DateTime.now().subtract(const Duration(hours: 4, minutes: 48)),
+    latency: const Duration(milliseconds: 5200),
+    inputTokens: 1450,
+    outputTokens: 380,
+    about: 'Dansk sprogmodel slår rekorder',
+    source: 'Bytebladet',
+    outcome: '4 facts found',
+  ),
+  Decision(
+    id: 'd4',
+    agent: 'verifier',
+    model: 'muse-spark-1.3',
+    at: DateTime.now().subtract(const Duration(hours: 4, minutes: 47)),
+    latency: const Duration(milliseconds: 6800),
+    inputTokens: 2100,
+    outputTokens: 290,
+    about: 'Dansk sprogmodel slår rekorder',
+    source: 'Bytebladet',
+    outcome: '2 kept, 1 repeated, 1 dropped',
+  ),
+  Decision(
+    id: 'd5',
+    agent: 'writer',
+    model: 'muse-spark-1.3',
+    at: DateTime.now().subtract(const Duration(hours: 4, minutes: 45)),
+    latency: const Duration(milliseconds: 4300),
+    inputTokens: 1300,
+    outputTokens: 240,
+    outcome: 'Wrote “Halcyon-2 tops multilingual benchmarks”',
+  ),
+];
+
 // ── Briefing ─────────────────────────────────────────────────────────────────
 
 final briefing = Briefing(

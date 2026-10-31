@@ -76,7 +76,14 @@ def _user_message(item: Item, candidates: list[Claim], existing: list[Claim]) ->
 def _ask(kit: AgentKit, item: Item, candidates: list[Claim], existing: list[Claim], *, effort: str | None) -> dict[int, VerdictOut] | None:
     prompt = load("verifier")
     result = kit.runner.call_once(
-        kit.spec("verifier", effort=effort, prompt_version=prompt.version, max_steps=2, token_budget=16_000),
+        kit.spec(
+            "verifier",
+            effort=effort,
+            prompt_version=prompt.version,
+            max_steps=2,
+            token_budget=16_000,
+            subject=f"item:{item.id}",
+        ),
         system=prompt.text,
         user=_user_message(item, candidates, existing),
         schema=VerifierOut,

@@ -45,6 +45,25 @@ other source.
   AGENTS.md (the author's decision). The interest agent sees the keywords it is working
   on, never who typed them, and the decision log records its steps without them.
 
+## Built Oct 31 (v1)
+
+- Saving interests (onboarding or `PUT /me/interests`) points each at its arXiv search
+  (`services/interests.py`): quoted phrases in `ti:`/`abs:`, its categories, newest first,
+  100 results. The same words, in any order or case, give the same URL, stored once as a
+  shared source titled "arXiv search" (never the words). Fetched daily after 05:15 UTC
+  like the category feeds, through the one rate-limited client (3 s per arXiv host).
+- The first fetch is the backfill: papers up to 30 days old (other items: 14).
+- Every kept paper, from a search or a category feed, is matched against interests by
+  the words it uses (keywords and accepted related terms, whole words); an interest with
+  categories only takes papers from its own search or those categories' feeds. Each
+  match records the words, per reader (`interest_matches`, migration `0006`).
+- `GET /me/research`: the reader's papers from the last two weeks, each with its words;
+  the app's "New research for you" shows them signed in.
+- **Not yet:** related by meaning (needs your threshold), the interest agent's
+  suggestions and rule-3 flags, the cap on borderline papers, the sidebar's "N new",
+  authors and categories on the card, and one connection across processes (the API
+  never calls arXiv today, so the worker's client is the only one).
+
 ## Steps
 
 1. `adapters/arxiv.py`: parse category feeds and API results into `Item`s of kind

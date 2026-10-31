@@ -5,8 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/audio/briefing_playback.dart';
 import '../../core/layout/three_pane_layout.dart';
 import '../../core/models/models.dart';
+import '../../core/session/briefing.dart';
+import '../../core/session/research.dart';
 import '../../core/session/session.dart';
 import '../../core/session/stories.dart';
 import '../../core/theme/tokens.dart';
@@ -53,13 +57,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   String _nav = 'today';
 
   /// Ask this story: the last question, its answer, and the request state.
-  /// Until the backend answers, asking ends in the spec'd unavailable state.
   String? _askQuestion;
   AskResult? _askResult;
   bool _askThinking = false;
   bool _askUnavailable = false;
 
+  /// The briefing's audio: one player for the floating bar and the full player, made
+  /// again only when a different briefing arrives.
+  BriefingPlayback? _playback;
+  String? _playbackFor;
+
   SessionController get _session => ref.read(sessionProvider.notifier);
+
+  BriefingPlayback? _playbackOf(Briefing? briefing) {
+    final id = briefing?.audioUrl == null ? null : briefing!.id;
+    if (id != _playbackFor) {
+      _playback?.dispose();
+      _playback = id == null ? null : ref.read(briefingPlaybackProvider)(briefing!.audioUrl!);
+      _playbackFor = id;
+    }
+    return _playback;
+  }
 
   @override
   void initState() {
@@ -71,6 +89,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   @override
   void dispose() {
     _refresh?.cancel();
+    _playback?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -96,20 +115,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     }
   }
 
-  void _askStory(String question) {
+  void _askStory(String question) => unawaited(_ask(question));
+
+  Future<void> _ask(String question) async {
+    final storyId = _selected;
+    if (storyId == null) return;
     setState(() {
       _askQuestion = question;
       _askResult = null;
       _askThinking = true;
       _askUnavailable = false;
     });
-    // No answer service until the backend lands: thinking, then unavailable.
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      setState(() {
-        _askThinking = false;
-        _askUnavailable = true;
-      });
+    final signedIn = ref.read(sessionProvider).value?.signedIn ?? false;
+    AskResult? result;
+    try {
+      result = await ref.read(apiClientProvider).ask(storyId, question, demo: !signedIn);
+    } on ApiException {
+      result = null; // Unavailable, over the limit or gone: the box offers to ask again.
+    }
+    // The reader may have moved on while OSMS was answering.
+    if (!mounted || _selected != storyId || _askQuestion != question) return;
+    setState(() {
+      _askThinking = false;
+      _askResult = result;
+      _askUnavailable = result == null;
     });
   }
 
@@ -207,9 +236,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final loaded = ref.watch(storiesProvider);
     final view = loaded.value ?? const StoriesView(stories: []);
     final loading = !loaded.hasValue;
-    // The sample briefing and papers belong to the sample stories; real ones come later.
-    final briefing = account == null && view.samples ? sample.briefing : null;
-    final research = view.samples && _nav == 'today' ? sample.research : const <Item>[];
+    // The sample briefing and papers belong to the sample stories; a real briefing comes
+    // with real stories.
+    final briefing = view.samples ? (account == null ? sample.briefing : null) : ref.watch(briefingProvider).value;
+    final playback = _playbackOf(briefing);
+    final research = _nav != 'today'
+        ? const <Item>[]
+        : (view.samples ? sample.research : (ref.watch(researchProvider).value ?? const <Item>[]));
     // The demo's sources and topics: the samples', or the seed sources behind real stories.
     final demoSources = view.samples
         ? sample.followedSources
@@ -304,14 +337,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               askThinking: _askThinking,
               askUnavailable: _askUnavailable,
               askSuggestions: _askSuggestions(story),
-              onAsk: _askStory,
+              // The invented samples have no facts to answer from; the box says so.
+              onAsk: view.samples ? null : _askStory,
+              loadDecisions: view.samples
+                  ? null
+                  : () => ref.read(apiClientProvider).decisions(story.id, demo: !session.signedIn),
             ),
-      floatingPlayer: briefing == null ? null : BriefingFloatingBar(briefing: briefing),
+      floatingPlayer: briefing == null ? null : BriefingFloatingBar(briefing: briefing, playback: playback),
       phoneNav: PillNav(destinations: _phoneTabs, selected: _phoneTab, onSelect: (i) => setState(() => _phoneTab = i)),
       phoneBody: switch (_phoneTab) {
         1 => SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, ThreePaneLayout.floatingInset),
-          child: BriefingPlayer(briefing: briefing),
+          child: BriefingPlayer(briefing: briefing, playback: playback),
         ),
         2 => const Padding(
           padding: EdgeInsets.all(Space.lg),

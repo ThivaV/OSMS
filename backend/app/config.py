@@ -17,8 +17,9 @@ SEED_OPML = BACKEND_DIR / "seed" / "sources.opml"
 SPARK_ID = "muse-spark-1.3"
 SPARK_OPEN_ID = "muse-spark-open-1026"
 WONDER_ID = "muse-wonder-1.0"
-# Provisional Ollama tag: confirm against the Ollama/Fireworks docs when the
-# triage agent lands (Day 7). The route shape is what's tested, not this tag.
+VOICE_TRANSCRIBE_ID = "muse-voice-transcribe-1.0"
+# Ollama's alias for hf.co/meta-models/Muse-Glimmer-30B-GGUF:Q4_K_M (`ollama cp`, see
+# AGENTS.md *Commands*); a hosted provider uses its own id for the same weights.
 GLIMMER_MODEL = "muse-glimmer-30b"
 
 # One base URL for hosted Meta models (AGENTS.md §3).
@@ -41,7 +42,7 @@ class Settings(BaseSettings):
     # Where the text models live. Meta's base URL is pinned above; Baseten's
     # deployment URL varies, so it comes from the environment. Empty until Day 5
     # wires the client, which refuses to judge without it — startup stays green.
-    glimmer_base_url: str = Field("http://127.0.0.1:11434", validation_alias="GLIMMER_BASE_URL")
+    glimmer_base_url: str = Field("http://127.0.0.1:11434/v1", validation_alias="GLIMMER_BASE_URL")
     baseten_base_url: str = Field("", validation_alias="BASETEN_BASE_URL")
 
     # Keys come from .env locally and the secret store when deployed; never logged.
@@ -54,6 +55,10 @@ class Settings(BaseSettings):
     # Milvus Lite, embedded on a file only the worker opens. Not `MILVUS_URI`: pymilvus
     # reads that name itself when imported and wants a server address there.
     milvus_uri: str = Field(str(REPO_ROOT / "data" / "milvus.db"), validation_alias="OSMS_MILVUS_PATH")
+    # Briefing audio: written by the worker, served by the API to the briefing's reader.
+    briefings_dir: Path = Field(REPO_ROOT / "data" / "briefings", validation_alias="OSMS_BRIEFINGS_DIR")
+    # Story illustrations: written by the worker, served by the API (not personal data).
+    visuals_dir: Path = Field(REPO_ROOT / "data" / "visuals", validation_alias="OSMS_VISUALS_DIR")
 
     def endpoint_for(self, model: str) -> str:
         """Where a pinned model lives: a backup runs on its own provider."""
@@ -97,6 +102,12 @@ class Settings(BaseSettings):
             "writer": spark,
             "ask": spark,
         }
+
+    def triage_escalation_route(self) -> ModelRoute:
+        """What the triage agent is unsure about: Muse Spark decides. Public source text
+        only, and no backup (guardrails)."""
+        return ModelRoute(model=SPARK_ID, endpoint=META_API_URL, effort="low")
+
 
 def check_routes(routes: dict[str, ModelRoute]) -> None:
     """The routing table upholds the frozen backup rules. Run at startup and

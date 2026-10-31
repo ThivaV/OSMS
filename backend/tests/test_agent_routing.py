@@ -16,7 +16,7 @@ def test_every_agent_resolves_with_pinned_models() -> None:
     assert routes["claims"].model == SPARK_ID == routes["verifier"].model
     assert routes["judge"].model == SPARK_OPEN_ID
     assert routes["judge"].endpoint == "https://baseten.example"
-    assert routes["triage"].endpoint == "http://127.0.0.1:11434"
+    assert routes["triage"].endpoint == "http://127.0.0.1:11434/v1"  # Ollama's OpenAI-compatible API
     assert routes["claims"].endpoint == META_API_URL
     check_routes(routes)
 

@@ -1,4 +1,4 @@
-"""Request dependencies: a database session, and the signed-in reader."""
+"""Request dependencies: a database session, the signed-in reader, and the agents."""
 
 from collections.abc import Iterator
 from typing import Annotated
@@ -6,6 +6,9 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.agent.decision_log import DecisionLog
+from app.agent.kit import AgentKit
+from app.agent.runtime import Runner
 from app.auth.tokens import AuthUnavailable, InvalidToken
 from app.db.models import User
 from app.services import accounts
@@ -33,3 +36,17 @@ def current_reader(request: Request, db: Db) -> User:
 
 
 Reader = Annotated[User, Depends(current_reader)]
+
+
+def agent_kit(request: Request) -> Iterator[AgentKit]:
+    """The agents for one request; the decision log commits on its own session."""
+    models = request.app.state.models
+    with request.app.state.sessions() as log_db:
+        yield AgentKit(
+            runner=Runner(models, DecisionLog(log_db)),
+            routes=dict(models.routes),
+            available={agent: models.available(agent) for agent in models.routes},
+        )
+
+
+Kit = Annotated[AgentKit, Depends(agent_kit)]

@@ -53,7 +53,7 @@ def write(db: Session, kit: AgentKit, story: Story) -> StorySummary | None:
         return None  # Every fact is already told.
     prompt = load("writer")
     result = kit.runner.call_once(
-        kit.spec("writer", prompt_version=prompt.version, max_steps=2, token_budget=12_000),
+        kit.spec("writer", prompt_version=prompt.version, max_steps=2, token_budget=12_000, subject=f"story:{story.id}"),
         system=prompt.text,
         user=f"<facts>\n{_facts(facts)}\n</facts>\n\nPrevious title: {previous.title if previous else '(none)'}",
         schema=WriterOut,
