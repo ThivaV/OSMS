@@ -62,13 +62,16 @@ def build(settings: Settings) -> tuple[sessionmaker[Session], Pipeline]:
     log = DecisionLog(sessions())
     available = {a: models.available(a) for a in models.routes}
     if available.get("triage") and settings.glimmer_base_url.startswith(("http://127.0.0.1", "http://localhost")):
-        # Ollama stopped, or Muse Glimmer not pulled yet: the word list stands in.
+        # Ollama stopped, or Muse Glimmer not pulled yet: Muse Spark triages every item, and
+        # the word list when that can't answer either.
         available["triage"] = local_model_ready(settings.glimmer_base_url, GLIMMER_MODEL)
     kit = AgentKit(runner=Runner(models, log), routes=dict(models.routes), available=available)
     unsure = triage_escalation(settings, models)
     escalation = AgentKit(runner=Runner(unsure, log), routes=dict(unsure.routes), available={"triage": unsure.available("triage")})
-    print(f"triage: {'Muse Glimmer' if available.get('triage') else 'the word list'}"
-          f"{', unsure items to Muse Spark' if escalation.can('triage') else ''}")
+    if available.get("triage"):
+        print(f"triage: Muse Glimmer{', unsure items to Muse Spark' if escalation.can('triage') else ''}")
+    else:
+        print(f"triage: {'Muse Spark, without Muse Glimmer' if escalation.can('triage') else 'the word list'}")
     pipeline = Pipeline(
         fetcher=Fetcher(),
         embedder_factory=BgeM3Embedder,
@@ -243,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         skip = {}
         local = settings.glimmer_base_url.startswith(("http://127.0.0.1", "http://localhost"))
         if local and not local_model_ready(settings.glimmer_base_url, GLIMMER_MODEL):
-            skip["triage"] = "Ollama isn't running (or has no Muse Glimmer): the word list stands in"
+            skip["triage"] = "no Muse Glimmer here (Ollama isn't running, or hasn't the model): Muse Spark triages"
         failed = False
         for label, model, result in check_models(models, triage_escalation(settings, models), skip):
             print(f"{label:22} {model:45} {result}")

@@ -35,10 +35,11 @@ tmp=$(mktemp)
   echo "META_API_KEY=$(secret osms-meta-api-key)"
   echo "GOOGLE_CLIENT_ID=$(secret osms-google-client-id)"
   echo "GOOGLE_CLIENT_SECRET=$(secret osms-google-client-secret)"
-  # Fireworks runs the open-weight models here: Muse Glimmer (triage), Muse Spark Open (judge).
+  # Fireworks runs Muse Spark Open (the judge) here. Not Muse Glimmer: Fireworks serves it
+  # only from a paid dedicated deployment (checked Nov 1), so triage runs on Muse Spark,
+  # and the word list when that can't answer.
   if [ -n "$fireworks" ]; then
     echo "FIREWORKS_API_KEY=$fireworks"
-    echo "GLIMMER_BASE_URL=https://api.fireworks.ai/inference/v1"
   fi
 } >"$tmp"
 unset fireworks token

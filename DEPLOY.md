@@ -13,7 +13,7 @@ deploys `main` when the tests pass. Running OSMS on your Mac is in [SETUP.md](SE
 | The server | one Compute Engine VM, `e2-highmem-4` (4 vCPU, 32 GB), `europe-north1` (Finland), Ubuntu 24.04, 100 GB disk |
 | The data | `/var/lib/osms/data` on the server's disk: `osms.db`, `auth.db`, `milvus.db`, briefings, illustrations; a snapshot every night, kept a week |
 | Secrets | Google Secret Manager; only the server's own identity can read them |
-| Open-weight models | Fireworks: Muse Glimmer (triage) and Muse Spark Open (the judge). Baseten stays first for the judge once it is set up |
+| Open-weight models | Fireworks: Muse Spark Open (the judge); Baseten stays first for it once it is set up. Muse Glimmer isn't serverless on Fireworks, so triage runs on Muse Spark here |
 | Other models | Meta Model API (your hackathon credit) |
 
 Caddy answers on ports 80 and 443 and gets the HTTPS certificates on its own; sign-in,
@@ -28,7 +28,7 @@ internet: it goes through Google's Identity-Aware Proxy.
 | Disk, static IP, snapshots, traffic | about $15 | credit |
 | **Google Cloud** | **about $160**: the credit lasts about two months | **$0 from you** |
 | DuckDNS | free | |
-| Fireworks (triage and the judge) | a few dollars in all | you |
+| Fireworks (the judge) | a few dollars in all | you |
 | Meta models | | your $150 hackathon credit |
 
 Prices are estimates; Google's pricing calculator has the exact ones. When the trial

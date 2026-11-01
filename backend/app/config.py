@@ -25,9 +25,11 @@ GLIMMER_MODEL = "muse-glimmer-30b"
 # One base URL for hosted Meta models (AGENTS.md §3).
 META_API_URL = "https://api.meta.ai/v1"
 
-# Fireworks hosts both open-weight models where Baseten (the judge) and a local Ollama
+# Fireworks hosts the open-weight models where Baseten (the judge) and a local Ollama
 # (triage) aren't there: the deployed server (decided Nov 1, Baseten not activated).
-# `python -m app.worker check-models` confirms these ids against the account.
+# `python -m app.worker check-models` confirms these ids against the account. Muse Spark
+# Open is serverless there; Muse Glimmer isn't (Nov 1): it needs a dedicated deployment,
+# so the server leaves GLIMMER_BASE_URL unset and Muse Spark triages.
 FIREWORKS_URL = "https://api.fireworks.ai/inference/v1"
 FIREWORKS_SPARK_OPEN_ID = "accounts/fireworks/models/muse-spark-open"
 FIREWORKS_GLIMMER_ID = "accounts/fireworks/models/muse-glimmer-30b"

@@ -610,7 +610,7 @@ flowchart LR
         box["One Google Cloud VM with a disk: Caddy (HTTPS), the web app, sign-in, API, worker, Milvus Lite"]
         meta["Meta Model API: Muse Spark, Muse Wonder, Muse Image, SAM 3.1, Muse Voice Transcribe"]
         baseten["Baseten: Muse Spark Open"]
-        fireworks["Fireworks: Muse Glimmer, Muse Spark Open"]
+        fireworks["Fireworks: Muse Spark Open"]
     end
 
     l_app --> l_auth
@@ -636,8 +636,9 @@ flowchart LR
   files with one writer, everything runs on one Google Cloud VM with a persistent disk,
   next to its data, snapshotted nightly. Caddy serves the web app and proxies sign-in and
   the API under one domain (the sign-in cookie needs one site), and the API trusts its
-  forwarded headers so briefing audio links stay https. Muse Glimmer and Muse Spark Open
-  run on Fireworks: triage and the judge see only public item text, so that is safe.
+  forwarded headers so briefing audio links stay https. Muse Spark Open runs on
+  Fireworks: the judge sees only public item text, so that is safe. Muse Glimmer isn't
+  serverless on Fireworks (only a paid dedicated deployment), so Muse Spark triages there.
   GitHub Actions tests every push and deploys `main` when the tests pass.
 - **Later, at scale:** the same code can move to PostgreSQL and Milvus Standalone or
   Zilliz Cloud by changing connection settings, since both sit behind SQLAlchemy and

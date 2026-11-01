@@ -97,7 +97,7 @@ output before a reader sees it.
 |---|---|---|
 | Muse Spark | The interest, claims, verifier, editor, writer and ask agents | In use |
 | Muse Spark Open (open weights; Fireworks, or Baseten) | The judge: are two items about the same event? | On Fireworks when deployed; Muse Spark judges where neither is set up |
-| Muse Glimmer (open weights) | Triage of every incoming item | In use: Ollama locally, Fireworks when deployed |
+| Muse Glimmer (open weights) | Triage of every incoming item | In use locally (Ollama); deployed, Muse Spark triages, since Fireworks serves Glimmer only from a paid dedicated deployment |
 | Muse Wonder | The overnight editor, if our agent tests favour it | Not yet |
 | Muse Image | One illustration per story | In use, from three sources |
 | SAM 3.1 | Checks and crops each illustration | In use |
