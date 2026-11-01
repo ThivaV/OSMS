@@ -25,6 +25,13 @@ GLIMMER_MODEL = "muse-glimmer-30b"
 # One base URL for hosted Meta models (AGENTS.md §3).
 META_API_URL = "https://api.meta.ai/v1"
 
+# Fireworks hosts both open-weight models where Baseten (the judge) and a local Ollama
+# (triage) aren't there: the deployed server (decided Nov 1, Baseten not activated).
+# `python -m app.worker check-models` confirms these ids against the account.
+FIREWORKS_URL = "https://api.fireworks.ai/inference/v1"
+FIREWORKS_SPARK_OPEN_ID = "accounts/fireworks/models/muse-spark-open"
+FIREWORKS_GLIMMER_ID = "accounts/fireworks/models/muse-glimmer-30b"
+
 
 class Settings(BaseSettings):
     # Blank values copied from .env.example count as unset.
@@ -51,6 +58,7 @@ class Settings(BaseSettings):
     meta_api_key: str = Field("", validation_alias="META_API_KEY", repr=False)
     baseten_api_key: str = Field("", validation_alias="BASETEN_API_KEY", repr=False)
     glimmer_api_key: str = Field("", validation_alias="GLIMMER_API_KEY", repr=False)
+    fireworks_api_key: str = Field("", validation_alias="FIREWORKS_API_KEY", repr=False)
 
     # Milvus Lite, embedded on a file only the worker opens. Not `MILVUS_URI`: pymilvus
     # reads that name itself when imported and wants a server address there.
@@ -60,13 +68,28 @@ class Settings(BaseSettings):
     # Story illustrations: written by the worker, served by the API (not personal data).
     visuals_dir: Path = Field(REPO_ROOT / "data" / "visuals", validation_alias="OSMS_VISUALS_DIR")
 
+    @property
+    def spark_open(self) -> tuple[str, str]:
+        """Muse Spark Open's (model id, endpoint): Baseten when it is set up, else
+        Fireworks when there is a key, else Baseten's empty endpoint (its backup runs)."""
+        if not self.baseten_base_url and self.fireworks_api_key:
+            return FIREWORKS_SPARK_OPEN_ID, FIREWORKS_URL
+        return SPARK_OPEN_ID, self.baseten_base_url
+
+    @property
+    def glimmer_model(self) -> str:
+        """Muse Glimmer's id where it runs: Fireworks names it its own way."""
+        return FIREWORKS_GLIMMER_ID if self.glimmer_base_url.rstrip("/") == FIREWORKS_URL else GLIMMER_MODEL
+
     def endpoint_for(self, model: str) -> str:
         """Where a pinned model lives: a backup runs on its own provider."""
         return {
             SPARK_ID: META_API_URL,
             WONDER_ID: META_API_URL,
             SPARK_OPEN_ID: self.baseten_base_url,
+            FIREWORKS_SPARK_OPEN_ID: FIREWORKS_URL,
             GLIMMER_MODEL: self.glimmer_base_url,
+            FIREWORKS_GLIMMER_ID: FIREWORKS_URL,
         }.get(model, "")
 
     def key_for(self, endpoint: str) -> str:
@@ -74,6 +97,8 @@ class Settings(BaseSettings):
             return self.meta_api_key
         if endpoint and endpoint == self.baseten_base_url:
             return self.baseten_api_key
+        if endpoint.rstrip("/") == FIREWORKS_URL:
+            return self.fireworks_api_key
         return self.glimmer_api_key
 
     @property
@@ -90,14 +115,15 @@ class Settings(BaseSettings):
         public-source-text agents get a backup (guardrails); the triage agent
         escalates unsure items to Muse Spark inside the same provider."""
         spark = ModelRoute(model=SPARK_ID, endpoint=META_API_URL)
+        open_id, open_url = self.spark_open
+        local = self.glimmer_model == GLIMMER_MODEL
         return {
-            "triage": ModelRoute(model=GLIMMER_MODEL, endpoint=self.glimmer_base_url, effort="low"),
+            # A hosted Glimmer gets no reasoning effort: Ollama refuses it, and a host may too.
+            "triage": ModelRoute(model=self.glimmer_model, endpoint=self.glimmer_base_url, effort="low" if local else None),
             "interest": spark,
-            "judge": ModelRoute(
-                model=SPARK_OPEN_ID, endpoint=self.baseten_base_url, backup=SPARK_ID, effort="medium"
-            ),
-            "claims": ModelRoute(model=SPARK_ID, endpoint=META_API_URL, backup=SPARK_OPEN_ID, effort="medium"),
-            "verifier": ModelRoute(model=SPARK_ID, endpoint=META_API_URL, backup=SPARK_OPEN_ID, effort="high"),
+            "judge": ModelRoute(model=open_id, endpoint=open_url, backup=SPARK_ID, effort="medium"),
+            "claims": ModelRoute(model=SPARK_ID, endpoint=META_API_URL, backup=open_id, effort="medium"),
+            "verifier": ModelRoute(model=SPARK_ID, endpoint=META_API_URL, backup=open_id, effort="high"),
             "editor": ModelRoute(model=SPARK_ID, endpoint=META_API_URL, effort="high"),
             "writer": spark,
             "ask": spark,

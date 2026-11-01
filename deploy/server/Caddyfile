@@ -1,0 +1,28 @@
+# Caddy, the server's front door (DEPLOY.md). HTTPS certificates come from Let's Encrypt
+# on their own. @DOMAIN@ is filled in on each deploy. Everything else listens on
+# 127.0.0.1 only.
+
+app.@DOMAIN@ {
+	root * /opt/osms/current/web
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+	# Flutter's entry files keep their names between releases: always revalidate them.
+	@entry path / /index.html /flutter_bootstrap.js /flutter_service_worker.js /main.dart.js /version.json /manifest.json
+	header @entry Cache-Control "no-cache"
+	try_files {path} /index.html
+	file_server
+}
+
+auth.@DOMAIN@ {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+}
+
+api.@DOMAIN@ {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8000
+}

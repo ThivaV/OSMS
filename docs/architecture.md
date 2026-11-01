@@ -607,11 +607,10 @@ flowchart LR
     end
 
     subgraph cloud["Deployed"]
-        web["Flutter web on a static host"]
-        box["One backend machine with a disk: sign-in, API, worker, agents, Milvus Lite"]
+        box["One Google Cloud VM with a disk: Caddy (HTTPS), the web app, sign-in, API, worker, Milvus Lite"]
         meta["Meta Model API: Muse Spark, Muse Wonder, Muse Image, SAM 3.1, Muse Voice Transcribe"]
         baseten["Baseten: Muse Spark Open"]
-        glimmer["Muse Glimmer: a GPU on Modal or a hosted provider"]
+        fireworks["Fireworks: Muse Glimmer, Muse Spark Open"]
     end
 
     l_app --> l_auth
@@ -623,10 +622,9 @@ flowchart LR
     l_worker --> l_milvus
     l_worker --> l_glimmer
     l_milvus --> l_data
-    web --> box
     box --> meta
-    box --> baseten
-    box --> glimmer
+    box --> fireworks
+    box -.-> baseten
 ```
 
 - **Local:** everything runs on the laptop with no Docker: SQLite and Milvus Lite are files
@@ -634,12 +632,13 @@ flowchart LR
   `make glimmer` or Tilt's `glimmer`) is a local process on 127.0.0.1. `make worker` (or
   Tilt's `worker`) runs the story pipeline, the briefing and illustrations. `make up`
   starts it all; see the README. The other models are called over the network.
-- **Deployed:** because SQLite and Milvus Lite are files with one writer, the backend
-  runs as one machine with a persistent disk, next to its data. Muse Glimmer needs a GPU,
-  so it runs on Modal or a hosted provider; triage sees only public item text, so that is
-  safe. The Flutter web build is served from a static host. Behind the HTTPS proxy, the
-  API must trust its forwarded headers, or briefing audio links come out as http and
-  browsers block them.
+- **Deployed** (built Nov 1, [DEPLOY.md](../DEPLOY.md)): because SQLite and Milvus Lite are
+  files with one writer, everything runs on one Google Cloud VM with a persistent disk,
+  next to its data, snapshotted nightly. Caddy serves the web app and proxies sign-in and
+  the API under one domain (the sign-in cookie needs one site), and the API trusts its
+  forwarded headers so briefing audio links stay https. Muse Glimmer and Muse Spark Open
+  run on Fireworks: triage and the judge see only public item text, so that is safe.
+  GitHub Actions tests every push and deploys `main` when the tests pass.
 - **Later, at scale:** the same code can move to PostgreSQL and Milvus Standalone or
   Zilliz Cloud by changing connection settings, since both sit behind SQLAlchemy and
   pymilvus.

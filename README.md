@@ -71,9 +71,13 @@ Oct 27 – Nov 4, 2026.
   - **How OSMS decided:** every model call behind a story, with what it changed.
   - **Illustrations:** Muse Image in one house style, checked by SAM 3.1 for people,
     faces, logos and text, cropped around its subject and labelled.
+- [x] **Deployment and CI/CD (Nov 1):** one Google Cloud VM serving the web app, sign-in,
+  the API and the worker, the databases on its disk with nightly snapshots; GitHub
+  Actions tests every push and deploys `main` when the tests pass, keyless. See
+  [DEPLOY.md](DEPLOY.md).
 - [ ] Still to do: related-by-meaning papers, adding sources from the app, the language
-  toggle, podcasts, the editor's review loop and the Muse Wonder trial, deployment, the
-  demo's fallback data (see AGENTS.md, *Build plan*).
+  toggle, podcasts, the editor's review loop and the Muse Wonder trial (see AGENTS.md,
+  *Build plan*).
 
 ## How judging maps to the repo
 
@@ -92,8 +96,8 @@ output before a reader sees it.
 | Model | What OSMS uses it for | Status |
 |---|---|---|
 | Muse Spark | The interest, claims, verifier, editor, writer and ask agents | In use |
-| Muse Spark Open (open weights, Baseten) | The judge: are two items about the same event? | Built; Muse Spark judges until the Baseten account is approved |
-| Muse Glimmer (open weights, local) | Triage of every incoming item | In use, through Ollama |
+| Muse Spark Open (open weights; Fireworks, or Baseten) | The judge: are two items about the same event? | On Fireworks when deployed; Muse Spark judges where neither is set up |
+| Muse Glimmer (open weights) | Triage of every incoming item | In use: Ollama locally, Fireworks when deployed |
 | Muse Wonder | The overnight editor, if our agent tests favour it | Not yet |
 | Muse Image | One illustration per story | In use, from three sources |
 | SAM 3.1 | Checks and crops each illustration | In use |
@@ -115,7 +119,7 @@ metadata and links to each paper on arXiv; it is not endorsed by arXiv.
 
 ## How to run
 
-Step by step, with and without Tilt: **[SETUP.md](SETUP.md)**.
+Step by step, with and without Tilt: **[SETUP.md](SETUP.md)**. Deploying to Google Cloud, with CI/CD: **[DEPLOY.md](DEPLOY.md)**.
 
 Everything runs through `make` from the repo root. `make` on its own lists every command:
 the app (web; macOS with Xcode), sign-in, the API, the story pipeline (the worker),

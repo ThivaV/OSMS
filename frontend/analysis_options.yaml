@@ -8,3 +8,6 @@ analyzer:
     - web/**
     - windows/**
     - macos/**
+    # Its own project, analyzed on its own (`cd widgetbook && flutter analyze`). From here,
+    # a fresh checkout has no packages for it yet: CI failed on exactly that.
+    - widgetbook/**

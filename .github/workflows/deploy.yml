@@ -1,0 +1,65 @@
+name: deploy
+
+# Deploys main to the Google Cloud server (DEPLOY.md) after `check` passes for a push to
+# main, or when run by hand from the Actions tab. Set the repo variable DEPLOY_ON_PUSH to
+# false to deploy only by hand (during judging, say).
+on:
+  workflow_run:
+    workflows: [check]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # keyless sign-in to Google Cloud
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Skipped until deploy/gcp/github.sh has set the repo's variables (DEPLOY.md, step 9).
+    if: >-
+      vars.GCP_PROJECT_ID != '' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        vars.DEPLOY_ON_PUSH != 'false'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://app.${{ vars.OSMS_DOMAIN }}
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ZONE: ${{ vars.GCP_ZONE }}
+      GCP_VM: ${{ vars.GCP_VM }}
+      OSMS_DOMAIN: ${{ vars.OSMS_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The commit `check` tested, not whatever main is by now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - run: flutter pub get
+        working-directory: frontend
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and deploy
+        run: bash deploy/release.sh
+      - name: The live site answers
+        run: |
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://api.$OSMS_DOMAIN/health"
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://auth.$OSMS_DOMAIN/health"
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://app.$OSMS_DOMAIN/" | grep -q flutter_bootstrap
+          echo "Live: https://app.$OSMS_DOMAIN"

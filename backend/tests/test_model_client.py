@@ -97,3 +97,30 @@ def test_without_keys_no_hosted_agent_is_available(tmp_path) -> None:
     assert all(with_meta.available(a) for a in ("claims", "verifier", "writer", "interest", "ask", "editor"))
     # No Baseten deployment yet: the judge runs on its backup, Muse Spark.
     assert with_meta.available("judge")
+
+
+def test_check_models_calls_each_agent_once_and_never_shows_an_answer() -> None:
+    from app.agent.runtime import ModelError, ModelRoute, ModelStep
+    from app.worker import check_models
+
+    class Models:
+        def __init__(self, routes, fails=()):
+            self.routes, self.fails, self.asked = routes, fails, []
+
+        def available(self, agent):
+            return agent != "editor"
+
+        def step(self, *, system, messages, tools, agent, schema=None, effort=None):
+            self.asked.append(agent)
+            if agent in self.fails:
+                raise ModelError(f"400 from {self.routes[agent].model}")
+            return ModelStep(final={"ok": True, "secret": "not shown"}, fallback=agent == "judge", model="muse-spark-1.3")
+
+    route = ModelRoute(model="muse-spark-1.3", endpoint="https://api.meta.ai/v1")
+    models = Models({"claims": route, "judge": route, "editor": route}, fails=("claims",))
+    escalation = Models({"triage": route})
+    results = {label: result for label, _, result in check_models(models, escalation)}
+    assert results["claims"] == "failed: 400 from muse-spark-1.3"
+    assert results["judge"].startswith("ok, by its backup muse-spark-1.3")
+    assert results["editor"] == "not configured" and results["triage, when unsure"].startswith("ok")
+    assert "not shown" not in str(results)

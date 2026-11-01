@@ -2,7 +2,8 @@
 
 Everything runs on your own machine, through `make` from the repo root (`make` on its own
 lists every command). There are two ways to run it: **with Tilt**, one command for
-everything plus a dashboard, or **without Tilt**, one terminal per service.
+everything plus a dashboard, or **without Tilt**, one terminal per service. Deploying it
+to Google Cloud is in [DEPLOY.md](DEPLOY.md).
 
 ## What you need
 

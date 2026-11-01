@@ -45,6 +45,13 @@ TILT_RUN := KUBECONFIG="$(TILT_KUBECONFIG)" $(TILT)
 # True while a Tilt session answers on its API (http://localhost:10350).
 tilt_up = command -v $(TILT) >/dev/null && $(TILT_RUN) get session >/dev/null 2>&1
 
+# The deployed site (DEPLOY.md): its name, from deploy/config.env unless given.
+OSMS_DOMAIN ?= $(shell sed -n 's/^OSMS_DOMAIN=//p' deploy/config.env 2>/dev/null)
+PROD_DEFINES = --dart-define=OSMS_AUTH_URL=https://auth.$(OSMS_DOMAIN) --dart-define=OSMS_API_URL=https://api.$(OSMS_DOMAIN)
+need_domain = @test -n "$(OSMS_DOMAIN)" || { echo "Set OSMS_DOMAIN in deploy/config.env first (DEPLOY.md)."; exit 1; }
+# A command on the deployed server, through Identity-Aware Proxy.
+ON_SERVER = bash -c '. deploy/lib.sh && load_config && on_server "$$0"'
+
 # OSMS's processes however they were started (make, Tilt, a terminal, another tool):
 # only ones running a service's program from inside this repo, and Ollama's server.
 PROCESSES := sh scripts/processes.sh
@@ -58,7 +65,9 @@ tilt_disable = if $(tilt_up); then \
 .DEFAULT_GOAL := help
 .PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
   stop-api stop-worker stop-glimmer worker glimmer glimmer-model fetch-now briefing illustrations pipeline-status eval stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
-  check-flutter check-backend check-auth eval-test clean _run-dir _need-tilt
+  check-flutter check-backend check-auth eval-test clean _run-dir _need-tilt \
+  provision server-setup deploy seed-server build-web-prod build-macos-prod server-ssh server-logs \
+  server-status server-check-models
 
 help: ## List the commands
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -232,3 +241,40 @@ _run-dir:
 _need-tilt: _run-dir
 	@command -v $(TILT) >/dev/null || { echo "Tilt isn't installed. Install it with: brew install tilt"; exit 1; }
 	@: > "$(TILT_KUBECONFIG)"
+
+##@ The deployed site on Google Cloud (DEPLOY.md)
+
+provision: ## Once: create the Google Cloud resources (VM, IP, firewall, snapshots, keyless GitHub access)
+	bash deploy/gcp/provision.sh
+
+server-setup: ## Once: prepare the server (Caddy, Node, uv, the osms user and folders)
+	bash -c '. deploy/lib.sh && load_config && g compute ssh "$$GCP_VM" --zone "$$GCP_ZONE" --tunnel-through-iap \
+	  --command "sudo bash -s $$OSMS_DOMAIN" < deploy/server/setup.sh'
+
+deploy: ## Deploy what is committed (GitHub Actions does it after every green push to main)
+	bash deploy/release.sh
+
+seed-server: ## Copy your local stories to the server, without readers (FORCE=1 replaces the server's)
+	bash deploy/seed.sh
+
+build-web-prod: ## The web app for the deployed site (frontend/build/web)
+	$(need_domain)
+	cd $(APP_DIR) && $(FLUTTER) build web --release --no-web-resources-cdn $(PROD_DEFINES)
+
+build-macos-prod: ## The macOS app, talking to the deployed site: frontend/build/macos/Build/Products/Release/OSMS.app
+	$(need_domain)
+	cd $(APP_DIR) && $(FLUTTER) build macos --release $(PROD_DEFINES)
+
+server-ssh: ## A shell on the server
+	bash -c '. deploy/lib.sh && load_config && g compute ssh "$$GCP_VM" --zone "$$GCP_ZONE" --tunnel-through-iap'
+
+server-logs: ## Follow a service's log on the server (SERVICE=worker, api, auth or caddy)
+	$(ON_SERVER) "sudo journalctl -u $(if $(filter caddy,$(SERVICE)),caddy,osms-$(or $(SERVICE),worker)) -n 100 -f"
+
+server-status: ## The server's services, and what its pipeline has stored and queued
+	$(ON_SERVER) "systemctl --no-pager --lines=0 status caddy osms-auth osms-api osms-worker; \
+	  cd /opt/osms/current/backend && sudo -u osms bash -c 'set -a; . /etc/osms/osms.env; set +a; /opt/osms/venv/bin/python -m app.worker status'"
+
+server-check-models: ## One tiny call per agent on the server: are its models and keys right?
+	$(ON_SERVER) "cd /opt/osms/current/backend && sudo -u osms bash -c 'set -a; . /etc/osms/osms.env; set +a; /opt/osms/venv/bin/python -m app.worker check-models'"
+

@@ -8,6 +8,7 @@ the pipeline and Milvus Lite has the only process it allows.
     uv run python -m app.worker claims-backlog [--min-sources 2]  # facts for items without any (after adding a key)
     uv run python -m app.worker briefing [--reader ID]  # the demo's briefing now, or a reader's
     uv run python -m app.worker illustrations-backlog [--limit 10]  # stories that earned one
+    uv run python -m app.worker check-models   # one tiny call per agent: are its model and key right?
     uv run python -m app.worker status         # what's queued, stored and clustered
     uv run python -m app.worker export-predictions FILE  # {item_id: story_id} for the eval
 """
@@ -20,16 +21,17 @@ import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agent.decision_log import DecisionLog
 from app.agent.kit import AgentKit
-from app.agent.runtime import Runner
+from app.agent.runtime import ModelError, Runner
 from app.clients.meta_media import MetaMedia
 from app.clients.meta_voice import Transcriber
 from app.clients.openai_compat import local_model_ready, models_from_settings, triage_escalation
-from app.config import GLIMMER_MODEL, SEED_OPML, Settings
+from app.config import FIREWORKS_URL, GLIMMER_MODEL, SEED_OPML, Settings
 from app.db.milvus import VectorIndex
 from app.db.models import Briefing, Claim, Item, Job, Source, Story, StorySummary, User
 from app.db.sqlite import make_engine, migrate, session_factory
@@ -145,6 +147,53 @@ def illustration_backlog(db: Session, limit: int) -> list[int]:
     return [story_id for story_id, _ in rows]
 
 
+_PING_SCHEMA = {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}
+
+
+def check_models(models, escalation, skip: dict[str, str] | None = None) -> list[tuple[str, str, str]]:
+    """One tiny structured call per configured agent, so a deploy can confirm its models
+    and keys: (agent, model, result). `skip` names agents not to call, with why. Never
+    shows a key or what the model said."""
+    rows = [(agent, models, agent, route) for agent, route in models.routes.items()]
+    rows.append(("triage, when unsure", escalation, "triage", escalation.routes["triage"]))
+    results = []
+    for label, client, agent, route in rows:
+        if label in (skip or {}):
+            results.append((label, route.model, skip[label]))
+            continue
+        if not client.available(agent):
+            results.append((label, route.model, "not configured"))
+            continue
+        started = time.monotonic()
+        try:
+            step = client.step(
+                system='Answer with JSON: {"ok": true}.',
+                messages=[{"role": "user", "content": "Are you there?"}],
+                tools=[],
+                agent=agent,
+                schema=_PING_SCHEMA,
+            )
+        except ModelError as error:
+            results.append((label, route.model, f"failed: {error.detail}"))
+            continue
+        answer = "ok" if isinstance(step.final, dict) and step.final.get("ok") is True else "answered, not as asked"
+        via = f", by its backup {step.model}" if step.fallback else ""
+        results.append((label, route.model, f"{answer}{via} ({time.monotonic() - started:.1f} s)"))
+    return results
+
+
+def fireworks_muse_models(settings: Settings) -> list[str]:
+    """The Muse models this Fireworks account can call, to confirm the pinned ids."""
+    try:
+        response = httpx.get(
+            f"{FIREWORKS_URL}/models", headers={"Authorization": f"Bearer {settings.fireworks_api_key}"}, timeout=30
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as error:
+        return [f"(couldn't list them: {type(error).__name__})"]
+    return sorted(m["id"] for m in response.json().get("data", []) if "muse" in str(m.get("id", "")).lower())
+
+
 def status(db: Session) -> dict[str, object]:
     def count(*where):
         return db.scalar(select(func.count()).select_from(Item).where(*where)) or 0
@@ -182,12 +231,26 @@ def main(argv: list[str] | None = None) -> int:
     drawings.add_argument("--limit", type=int, default=10, help="at most this many (each is a few paid calls)")
     brief = sub.add_parser("briefing")
     brief.add_argument("--reader", help="a reader's id; the demo's briefing without it")
+    sub.add_parser("check-models")
     sub.add_parser("status")
     export = sub.add_parser("export-predictions")
     export.add_argument("path", type=Path)
     args = parser.parse_args(argv)
 
     settings = Settings()
+    if args.command == "check-models":
+        models = models_from_settings(settings)
+        skip = {}
+        local = settings.glimmer_base_url.startswith(("http://127.0.0.1", "http://localhost"))
+        if local and not local_model_ready(settings.glimmer_base_url, GLIMMER_MODEL):
+            skip["triage"] = "Ollama isn't running (or has no Muse Glimmer): the word list stands in"
+        failed = False
+        for label, model, result in check_models(models, triage_escalation(settings, models), skip):
+            print(f"{label:22} {model:45} {result}")
+            failed |= result.startswith("failed")
+        if settings.fireworks_api_key:
+            print("Muse models on this Fireworks account:", ", ".join(fireworks_muse_models(settings)) or "none")
+        return 1 if failed else 0
     sessions, pipeline = build(settings)
     if args.command == "status":
         with sessions() as db:

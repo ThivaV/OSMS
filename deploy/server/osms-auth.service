@@ -1,0 +1,21 @@
+[Unit]
+Description=OSMS sign-in (Better Auth)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=osms
+Group=osms
+EnvironmentFile=/etc/osms/osms.env
+WorkingDirectory=/opt/osms/current/auth
+ExecStart=/usr/local/bin/node --disable-warning=ExperimentalWarning src/main.ts
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/osms
+
+[Install]
+WantedBy=multi-user.target

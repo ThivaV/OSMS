@@ -3,7 +3,17 @@
 import pytest
 
 from app.agent.guardrails import ALL_AGENTS
-from app.config import META_API_URL, SPARK_ID, SPARK_OPEN_ID, Settings, check_routes
+from app.config import (
+    FIREWORKS_GLIMMER_ID,
+    FIREWORKS_SPARK_OPEN_ID,
+    FIREWORKS_URL,
+    GLIMMER_MODEL,
+    META_API_URL,
+    SPARK_ID,
+    SPARK_OPEN_ID,
+    Settings,
+    check_routes,
+)
 
 
 def _routes(**env) -> dict:
@@ -45,3 +55,23 @@ def test_broken_tables_fail_before_deciding() -> None:
     routes["ask"] = routes["ask"].__class__(model=routes["ask"].model, endpoint="x", backup="other")
     with pytest.raises(ValueError, match="never move personal data"):
         check_routes(routes)
+
+
+def test_without_baseten_fireworks_runs_the_open_weight_models() -> None:
+    settings = Settings(_env_file=None, FIREWORKS_API_KEY="fw", GLIMMER_BASE_URL=FIREWORKS_URL)
+    routes = settings.model_routes()
+    assert (routes["judge"].model, routes["judge"].endpoint, routes["judge"].backup) == (
+        FIREWORKS_SPARK_OPEN_ID, FIREWORKS_URL, SPARK_ID
+    )
+    assert routes["claims"].backup == routes["verifier"].backup == FIREWORKS_SPARK_OPEN_ID
+    assert settings.endpoint_for(FIREWORKS_SPARK_OPEN_ID) == FIREWORKS_URL
+    assert (routes["triage"].model, routes["triage"].effort) == (FIREWORKS_GLIMMER_ID, None)
+    assert settings.key_for(FIREWORKS_URL) == "fw"
+    check_routes(routes)
+
+
+def test_baseten_stays_first_and_ollama_stays_local() -> None:
+    settings = Settings(_env_file=None, FIREWORKS_API_KEY="fw", BASETEN_BASE_URL="https://baseten.example")
+    routes = settings.model_routes()
+    assert (routes["judge"].model, routes["judge"].endpoint) == (SPARK_OPEN_ID, "https://baseten.example")
+    assert (routes["triage"].model, routes["triage"].effort) == (GLIMMER_MODEL, "low")

@@ -1,0 +1,23 @@
+[Unit]
+Description=OSMS API
+After=network-online.target osms-auth.service
+Wants=network-online.target
+
+[Service]
+User=osms
+Group=osms
+EnvironmentFile=/etc/osms/osms.env
+WorkingDirectory=/opt/osms/current/backend
+# One process: SQLite has one writer. Caddy's forwarded headers make links (briefing
+# audio) come out as https://api.<domain>.
+ExecStart=/opt/osms/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/osms
+
+[Install]
+WantedBy=multi-user.target

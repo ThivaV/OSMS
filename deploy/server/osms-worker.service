@@ -1,0 +1,24 @@
+[Unit]
+Description=OSMS worker: fetch, triage, cluster, facts, briefings, illustrations
+After=network-online.target osms-api.service
+Wants=network-online.target
+
+[Service]
+User=osms
+Group=osms
+EnvironmentFile=/etc/osms/osms.env
+WorkingDirectory=/opt/osms/current/backend
+ExecStart=/opt/osms/venv/bin/python -m app.worker run
+# Ctrl+C, so it stops its Milvus Lite process cleanly; its queue survives any restart.
+KillSignal=SIGINT
+TimeoutStopSec=60
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/osms
+
+[Install]
+WantedBy=multi-user.target
