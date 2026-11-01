@@ -99,7 +99,7 @@ anyone signed in to the project can run.
    make server-setup     # Caddy, Node 24, uv, the osms user and folders
    make stop-worker      # the local worker must be stopped to copy its data
    make seed-server      # your local stories, facts and the demo's briefing; no readers
-   make deploy           # build and deploy what is committed
+   make deploy           # deploy what is committed, then build the macOS app for it
    ```
 
    `make seed-server` copies stories, facts, summaries, the demo's briefing and the
@@ -131,7 +131,8 @@ anyone signed in to the project can run.
   `main`, or when you start it from the Actions tab. It builds the web app for the
   deployed addresses, packs a release of what was tested, and runs
   `deploy/release.sh`, the same script `make deploy` runs. A last step checks that the
-  live site answers.
+  live site answers. It doesn't build the macOS app (that needs a Mac): `make deploy`
+  does, on yours.
 - **On the server**, `deploy/server/deploy.sh` installs the release next to the previous
   ones, refreshes the settings from Secret Manager, restarts the services and checks that
   sign-in and the API are healthy. If they aren't, it goes back to the previous release
@@ -145,7 +146,8 @@ anyone signed in to the project can run.
 ## The macOS app
 
 The desktop app talks to sign-in and the API over HTTPS, like the web app; only the
-API touches the databases. Build it for the deployed site:
+API touches the databases. `make deploy` builds it for the deployed site after each
+deploy from your Mac; to build it alone:
 
 ```bash
 make build-macos-prod      # frontend/build/macos/Build/Products/Release/OSMS.app
@@ -161,7 +163,7 @@ make server-status                 # services, and what is stored and queued
 make server-logs SERVICE=worker    # follow a log: worker, api, auth, deploy or caddy
 make server-check-models           # models and keys
 make server-ssh                    # a shell on the server
-make deploy                        # deploy what is committed, from your Mac
+make deploy                        # deploy what is committed, and build the macOS app
 ```
 
 - **New or changed secret:** run `bash deploy/gcp/secrets.sh` again, then `make deploy`

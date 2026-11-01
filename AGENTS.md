@@ -1413,7 +1413,7 @@ make check                                 # analyze + test everything (check-fl
 # the deployed site on Google Cloud (DEPLOY.md)
 make provision                             # once: VM, IP, firewall, snapshots, keyless GitHub access
 make server-setup                          # once: Caddy, Node, uv, the osms user and folders
-make deploy                                # what is committed (GitHub does it after every green push to main)
+make deploy                                # what is committed, then the macOS app for it (GitHub deploys every green push to main)
 make seed-server                           # your local stories, without readers
 make build-macos-prod                      # the macOS app against the deployed site
 make server-status                         # server-logs SERVICE=worker, server-check-models, server-ssh

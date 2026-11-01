@@ -251,8 +251,10 @@ server-setup: ## Once: prepare the server (Caddy, Node, uv, the osms user and fo
 	bash -c '. deploy/lib.sh && load_config && g compute ssh "$$GCP_VM" --zone "$$GCP_ZONE" --tunnel-through-iap \
 	  --command "sudo bash -s $$OSMS_DOMAIN" < deploy/server/setup.sh'
 
-deploy: ## Deploy what is committed (GitHub Actions does it after every green push to main)
+deploy: ## Deploy what is committed (web app, sign-in, API, worker), then build the macOS app for it
 	bash deploy/release.sh
+	@if [ "$$(uname -s)" = Darwin ]; then $(MAKE) --no-print-directory build-macos-prod; \
+	else echo "The macOS app builds on a Mac only: skipped."; fi
 
 seed-server: ## Copy your local stories to the server, without readers (FORCE=1 replaces the server's)
 	bash deploy/seed.sh
