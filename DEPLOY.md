@@ -56,7 +56,8 @@ anyone signed in to the project can run.
    and warned visitors off, so OSMS moved to `onestory-osms.duckdns.org`.
 
 3. **You: Fireworks.** Create an account at [fireworks.ai](https://fireworks.ai) and an API
-   key. Keep it to yourself: step 6 stores it.
+   key, and put it in your `.env` as `FIREWORKS_API_KEY`. Keep it to yourself (never in a
+   chat): step 6 stores it.
 
 4. **The settings.** Fill in `GCP_PROJECT_ID` and `OSMS_DOMAIN` (`<name>.duckdns.org`) in
    `deploy/config.env`, and commit it: nothing in it is secret.
@@ -76,10 +77,12 @@ anyone signed in to the project can run.
    bash deploy/gcp/secrets.sh
    ```
 
-   It copies `META_API_KEY`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from your `.env`
-   to Secret Manager, makes a fresh sign-in secret, and asks for the Fireworks key with
-   your typing hidden; it stores the key only once Fireworks accepts it. It prints names,
-   never values. Run it again any time to replace a key.
+   It copies `META_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and
+   `FIREWORKS_API_KEY` from your `.env` to Secret Manager (it asks for the Fireworks key,
+   with your typing hidden, when `.env` has none), and makes a fresh sign-in secret. It
+   stores the Fireworks key only once Fireworks accepts it, and leaves a key that is
+   already stored as it is. It prints names, never values. Run it again any time to
+   replace a key.
 
 7. **You: Google sign-in.** In the Google Cloud console that holds your OAuth client
    (APIs & Services → Credentials), add:
