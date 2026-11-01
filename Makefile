@@ -268,7 +268,7 @@ build-macos-prod: ## The macOS app, talking to the deployed site: frontend/build
 server-ssh: ## A shell on the server
 	bash -c '. deploy/lib.sh && load_config && g compute ssh "$$GCP_VM" --zone "$$GCP_ZONE" --tunnel-through-iap'
 
-server-logs: ## Follow a service's log on the server (SERVICE=worker, api, auth or caddy)
+server-logs: ## Follow a service's log on the server (SERVICE=worker, api, auth, deploy or caddy)
 	$(ON_SERVER) "sudo journalctl -u $(if $(filter caddy,$(SERVICE)),caddy,osms-$(or $(SERVICE),worker)) -n 100 -f"
 
 server-status: ## The server's services, and what its pipeline has stored and queued

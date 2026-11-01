@@ -25,10 +25,33 @@ echo "== the release: $id"
 mkdir -p "$work/release"
 git archive --format=tar HEAD backend auth deploy scripts | tar -x -C "$work/release"
 cp -R frontend/build/web "$work/release/web"
-tar -czf "$work/osms-$id.tgz" -C "$work/release" .
+tar --no-xattrs -czf "$work/osms-$id.tgz" -C "$work/release" .
 
 echo "== to $GCP_VM"
 to_server "$work/osms-$id.tgz" "/tmp/osms-$id.tgz"
-on_server "sudo bash -c 'set -e; mkdir -p /opt/osms/releases/$id; \
-  tar -xzf /tmp/osms-$id.tgz -C /opt/osms/releases/$id; rm -f /tmp/osms-$id.tgz; \
-  bash /opt/osms/releases/$id/deploy/server/deploy.sh $id'"
+# deploy.sh runs on the server as its own service, osms-deploy: SSH through IAP drops
+# during a long, quiet install, and that can't stop it halfway. A second deploy is
+# refused while one runs.
+run=$(on_server "sudo bash -c 'set -e
+  if systemctl is-active --quiet osms-deploy; then echo \"another deploy is running on the server\" >&2; exit 1; fi
+  mkdir -p /opt/osms/releases/$id
+  tar -xzf /tmp/osms-$id.tgz -C /opt/osms/releases/$id; rm -f /tmp/osms-$id.tgz
+  systemctl reset-failed osms-deploy 2>/dev/null || true
+  systemd-run --quiet --unit=osms-deploy --setenv=HOME=/root bash /opt/osms/releases/$id/deploy/server/deploy.sh $id
+  systemctl show osms-deploy --property=InvocationID --value'" | tail -1)
+
+# Its log as it goes, until it ends: a finished run is unloaded (inactive), a failed one stays failed.
+seen=0 state=active
+for _ in $(seq 1 240); do
+  sleep 10
+  out=$(on_server "sudo journalctl _SYSTEMD_INVOCATION_ID=$run -o cat --no-pager | tail -n +$((seen + 1)); \
+    systemctl show osms-deploy --property=ActiveState --value" 2>/dev/null) || continue
+  state=${out##*$'\n'}
+  new=$(printf '%s\n' "$out" | sed '$d')
+  if [ -n "$new" ]; then
+    printf '%s\n' "$new"
+    seen=$((seen + $(printf '%s\n' "$new" | wc -l)))
+  fi
+  case "$state" in active | activating | deactivating) ;; *) break ;; esac
+done
+[ "$state" = inactive ] || { echo "the deploy on the server is $state: make server-logs SERVICE=deploy" >&2; exit 1; }

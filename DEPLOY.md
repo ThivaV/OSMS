@@ -129,7 +129,8 @@ anyone signed in to the project can run.
 - **On the server**, `deploy/server/deploy.sh` installs the release next to the previous
   ones, refreshes the settings from Secret Manager, restarts the services and checks that
   sign-in and the API are healthy. If they aren't, it goes back to the previous release
-  and the deploy fails.
+  and the deploy fails. It runs as a service of its own, `osms-deploy`, so a dropped
+  connection can't stop it halfway, and only one deploy runs at a time.
 - **No keys in GitHub.** GitHub Actions signs in to Google Cloud with Workload Identity
   Federation, as the `osms-deploy` account, and only from `main` of this repo.
 - **During judging**, to deploy only by hand: `gh variable set DEPLOY_ON_PUSH --body false`.
@@ -151,7 +152,7 @@ back to the app. Email sign-in links are off in production.
 
 ```bash
 make server-status                 # services, and what is stored and queued
-make server-logs SERVICE=worker    # follow a log: worker, api, auth or caddy
+make server-logs SERVICE=worker    # follow a log: worker, api, auth, deploy or caddy
 make server-check-models           # models and keys
 make server-ssh                    # a shell on the server
 make deploy                        # deploy what is committed, from your Mac

@@ -58,8 +58,11 @@ jobs:
       - name: Build and deploy
         run: bash deploy/release.sh
       - name: The live site answers
+        # Each try gives up after 20 s: an address that doesn't answer (DNS not on the server
+        # yet) otherwise hangs until the job's timeout.
         run: |
-          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://api.$OSMS_DOMAIN/health"
-          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://auth.$OSMS_DOMAIN/health"
-          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://app.$OSMS_DOMAIN/" | grep -q flutter_bootstrap
+          get() { curl -fsS --connect-timeout 10 --max-time 20 --retry 10 --retry-delay 6 --retry-all-errors "$1"; }
+          get "https://api.$OSMS_DOMAIN/health"
+          get "https://auth.$OSMS_DOMAIN/health"
+          get "https://app.$OSMS_DOMAIN/" | grep -q flutter_bootstrap
           echo "Live: https://app.$OSMS_DOMAIN"

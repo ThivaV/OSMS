@@ -14,7 +14,7 @@ set -euo pipefail
 load_config
 data="$ROOT/data"
 [ -f "$data/osms.db" ] || { echo "no local data/osms.db to copy" >&2; exit 1; }
-if sh "$ROOT/scripts/processes.sh" list worker milvus | grep -q running; then
+if sh "$ROOT/scripts/processes.sh" list worker milvus | grep -q ': running'; then
   echo "The local worker is running: stop it first (make stop-worker)." >&2
   exit 1
 fi
@@ -36,7 +36,7 @@ for name in $(sqlite3 "$work/data/osms.db" "select audio_path from briefings whe
   [ -f "$data/briefings/$name" ] && cp "$data/briefings/$name" "$work/data/briefings/"
 done
 [ -d "$data/visuals" ] && cp -R "$data/visuals/." "$work/data/visuals/" 2>/dev/null || true
-tar -czf "$work/seed.tgz" -C "$work" data
+tar --no-xattrs -czf "$work/seed.tgz" -C "$work" data
 echo "== copying $(du -h "$work/seed.tgz" | cut -f1) of stories to $GCP_VM (no readers)"
 
 to_server "$work/seed.tgz" /tmp/osms-seed.tgz
