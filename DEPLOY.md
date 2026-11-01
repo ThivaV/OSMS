@@ -76,7 +76,8 @@ anyone signed in to the project can run.
 
    It copies `META_API_KEY`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from your `.env`
    to Secret Manager, makes a fresh sign-in secret, and asks for the Fireworks key with
-   your typing hidden. It prints names, never values.
+   your typing hidden; it stores the key only once Fireworks accepts it. It prints names,
+   never values. Run it again any time to replace a key.
 
 7. **You: Google sign-in.** In the Google Cloud console that holds your OAuth client
    (APIs & Services → Credentials), add:

@@ -18,7 +18,10 @@ export UV_PROJECT_ENVIRONMENT=/opt/osms/venv UV_PYTHON_INSTALL_DIR=/opt/osms/uv/
 echo "== settings"
 bash "$dir/deploy/server/render-env.sh"
 sed "s/@DOMAIN@/$domain/g" "$dir/deploy/server/Caddyfile" >/etc/caddy/Caddyfile.new
-caddy validate --config /etc/caddy/Caddyfile.new --adapter caddyfile >/dev/null
+if ! out=$(caddy validate --config /etc/caddy/Caddyfile.new --adapter caddyfile 2>&1); then
+  echo "$out" >&2
+  exit 1
+fi
 mv /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile
 install -m 0644 "$dir"/deploy/server/osms-*.service /etc/systemd/system/
 systemctl daemon-reload
