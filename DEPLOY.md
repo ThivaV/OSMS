@@ -51,7 +51,9 @@ anyone signed in to the project can run.
    ```
 
 2. **You: DuckDNS.** Sign in at [duckdns.org](https://www.duckdns.org) and add a name
-   (`<name>.duckdns.org`). Leave its IP for now.
+   (`<name>.duckdns.org`). Leave its IP for now. Keep brand names out of it: Chrome took
+   `meta-osms.duckdns.org` (a brand, a free address and a sign-in button) for phishing
+   and warned visitors off, so OSMS moved to `onestory-osms.duckdns.org`.
 
 3. **You: Fireworks.** Create an account at [fireworks.ai](https://fireworks.ai) and an API
    key. Keep it to yourself: step 6 stores it.
