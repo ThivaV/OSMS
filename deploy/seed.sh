@@ -36,7 +36,7 @@ for name in $(sqlite3 "$work/data/osms.db" "select audio_path from briefings whe
   [ -f "$data/briefings/$name" ] && cp "$data/briefings/$name" "$work/data/briefings/"
 done
 [ -d "$data/visuals" ] && cp -R "$data/visuals/." "$work/data/visuals/" 2>/dev/null || true
-tar --no-xattrs -czf "$work/seed.tgz" -C "$work" data
+COPYFILE_DISABLE=1 tar --no-xattrs --exclude='._*' -czf "$work/seed.tgz" -C "$work" data
 echo "== copying $(du -h "$work/seed.tgz" | cut -f1) of stories to $GCP_VM (no readers)"
 
 to_server "$work/seed.tgz" /tmp/osms-seed.tgz

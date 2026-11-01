@@ -37,5 +37,16 @@ fi
 
 read -rsp "Fireworks API key (hidden; Enter to skip): " key
 echo
-if [ -n "$key" ]; then printf %s "$key" | put osms-fireworks-api-key; fi
+if [ -n "$key" ]; then
+  # Fireworks must accept it first: a mistyped key only shows up as a 401 on the server.
+  # The key reaches curl on stdin, never on a command line.
+  code=$(printf 'Authorization: Bearer %s' "$key" |
+    curl -s -o /dev/null -w '%{http_code}' -H @- https://api.fireworks.ai/inference/v1/models || true)
+  if [ "$code" != 200 ]; then
+    unset key
+    echo "Fireworks refused that key (HTTP $code), so it wasn't stored: copy it again from fireworks.ai." >&2
+    exit 1
+  fi
+  printf %s "$key" | put osms-fireworks-api-key
+fi
 unset key

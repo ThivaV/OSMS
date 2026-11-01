@@ -25,7 +25,13 @@ echo "== the release: $id"
 mkdir -p "$work/release"
 git archive --format=tar HEAD backend auth deploy scripts | tar -x -C "$work/release"
 cp -R frontend/build/web "$work/release/web"
-tar --no-xattrs -czf "$work/osms-$id.tgz" -C "$work/release" .
+# Never macOS's ._ metadata files: Alembic loads backend/alembic/versions/._*.py as
+# migrations, and the API then refuses to start.
+COPYFILE_DISABLE=1 tar --no-xattrs --exclude='._*' -czf "$work/osms-$id.tgz" -C "$work/release" .
+if tar -tzf "$work/osms-$id.tgz" | grep -q '/\._'; then
+  echo "the release holds macOS ._ files; nothing was sent" >&2
+  exit 1
+fi
 
 echo "== to $GCP_VM"
 to_server "$work/osms-$id.tgz" "/tmp/osms-$id.tgz"
