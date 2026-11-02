@@ -11,7 +11,10 @@ import 'sign_in_page.dart';
 /// Sign in and create an account, on one page. Google in every build; an emailed
 /// link only in local development, where the link is printed in the auth log.
 class SignInScreen extends ConsumerStatefulWidget {
-  const SignInScreen({super.key});
+  const SignInScreen({super.key, this.createAccount = false});
+
+  /// Opens on the Create account tab (`/?intent=create`).
+  final bool createAccount;
 
   @override
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
@@ -76,9 +79,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       status: status,
       pending: _pending,
       error: session.message,
+      initialIntent: widget.createAccount ? SignInIntent.createAccount : SignInIntent.signIn,
       onContinue: _continue,
       onWhatWeKeep: () => context.go('/what-we-keep'),
-      onBack: () => context.go('/'),
     );
   }
 }

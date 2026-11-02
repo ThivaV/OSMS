@@ -18,7 +18,6 @@ import 'package:integration_test/integration_test.dart';
 import 'package:osms/app.dart';
 import 'package:osms/core/api/auth_client_io.dart';
 import 'package:osms/core/config/env.dart';
-import 'package:osms/features/auth/demo_banner.dart';
 
 const sessionCookie = String.fromEnvironment('OSMS_TEST_SESSION_COOKIE');
 
@@ -87,11 +86,12 @@ void main() {
     await const KeychainStore().delete();
     await startApp(tester);
     // Only shown when the sandboxed app reached the sign-in service.
-    final signIn = find.descendant(of: find.byType(DemoBanner), matching: find.text('Sign in'));
-    await waitFor(tester, signIn);
+    // The start page; its Google button only shows when the sandboxed app reached the
+    // sign-in service.
+    await waitFor(tester, find.text('Sign in with Google'));
     await shot(tester, '1-signed-out');
-    await tester.tap(signIn.first);
-    await waitFor(tester, find.text('Continue with Google'));
+    await tester.tap(find.text('Create account'));
+    await waitFor(tester, find.text('Sign up with Google'));
     expect(find.text('Email me a sign-in link'), findsNothing, reason: 'email links are web-only');
     await shot(tester, '2-sign-in');
   });
@@ -140,7 +140,7 @@ void main() {
       await tester.tap(find.text('Delete my account').first);
       await waitFor(tester, find.widgetWithText(FilledButton, 'Delete my account'));
       await tester.tap(find.widgetWithText(FilledButton, 'Delete my account'));
-      await waitFor(tester, find.text('You’re reading the demo'));
+      await waitFor(tester, find.text('Sign in with Google'));
       expect(await const KeychainStore().read(), isNull);
 
       // The sign-in account is gone too: its session no longer works.

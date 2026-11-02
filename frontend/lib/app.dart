@@ -15,15 +15,28 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/sources/interests_screen.dart';
 
-/// Where a reader may be. Signed out: everywhere but onboarding and interests (the
-/// demo). Signed in but new: onboarding first. Returning: never back to sign-in, and
-/// onboarding again only to choose topics and sources (an empty Today offers it).
+/// Where a reader may be. Signed out: `/` is the sign-in and sign-up page, the demo is at
+/// `/demo`, and everywhere else but onboarding and interests is open. Signed in but new:
+/// onboarding first. Returning: `/` is Today, never the demo, and onboarding again only
+/// to choose topics and sources (an empty Today offers it).
 String? redirectFor(Session? session, String path) {
   if (session == null) return null; // Still loading: the app shows its splash.
   final account = session.account;
-  if (account == null) return const {'/onboarding', '/interests'}.contains(path) ? '/sign-in' : null;
+  if (account == null) return const {'/onboarding', '/interests'}.contains(path) ? '/' : null;
   if (!account.onboarded) return const {'/onboarding', '/what-we-keep'}.contains(path) ? null : '/onboarding';
-  return path == '/sign-in' ? '/' : null;
+  return path == '/demo' ? '/' : null;
+}
+
+/// `/`: the reader's Today, or the sign-in and sign-up page while signed out.
+class _Start extends ConsumerWidget {
+  const _Start({required this.createAccount});
+
+  final bool createAccount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref.watch(sessionProvider.select((s) => s.value?.signedIn ?? false))
+      ? const HomeScreen()
+      : SignInScreen(key: ValueKey(createAccount), createAccount: createAccount);
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -33,8 +46,13 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: changed,
     redirect: (context, state) => redirectFor(ref.read(sessionProvider).value, state.matchedLocation),
     routes: [
-      GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
-      GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
+      GoRoute(
+        path: '/',
+        builder: (_, state) => _Start(createAccount: state.uri.queryParameters['intent'] == 'create'),
+      ),
+      // Older links: the page lives at `/` now.
+      GoRoute(path: '/sign-in', redirect: (_, state) => state.uri.replace(path: '/').toString()),
+      GoRoute(path: '/demo', builder: (_, _) => const HomeScreen()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/interests', builder: (_, _) => const InterestsScreen()),

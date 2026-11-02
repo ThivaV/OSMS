@@ -211,7 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         icon: Icons.science_outlined,
         label: 'Follow research on arXiv',
         group: 'Actions',
-        onRun: () => context.go(session.signedIn ? '/interests' : '/sign-in'),
+        onRun: () => context.go(session.signedIn ? '/interests' : '/'),
       ),
       CommandItem(
         icon: Icons.tune_rounded,
@@ -227,7 +227,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           icon: Icons.login_rounded,
           label: 'Sign in or create an account',
           group: 'Actions',
-          onRun: () => context.go('/sign-in'),
+          onRun: () => context.go('/'),
         ),
       CommandItem(
         icon: Icons.wb_sunny_outlined,
@@ -278,7 +278,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ? DemoBanner(
             signInAvailable: session.available && session.providers.any,
             samples: view.samples,
-            onSignIn: () => context.go('/sign-in'),
+            onSignIn: () => context.go('/'),
           )
         : view.unavailable
         ? const QuietNote(
@@ -302,7 +302,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       user: user,
       selected: _nav,
       onSelect: (id) => _selectNav(id, session),
-      onSignIn: () => context.go('/sign-in'),
+      onSignIn: () => context.go('/'),
       onSearch: withSearch ? () => _openPalette(context, session, view, navSources) : null,
       onSettings: () => context.go('/settings'),
       onWhatWeKeep: () => context.go('/what-we-keep'),

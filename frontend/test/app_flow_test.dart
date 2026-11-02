@@ -25,41 +25,41 @@ void expectNoSamples() {
 }
 
 void main() {
-  testWidgets('signed out: the demo, labelled, with one way in', (tester) async {
+  testWidgets('signed out, the start is the sign-in and sign-up page, and nothing else', (tester) async {
     await start(tester);
-    expect(find.text('You’re reading the demo'), findsWidgets);
-    expect(find.textContaining('Its stories are invented samples'), findsWidgets);
-    expect(find.text(sample.stories.first.title), findsWidgets);
-    expect(find.text('Create an account'), findsNothing, reason: 'signing in creates the account');
-    await tapText(tester, 'Sign in');
-    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Sign in with Google'), findsOneWidget);
     expect(find.text('Email me a sign-in link'), findsOneWidget);
-    expect(find.text('New here? This creates your account.'), findsOneWidget);
-  });
-
-  testWidgets('the sign-in page is only the way in: no examples, demo or second path', (tester) async {
-    await start(tester);
-    go(tester, '/sign-in');
-    await tester.pumpAndSettle();
     for (final gone in [
+      'You’re reading the demo',
       'Sixty items become seven stories',
       'Only what changed',
-      'A morning briefing',
       'Look around the demo first',
-      'New to OSMS? Create an account',
-      'Create your account',
     ]) {
       expect(find.text(gone), findsNothing, reason: gone);
     }
-    await tester.tap(find.byTooltip('Back'));
+    await tapText(tester, 'Create account');
+    expect(find.text('Create your account'), findsOneWidget);
+    expect(find.text('Sign up with Google'), findsOneWidget);
+  });
+
+  testWidgets('older links and ?intent=create open the same page; the demo lives at /demo', (tester) async {
+    await start(tester, at: '/sign-in?intent=create');
+    expect(find.text('Sign up with Google'), findsOneWidget);
+    go(tester, '/demo');
     await tester.pumpAndSettle();
     expect(find.text('You’re reading the demo'), findsWidgets);
+    expect(find.textContaining('Its stories are invented samples'), findsWidgets);
+    expect(find.text(sample.stories.first.title), findsWidgets);
+    await tester.tap(find.descendant(of: find.byType(DemoBanner), matching: find.text('Sign in')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign in with Google'), findsOneWidget);
   });
 
   testWidgets('first sign-in goes to onboarding, then an empty Today waiting for its sources', (tester) async {
     final (auth, api) = await start(tester);
-    await tapText(tester, 'Sign in');
-    await tapText(tester, 'Continue with Google');
+    await tapText(tester, 'Create account');
+    await tapText(tester, 'Sign up with Google');
     expect(auth.signedIn, isTrue);
     expect(find.text('Which language should OSMS write in?'), findsOneWidget);
 
@@ -135,21 +135,24 @@ void main() {
     await start(tester, auth: FakeAuth(signedIn: true), onboarded: true);
     expect(find.text('Your stories will appear here'), findsWidgets);
     expectNoSamples();
-    go(tester, '/sign-in');
-    await tester.pumpAndSettle();
-    expect(find.text('Continue with Google'), findsNothing);
+    for (final elsewhere in ['/sign-in', '/demo']) {
+      go(tester, elsewhere);
+      await tester.pumpAndSettle();
+      expect(find.text('Sign in with Google'), findsNothing, reason: elsewhere);
+      expect(find.text('You’re reading the demo'), findsNothing, reason: elsewhere);
+      expect(find.text('Your stories will appear here'), findsWidgets, reason: elsewhere);
+    }
   });
 
   testWidgets('signed out, onboarding and interests send you to sign in', (tester) async {
     await start(tester);
     go(tester, '/onboarding');
     await tester.pumpAndSettle();
-    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Sign in with Google'), findsOneWidget);
   });
 
   testWidgets('development sign-in link: asks for an address, then says where the link is', (tester) async {
     final (auth, _) = await start(tester);
-    await tapText(tester, 'Sign in');
     await tapText(tester, 'Email me a sign-in link');
     await tester.enterText(find.byType(TextField), 'ada@users.example');
     await tapText(tester, 'Send link');
@@ -157,8 +160,12 @@ void main() {
     expect(find.text('Open the link in the sign-in log'), findsOneWidget);
   });
 
-  testWidgets('when sign-in is down, the demo still works and says so', (tester) async {
+  testWidgets('when sign-in is down, the page says so and the demo still works', (tester) async {
     await start(tester, auth: FakeAuth(available: false));
+    expect(find.text('Sign-in is unavailable right now'), findsOneWidget);
+    expect(find.text('Sign in with Google'), findsNothing);
+    go(tester, '/demo');
+    await tester.pumpAndSettle();
     expect(find.textContaining('Sign-in is unavailable right now'), findsWidgets);
     expect(find.descendant(of: find.byType(DemoBanner), matching: find.text('Sign in')), findsNothing);
   });
@@ -173,7 +180,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.deleted, isTrue);
     expect(auth.deleted, isTrue);
-    expect(find.text('You’re reading the demo'), findsWidgets);
+    expect(find.text('Sign in with Google'), findsOneWidget, reason: 'back at the start page');
   });
 
   test('where a reader may go', () {
@@ -183,10 +190,11 @@ void main() {
     const back = Session(account: Account(user: user, onboarded: true));
     expect(redirectFor(null, '/settings'), isNull, reason: 'still loading');
     expect(redirectFor(out, '/'), isNull);
-    expect(redirectFor(out, '/interests'), '/sign-in');
+    expect(redirectFor(out, '/demo'), isNull);
+    expect(redirectFor(out, '/interests'), '/');
     expect(redirectFor(fresh, '/'), '/onboarding');
     expect(redirectFor(fresh, '/what-we-keep'), isNull);
-    expect(redirectFor(back, '/sign-in'), '/');
+    expect(redirectFor(back, '/demo'), '/');
     expect(redirectFor(back, '/onboarding'), isNull, reason: 'to choose topics and sources again');
     expect(redirectFor(back, '/settings'), isNull);
   });

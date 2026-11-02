@@ -155,6 +155,7 @@ void main() {
         storyFromJson(wire),
         storyFromJson({...wire, 'id': '43', 'title': 'Another story'}),
       ],
+      at: '/demo',
     );
     expect(find.text('Lumen Fold arrives in Denmark and the US'), findsWidgets);
     // Each demo source once in the sidebar, however many stories it fed.
@@ -208,7 +209,7 @@ void main() {
   });
 
   testWidgets('signed out, the demo answers too, and a failure offers to ask again', (tester) async {
-    final (_, api) = await start(tester, demo: [storyFromJson(wire)]);
+    final (_, api) = await start(tester, demo: [storyFromJson(wire)], at: '/demo');
     await ask(tester, 'What does it weigh?');
     expect(api.asked, [('42', 'What does it weigh?', true)]);
     expect(find.text('Ask again'), findsOneWidget);
@@ -243,7 +244,7 @@ void main() {
         },
       ],
     });
-    await start(tester, demo: [storyFromJson(wire)], briefing: briefing, players: players);
+    await start(tester, demo: [storyFromJson(wire)], at: '/demo', briefing: briefing, players: players);
     expect(find.text('The Lumen Fold arrives'), findsWidgets); // The floating bar and the sidebar's.
     final player = players.single;
     expect(player.url, briefing.audioUrl);

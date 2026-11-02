@@ -23,6 +23,11 @@ Widget _largeText(Widget child) => Builder(
 
 @widgetbook.UseCase(name: 'Normal', type: SignInPage, path: '[Accounts]')
 Widget signInNormal(BuildContext context) {
+  final intent = context.knobs.object.segmented(
+    label: 'Opens on',
+    options: SignInIntent.values,
+    labelBuilder: (i) => i == SignInIntent.signIn ? 'Sign in' : 'Create account',
+  );
   final status = context.knobs.object.dropdown(
     label: 'State',
     options: const [SignInStatus.idle, SignInStatus.signingIn, SignInStatus.error],
@@ -30,7 +35,8 @@ Widget signInNormal(BuildContext context) {
   );
   final allProviders = context.knobs.boolean(label: 'All providers (post-hackathon)');
   return SignInPage(
-    key: ValueKey(status),
+    key: ValueKey((intent, status)),
+    initialIntent: intent,
     status: status,
     pending: SignInProvider.google,
     error: fx.popupBlocked,
@@ -51,6 +57,7 @@ Widget signInExtreme(BuildContext context) => _largeText(
     status: SignInStatus.error,
     error: fx.signedUpElsewhere,
     providers: fx.allSignInProviders,
+    initialIntent: SignInIntent.createAccount,
     onContinue: (_) {},
     onWhatWeKeep: () {},
     onBack: () {},

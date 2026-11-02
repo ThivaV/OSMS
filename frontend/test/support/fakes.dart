@@ -205,6 +205,7 @@ Future<(FakeAuth, FakeApi)> start(
   Briefing? briefing,
   bool briefingMaking = false,
   List<FakePlayback>? players,
+  String? at,
 }) async {
   tester.view.physicalSize = const Size(1440, 900);
   tester.view.devicePixelRatio = 1;
@@ -230,6 +231,10 @@ Future<(FakeAuth, FakeApi)> start(
     ),
   );
   await tester.pumpAndSettle();
+  if (at != null) {
+    go(tester, at);
+    await tester.pumpAndSettle();
+  }
   return (fakeAuth, fakeApi);
 }
 

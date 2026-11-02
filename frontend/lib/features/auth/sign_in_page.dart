@@ -15,16 +15,22 @@ enum SignInStatus {
   unavailable,
 }
 
-/// Sign in and sign up in one page, and nothing else on it. No passwords: every option
-/// goes through a provider. A new account continues to onboarding; a returning reader,
-/// on any device, straight to their stories.
-class SignInPage extends StatelessWidget {
+/// Which tab the page opens on. Both run the same flow: continuing signs a returning
+/// reader in, or creates the account on first use.
+enum SignInIntent { signIn, createAccount }
+
+/// Signing in and creating an account, and nothing else: no examples, no demo. The
+/// first page a signed-out visitor sees, on the web and on the Mac. No passwords: every
+/// option goes through a provider. A new account continues to onboarding; a returning
+/// reader, on any device, straight to their stories.
+class SignInPage extends StatefulWidget {
   const SignInPage({
     super.key,
     this.providers = const [SignInProvider.google],
     this.status = SignInStatus.idle,
     this.pending,
     this.error,
+    this.initialIntent = SignInIntent.signIn,
     this.onContinue,
     this.onWhatWeKeep,
     this.onBack,
@@ -38,11 +44,19 @@ class SignInPage extends StatelessWidget {
 
   /// Shown while [status] is `error`.
   final String? error;
+  final SignInIntent initialIntent;
   final ValueChanged<SignInProvider>? onContinue;
   final VoidCallback? onWhatWeKeep;
 
-  /// Back to where the reader came from (the desktop app has no browser back button).
+  /// Back to where the reader came from, when the page isn't the start (Widgetbook's flow).
   final VoidCallback? onBack;
+
+  @override
+  State<SignInPage> createState() => _SignInPageState();
+}
+
+class _SignInPageState extends State<SignInPage> {
+  late SignInIntent _intent = widget.initialIntent;
 
   @override
   Widget build(BuildContext context) {
@@ -55,15 +69,15 @@ class SignInPage extends StatelessWidget {
                 padding: const EdgeInsets.all(Space.xl),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: Sizes.signInPanelWidth),
-                  child: _SignInPanel(page: this),
+                  child: _SignInPanel(page: widget, intent: _intent, onIntent: (i) => setState(() => _intent = i)),
                 ),
               ),
             ),
-            if (onBack != null)
+            if (widget.onBack != null)
               Positioned(
                 top: Space.sm,
                 left: Space.sm,
-                child: IconButton(tooltip: 'Back', icon: const Icon(Icons.arrow_back_rounded), onPressed: onBack),
+                child: IconButton(tooltip: 'Back', icon: const Icon(Icons.arrow_back_rounded), onPressed: widget.onBack),
               ),
           ],
         ),
@@ -73,15 +87,18 @@ class SignInPage extends StatelessWidget {
 }
 
 class _SignInPanel extends StatelessWidget {
-  const _SignInPanel({required this.page});
+  const _SignInPanel({required this.page, required this.intent, required this.onIntent});
 
   final SignInPage page;
+  final SignInIntent intent;
+  final ValueChanged<SignInIntent> onIntent;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final t = context.text;
     final busy = page.status == SignInStatus.signingIn;
+    final creating = intent == SignInIntent.createAccount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,8 +107,26 @@ class _SignInPanel extends StatelessWidget {
         const SizedBox(height: Space.xs),
         Text('One story, many sources', style: t.reading.copyWith(color: c.textSecondary)),
         const SizedBox(height: Space.xxl),
-        Text('Sign in', style: t.title),
-        const SizedBox(height: Space.lg),
+        SegmentedButton<SignInIntent>(
+          showSelectedIcon: false,
+          expandedInsets: EdgeInsets.zero,
+          segments: const [
+            ButtonSegment(value: SignInIntent.signIn, label: Text('Sign in')),
+            ButtonSegment(value: SignInIntent.createAccount, label: Text('Create account')),
+          ],
+          selected: {intent},
+          onSelectionChanged: busy ? null : (s) => onIntent(s.first),
+        ),
+        const SizedBox(height: Space.xl),
+        Text(creating ? 'Create your account' : 'Welcome back', style: t.title),
+        const SizedBox(height: Space.sm),
+        Text(
+          creating
+              ? 'Choose your own topics and sources. It takes about a minute.'
+              : 'Sign in to your stories and your morning briefing.',
+          style: t.body.copyWith(color: c.textSecondary),
+        ),
+        const SizedBox(height: Space.xl),
         if (page.status == SignInStatus.error) ...[
           _ErrorNote(message: page.error ?? 'Something went wrong. Please try again.'),
           const SizedBox(height: Space.lg),
@@ -102,18 +137,16 @@ class _SignInPanel extends StatelessWidget {
             title: 'Sign-in is unavailable right now',
             body: 'Please try again in a little while.',
           )
-        else ...[
+        else
           for (final provider in page.providers) ...[
             _ProviderButton(
               provider: provider,
+              intent: intent,
               waiting: busy && page.pending == provider,
               onPressed: busy || page.onContinue == null ? null : () => page.onContinue!(provider),
             ),
             const SizedBox(height: Space.sm),
           ],
-          const SizedBox(height: Space.xs),
-          Text('New here? This creates your account.', style: t.caption.copyWith(color: c.textTertiary)),
-        ],
         const SizedBox(height: Space.xl),
         Align(
           alignment: Alignment.centerLeft,
@@ -134,9 +167,10 @@ class _SignInPanel extends StatelessWidget {
 }
 
 class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({required this.provider, required this.waiting, this.onPressed});
+  const _ProviderButton({required this.provider, required this.intent, required this.waiting, this.onPressed});
 
   final SignInProvider provider;
+  final SignInIntent intent;
   final bool waiting;
   final VoidCallback? onPressed;
 
@@ -147,7 +181,9 @@ class _ProviderButton extends StatelessWidget {
         ? 'Finish in the ${provider.label} window…'
         : provider == SignInProvider.emailLink
         ? 'Email me a sign-in link'
-        : 'Continue with ${provider.label}';
+        : intent == SignInIntent.createAccount
+        ? 'Sign up with ${provider.label}'
+        : 'Sign in with ${provider.label}';
     return SizedBox(
       height: Sizes.buttonHeight,
       child: OutlinedButton(

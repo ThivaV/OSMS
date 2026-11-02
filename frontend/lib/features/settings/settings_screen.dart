@@ -31,7 +31,7 @@ class SettingsScreen extends ConsumerWidget {
       onDefaultLayoutChanged: account == null ? null : session.setDefaultLayout,
       user: account?.user,
       previewStory: sample.stories.first,
-      onBack: () => context.go('/'),
+      onBack: () => context.go(account == null ? '/demo' : '/'),
       onWhatWeKeep: () => context.go('/what-we-keep'),
       onResearchInterests: account == null ? null : () => context.go('/interests'),
       onSignOut: account == null
