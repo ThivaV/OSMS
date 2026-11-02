@@ -7,6 +7,18 @@ id=${1:?usage: deploy.sh <release id>}
 dir=/opt/osms/releases/$id
 [ -d "$dir/backend" ] && [ -d "$dir/web" ] || { echo "no release at $dir" >&2; exit 1; }
 previous=$(readlink -f /opt/osms/current 2>/dev/null || true)
+
+# Never older over newer: a deploy from your Mac and one from GitHub can finish out of
+# order. Runs under the one-deploy-at-a-time lock (osms-deploy). FORCE=1 for a rollback.
+if [ "${FORCE:-}" != 1 ] && [ -f "$previous/COMMIT" ]; then
+  live=$(cut -d' ' -f2 "$previous/COMMIT")
+  new=$(cut -d' ' -f2 "$dir/COMMIT" 2>/dev/null || echo 0)
+  if [ "$new" -lt "$live" ]; then
+    echo "skipped: $id is older than the live $(basename "$previous"); FORCE=1 deploys it anyway (a rollback)"
+    rm -rf "$dir"
+    exit 0
+  fi
+fi
 domain=$(cat /etc/osms/domain)
 
 echo "== packages"

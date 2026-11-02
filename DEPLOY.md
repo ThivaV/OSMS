@@ -137,7 +137,8 @@ anyone signed in to the project can run.
   ones, refreshes the settings from Secret Manager, restarts the services and checks that
   sign-in and the API are healthy. If they aren't, it goes back to the previous release
   and the deploy fails. It runs as a service of its own, `osms-deploy`, so a dropped
-  connection can't stop it halfway, and only one deploy runs at a time.
+  connection can't stop it halfway, and only one deploy runs at a time. A release older
+  than the live one (by commit time) is skipped, never deployed over it.
 - **No keys in GitHub.** GitHub Actions signs in to Google Cloud with Workload Identity
   Federation, as the `osms-deploy` account, and only from `main` of this repo.
 - **During judging**, to deploy only by hand: `gh variable set DEPLOY_ON_PUSH --body false`.
@@ -170,8 +171,9 @@ make deploy                        # deploy what is committed, and build the mac
   (each deploy reads them fresh).
 - **Rollback:** each deploy keeps the last five releases. On the server:
   `ls -t /opt/osms/releases`, then
-  `sudo bash /opt/osms/releases/<id>/deploy/server/deploy.sh <id>` for the one you want.
-  Or run `deploy` on an older commit from the Actions tab.
+  `sudo env FORCE=1 bash /opt/osms/releases/<id>/deploy/server/deploy.sh <id>` for the one you
+  want (without `FORCE=1` the server refuses a release older than the live one, so a
+  deploy from your Mac and one from GitHub can't finish out of order).
 - **Backups:** a snapshot of the disk every night at 02:00 UTC, kept seven days (Compute
   Engine → Snapshots). To restore, create a disk from a snapshot and attach it.
 - **Saving money after judging:** `gcloud compute instances stop osms --zone

@@ -24,6 +24,8 @@ echo "== the web app, for https://app.$OSMS_DOMAIN"
 echo "== the release: $id"
 mkdir -p "$work/release"
 git archive --format=tar HEAD backend auth deploy scripts | tar -x -C "$work/release"
+# The commit and its time: the server never lets an older release replace a newer one.
+git log -1 --format='%H %ct' HEAD >"$work/release/COMMIT"
 cp -R frontend/build/web "$work/release/web"
 # Never macOS's ._ metadata files: Alembic loads backend/alembic/versions/._*.py as
 # migrations, and the API then refuses to start.
