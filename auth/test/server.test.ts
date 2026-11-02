@@ -184,6 +184,8 @@ describe("auth service", () => {
     assert.ok(html.includes("another=1"), "another Google account is one link away");
     assert.match(page.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
     assert.match(page.headers.get("content-security-policy") ?? "", /form-action 'self' http:\/\/127\.0\.0\.1:53682/);
+    // A browser posting the form under no-referrer sends `Origin: null`, which is refused.
+    assert.equal(page.headers.get("referrer-policy"), "same-origin");
     const flow = cookiesFrom(page).find((c) => c.startsWith("osms_native_flow="))!;
     assert.ok(flow, "the flow is tied to this browser");
 
@@ -220,6 +222,7 @@ describe("auth service", () => {
       });
     assert.equal((await post({ Cookie: `${cookie}; ${flow}`, Origin: "https://evil.example" })).status, 403);
     assert.equal((await post({ Cookie: `${cookie}; ${flow}` })).status, 403, "no origin, no hand-over");
+    assert.equal((await post({ Cookie: `${cookie}; ${flow}`, Origin: "null" })).status, 403, "nor an opaque one");
     const noFlow = await post({ Cookie: cookie, Origin: "http://localhost:3000" });
     assert.equal(new URL(noFlow.headers.get("location") ?? "").searchParams.get("error"), "expired");
     assert.equal(new URL(noFlow.headers.get("location") ?? "").searchParams.get("token"), null);

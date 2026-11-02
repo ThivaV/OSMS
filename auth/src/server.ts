@@ -144,7 +144,9 @@ export async function createServer(config: Config, log: (line: string) => void =
           "Cache-Control": "no-store",
           "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${new URL(returnTo).origin}; frame-ancestors 'none'; base-uri 'none'`,
           "X-Frame-Options": "DENY",
-          "Referrer-Policy": "no-referrer",
+          // Not no-referrer: with it, browsers send `Origin: null` on the form's POST, and
+          // /native/continue rightly refuses that.
+          "Referrer-Policy": "same-origin",
         })
         .end(continuePage(returnTo, signedIn.user));
       return;
