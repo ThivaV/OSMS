@@ -349,6 +349,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       ),
       overview: TodayOverview(
         stories: stories,
+        title: _nav == 'today' ? null : _navTitle(listTopics, navSources),
         research: research,
         briefing: briefing,
         user: user,

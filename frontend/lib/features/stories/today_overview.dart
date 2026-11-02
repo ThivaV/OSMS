@@ -17,6 +17,7 @@ class TodayOverview extends StatelessWidget {
   const TodayOverview({
     super.key,
     required this.stories,
+    this.title,
     this.research = const [],
     this.briefing,
     this.user,
@@ -34,6 +35,10 @@ class TodayOverview extends StatelessWidget {
 
   /// Ranked: the first is the lead.
   final List<Story> stories;
+
+  /// What the sidebar narrowed the stories to (a topic's folder, a source, Saved); null
+  /// for Today, which greets the reader instead.
+  final String? title;
 
   /// New arXiv papers matched to the reader's research interests, best first.
   final List<Item> research;
@@ -88,7 +93,7 @@ class TodayOverview extends StatelessWidget {
               style: t.caption.copyWith(color: c.textTertiary, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: Space.xs),
-            Text(firstName == null ? 'Today' : '${greeting(now)}, $firstName', style: t.title),
+            Text(title ?? (firstName == null ? 'Today' : '${greeting(now)}, $firstName'), style: t.title),
             const SizedBox(height: Space.xs),
             Text(
               stories.isEmpty

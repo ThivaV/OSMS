@@ -158,6 +158,7 @@ void main() {
     expect(find.text('Nordic Startup Wire'), findsOneWidget, reason: 'selecting a folder opens it');
     expect(find.text(sample.cellcycle.title), findsWidgets, reason: 'its stories');
     expect(find.text(sample.kestrel.title), findsNothing, reason: 'and only its stories');
+    expect(find.text('Startups and product'), findsNWidgets(2), reason: 'titled after the folder');
     semantics.dispose();
   });
 
