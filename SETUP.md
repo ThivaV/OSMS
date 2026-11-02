@@ -186,3 +186,8 @@ make check-auth         # type-check and test sign-in
 - **No facts, answers or briefing:** `META_API_KEY` is missing from `.env`.
 - **The first briefing takes a while:** the voices download first (about 9.5 GB).
 - **Tilt refuses to start because it can see a kube context:** start it with `make up`.
+- **The Dock shows an old OSMS icon:** the Dock caches icons by app identity, and every
+  OSMS build (the release app, and the debug one tests and `make app DEVICE=macos` run)
+  shares one. `make build-macos` and `make deploy` refresh macOS's record of the app;
+  rebuild the debug copy too (`cd frontend && flutter build macos --debug`), quit OSMS,
+  and if the old icon still shows, restart the Dock with `killall Dock`.

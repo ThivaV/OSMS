@@ -49,6 +49,10 @@ tilt_up = command -v $(TILT) >/dev/null && $(TILT_RUN) get session >/dev/null 2>
 OSMS_DOMAIN ?= $(shell sed -n 's/^OSMS_DOMAIN=//p' deploy/config.env 2>/dev/null)
 PROD_DEFINES = --dart-define=OSMS_AUTH_URL=https://auth.$(OSMS_DOMAIN) --dart-define=OSMS_API_URL=https://api.$(OSMS_DOMAIN)
 need_domain = @test -n "$(OSMS_DOMAIN)" || { echo "Set OSMS_DOMAIN in deploy/config.env first (DEPLOY.md)."; exit 1; }
+# Flutter rebuilds the app inside the same bundle folder, whose date then never changes, so
+# macOS keeps showing the icon it cached. A fresh date and a re-registration fix that.
+MACOS_APP := $(APP_DIR)/build/macos/Build/Products/Release/OSMS.app
+MACOS_REFRESH := touch "$(MACOS_APP)" && /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$(MACOS_APP)"
 # A command on the deployed server, through Identity-Aware Proxy.
 ON_SERVER = bash -c '. deploy/lib.sh && load_config && on_server "$$0"'
 
@@ -201,6 +205,7 @@ widgetbook-build: widgetbook-gen ## Build Widgetbook as a static site in fronten
 
 build-macos: ## Build the macOS app (needs Xcode): frontend/build/macos/Build/Products/Release/OSMS.app
 	cd $(APP_DIR) && $(FLUTTER) build macos --release
+	@$(MACOS_REFRESH)
 
 # How test-macos reads the sign-in log: Tilt's by default.
 AUTH_LOG ?= env KUBECONFIG=$(TILT_KUBECONFIG) $(TILT) logs auth
@@ -269,6 +274,7 @@ build-web-prod: ## The web app for the deployed site (frontend/build/web)
 build-macos-prod: ## The macOS app, talking to the deployed site: frontend/build/macos/Build/Products/Release/OSMS.app
 	$(need_domain)
 	cd $(APP_DIR) && $(FLUTTER) build macos --release $(PROD_DEFINES)
+	@$(MACOS_REFRESH)
 
 server-ssh: ## A shell on the server
 	bash -c '. deploy/lib.sh && load_config && g compute ssh "$$GCP_VM" --zone "$$GCP_ZONE" --tunnel-through-iap'
