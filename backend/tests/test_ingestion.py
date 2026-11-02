@@ -74,6 +74,8 @@ MEDIA_RSS = b"""<?xml version="1.0"?>
 <img src="https://cdn.pics.example/4.jpg?w=1200&amp;q=80" alt="">]]></description></item>
 <item><guid>m5</guid><title>Plain http</title><link>https://pics.example/5</link>
 <media:content url="http://cdn.pics.example/5.jpg" medium="image"/></item>
+<item><guid>m6</guid><title>Thumbnail and enclosure</title><link>https://pics.example/6</link>
+<media:thumbnail url="https://cdn.pics.example/6-small.jpg"/><enclosure url="https://cdn.pics.example/6.jpg" type="image/jpeg" length="1"/></item>
 </channel></rss>"""
 
 
@@ -85,6 +87,7 @@ def test_each_entry_keeps_its_own_picture_as_a_link() -> None:
         "https://cdn.pics.example/3.png",
         "https://cdn.pics.example/4.jpg?w=1200&q=80",  # Past two trackers, entities decoded.
         None,  # Plain http: the apps refuse it.
+        "https://cdn.pics.example/6.jpg",  # The thumbnail only when nothing bigger is offered.
     ]
     _, rss = parse_feed(RSS)
     assert rss[0].image is None, "a tracking pixel is not a picture"

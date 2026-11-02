@@ -210,7 +210,12 @@ StoryImage? _image(Object? value) {
   if (value is! Map<String, Object?>) return null;
   final url = value['url'];
   if (url is! String || !url.startsWith('https://')) return null;
-  return StoryImage(url: url, source: (value['source'] as String?) ?? '', link: value['link'] as String?);
+  return StoryImage(
+    url: url,
+    source: (value['source'] as String?) ?? '',
+    link: value['link'] as String?,
+    small: value['small'] == true,
+  );
 }
 
 Alignment _focus(Object? value) {

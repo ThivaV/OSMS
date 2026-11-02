@@ -104,11 +104,28 @@ def test_a_story_shows_its_newest_reports_picture_with_credit(client) -> None:
         db.add(older)
         db.commit()
     image = client.get("/demo/stories").json()["stories"][0]["image"]
-    assert image == {"url": "https://orbit.example/old.jpg", "source": "Orbit Notes", "link": "https://orbit.example/k0"}
+    assert image == {"url": "https://orbit.example/old.jpg", "source": "Orbit Notes", "link": "https://orbit.example/k0", "small": False}
     with client.app.state.sessions() as db:
         db.get(Item, db.scalar(select(Item.id).where(Item.guid == "k1"))).image_url = "https://orbit.example/new.jpg"
         db.commit()
     assert client.get("/demo/stories").json()["stories"][0]["image"]["url"] == "https://orbit.example/new.jpg", "the newest wins"
+
+
+def test_a_thumbnail_gives_way_to_a_large_picture_and_says_it_is_small(client) -> None:
+    ids = _seed(client)
+    with client.app.state.sessions() as db:
+        kestrel = db.scalar(select(Item).where(Item.guid == "k1"))
+        kestrel.image_url = "https://orbit.example/wp-content/uploads/kestrel-300x188.jpg"
+        db.commit()
+    image = client.get("/demo/stories").json()["stories"][0]["image"]
+    assert image["small"] is True, "a thumbnail is still better than nothing, in a list row"
+    with client.app.state.sessions() as db:
+        db.add(Item(source_id=ids["demo"], guid="k0", link="https://orbit.example/k0", title="Kestrel ready", text="Soon.",
+                    image_url="https://cdn.orbit.example/kestrel-1920-80.jpg", published_at=NOW - timedelta(hours=5),
+                    content_hash="h0", story_id=ids["launch"], status="ready"))
+        db.commit()
+    image = client.get("/demo/stories").json()["stories"][0]["image"]
+    assert (image["url"], image["small"]) == ("https://cdn.orbit.example/kestrel-1920-80.jpg", False), "older, but large"
 
 
 def test_one_article_in_two_feeds_counts_once(client) -> None:

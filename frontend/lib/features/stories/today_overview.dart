@@ -270,7 +270,7 @@ class _LeadCard extends StatelessWidget {
                 isIllustration: story.hasIllustration,
                 imageUrl: story.illustrationUrl,
                 focus: story.illustrationFocus,
-                photo: story.image,
+                photo: story.largeImage,
               ),
               Padding(
                 padding: EdgeInsets.all(large ? Space.xl : Space.lg),

@@ -125,15 +125,15 @@ def _safe_image(url: str | None) -> str | None:
 
 
 def _image(raw) -> str | None:
-    """The entry's own image, as its feed gives it: media:content or media:thumbnail, an
-    image enclosure, else the first real <img> in its HTML (never a tracking pixel). Only
-    the link is kept: OSMS never downloads, re-hosts or shows it to a model."""
+    """The entry's own image, as its feed gives it: media:content, an image enclosure, the
+    first real <img> in its HTML (never a tracking pixel), and media:thumbnail last, as
+    thumbnails are small. Only the link is kept: OSMS never downloads, re-hosts or shows it
+    to a model."""
     candidates = [
         m.get("url")
         for m in raw.get("media_content") or []
         if m.get("medium") == "image" or str(m.get("type", "")).startswith("image/") or _IMAGE_FILE.search(m.get("url", ""))
     ]
-    candidates += [m.get("url") for m in raw.get("media_thumbnail") or []]
     candidates += [e.get("href") for e in raw.get("enclosures") or [] if str(e.get("type", "")).startswith("image/")]
     for markup in [c.get("value", "") for c in raw.get("content") or []] + [raw.get("summary", "")]:
         for tag in _IMG_TAG.findall(markup or ""):
@@ -141,6 +141,7 @@ def _image(raw) -> str | None:
             if attrs.get("width") in {"0", "1"} or attrs.get("height") in {"0", "1"} or _PIXEL.search(attrs.get("src", "")):
                 continue
             candidates.append(attrs.get("src"))
+    candidates += [m.get("url") for m in raw.get("media_thumbnail") or []]
     return next((safe for url in candidates if (safe := _safe_image(url))), None)
 
 

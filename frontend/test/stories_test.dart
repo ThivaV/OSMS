@@ -185,6 +185,12 @@ void main() {
       'The Launch Desk',
       'https://launchdesk.example/fold',
     ]);
+    expect(pictured.largeImage, isNotNull);
+    final thumb = storyFromJson({
+      ...wire,
+      'image': {'url': 'https://cdn.example/x-184x111.jpg', 'source': 'x', 'small': true},
+    });
+    expect([thumb.image != null, thumb.largeImage], [true, isNull], reason: 'a thumbnail: list rows only');
     expect(storyFromJson({...wire, 'image': {'url': 'http://cdn.example/x.jpg', 'source': 'x'}}).image, isNull);
     expect(storyFromJson(wire).image, isNull, reason: 'no picture: the illustration or the drawn art');
   });

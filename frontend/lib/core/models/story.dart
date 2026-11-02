@@ -92,7 +92,7 @@ class TimelineEvent {
 /// A picture from one of a story's sources, shown from the publisher's own address with
 /// credit and a link back; OSMS never copies it (AGENTS.md: media stays where it is).
 class StoryImage {
-  const StoryImage({required this.url, required this.source, this.link});
+  const StoryImage({required this.url, required this.source, this.link, this.small = false});
 
   final String url;
 
@@ -101,6 +101,9 @@ class StoryImage {
 
   /// The report it belongs to.
   final String? link;
+
+  /// A thumbnail, by its address: it would blur on a large card, so only list rows show it.
+  final bool small;
 }
 
 class Story {
@@ -158,6 +161,9 @@ class Story {
 
   /// The newest report's picture, from its publisher: shown before any illustration.
   final StoryImage? image;
+
+  /// [image] where it shows large (cards, Today, the story page): never a thumbnail.
+  StoryImage? get largeImage => image?.small == false ? image : null;
 
   /// When the reader last opened it. Null if never.
   final DateTime? lastReadAt;

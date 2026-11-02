@@ -69,6 +69,8 @@ class StoryImageOut(BaseModel):
     source: str
     #: The report it belongs to: the credit links back to it.
     link: str | None
+    #: A thumbnail by its address: list rows only; large cards keep their art.
+    small: bool = False
 
 
 class StoryOut(BaseModel):
