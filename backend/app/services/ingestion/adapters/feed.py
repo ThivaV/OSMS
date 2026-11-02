@@ -115,7 +115,7 @@ _ATTR = re.compile(r"([\w-]+)\s*=\s*[\"']([^\"']*)[\"']")
 _PIXEL = re.compile(r"pixel|beacon|track|feedburner\.com/~r/|//stats\.|\.gif(?:$|[?#])", re.IGNORECASE)
 
 
-def _safe_image(url: str | None) -> str | None:
+def safe_image(url: str | None) -> str | None:
     """An image the reader's app can show from the publisher: https only (the macOS app's
     sandbox and the web app's HTTPS page refuse plain http), checked like any link."""
     url = html.unescape((url or "").strip())
@@ -142,7 +142,7 @@ def _image(raw) -> str | None:
                 continue
             candidates.append(attrs.get("src"))
     candidates += [m.get("url") for m in raw.get("media_thumbnail") or []]
-    return next((safe for url in candidates if (safe := _safe_image(url))), None)
+    return next((safe for url in candidates if (safe := safe_image(url))), None)
 
 
 def _json_feed(body: bytes, source_type: str) -> tuple[FeedMeta, list[Entry]]:
@@ -169,7 +169,7 @@ def _json_feed(body: bytes, source_type: str) -> tuple[FeedMeta, list[Entry]]:
                 published = None
         guid = str(raw.get("id") or link or hashlib.sha256(f"{title}\n{text}".encode()).hexdigest())[:1000]
         kind = "paper" if source_type.startswith("arxiv") else ("post" if not title else "article")
-        image = _safe_image(str(raw.get("image") or raw.get("banner_image") or ""))
+        image = safe_image(str(raw.get("image") or raw.get("banner_image") or ""))
         entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=published, kind=kind, image=image))
     meta = FeedMeta(title=plain_text(str(feed.get("title") or ""), MAX_TITLE), language=normalise(feed.get("language")), ttl_minutes=None)
     return meta, entries

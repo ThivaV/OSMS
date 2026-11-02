@@ -19,6 +19,11 @@ from app.services.ingestion.safety import UnsafeUrl, check_url
 
 USER_AGENT = "OSMS/0.1 (news reader; +https://github.com/ThivaV/OSMS)"
 MAX_BYTES = 5_000_000
+#: An article page is read only as far as its <head>, where it names its preview image;
+#: the article itself is never downloaded.
+HEAD_BYTES = 512_000
+FEED_ACCEPT = "application/rss+xml, application/atom+xml, application/feed+json, application/xml;q=0.9, */*;q=0.5"
+PAGE_ACCEPT = "text/html, application/xhtml+xml;q=0.9, */*;q=0.5"
 MAX_REDIRECTS = 5
 TIMEOUT_S = 20.0
 DEFAULT_GAP_S = 1.0
@@ -98,14 +103,17 @@ class Fetcher:
             self.sleep(wait)
         self._last_request[host] = self.clock()
 
-    def fetch(self, url: str, *, etag: str | None = None, last_modified: str | None = None) -> FetchResult:
+    def fetch(
+        self, url: str, *, etag: str | None = None, last_modified: str | None = None, head_only: bool = False
+    ) -> FetchResult:
+        """A feed, or with [head_only] an HTML page up to its </head> (at most HEAD_BYTES)."""
         current = url
         for _ in range(MAX_REDIRECTS + 1):
             safe = self._check_public(current)
             self._polite_wait(urlparse(safe).hostname or "")
             headers = {
                 "User-Agent": USER_AGENT,
-                "Accept": "application/rss+xml, application/atom+xml, application/feed+json, application/xml;q=0.9, */*;q=0.5",
+                "Accept": PAGE_ACCEPT if head_only else FEED_ACCEPT,
             }
             if etag:
                 headers["If-None-Match"] = etag
@@ -132,6 +140,12 @@ class Fetcher:
                     body = bytearray()
                     for chunk in response.iter_bytes():
                         body.extend(chunk)
+                        if head_only:
+                            # Nothing after the head is kept, whatever the last chunk carried.
+                            end = body.lower().find(b"</head>", max(0, len(body) - len(chunk) - 7))
+                            if end >= 0 or len(body) >= HEAD_BYTES:
+                                del body[end + 7 if end >= 0 else HEAD_BYTES :]
+                                break
                         if len(body) > MAX_BYTES:
                             raise FetchError(f"response over {MAX_BYTES} bytes")
                     return FetchResult(

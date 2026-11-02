@@ -540,7 +540,8 @@ before saving, and authors and categories on the paper.
   title, text, link, published time, language, media links). Clustering, claims and the
   agent see the kind, never the platform.
 - **Polite fetching.** Conditional requests (ETag / Last-Modified), per-host rate limits,
-  back off on HTTP 429 and `Retry-After`, a descriptive User-Agent. Reddit in particular
+  back off on HTTP 429 and `Retry-After`, a descriptive User-Agent. Article pages (read
+  only for their preview image) also follow robots.txt. Reddit in particular
   throttles anonymous clients.
 - **Media stays where it is.** Store links to images, thumbnails and videos, not the files.
   Show them from the original with credit and a link back. Never re-host them, and never
@@ -548,7 +549,10 @@ before saving, and authors and categories on the paper.
   the author's say. Story art works this way since Nov 2 (the author's call): the newest
   report's own picture from its feed (`items.image_url`, https only), credited "Image:
   <source>" and linking back; Muse Image's illustration, then the drawn art, only where no
-  source has a picture. Podcast enclosures are the only media we download, and only to
+  source has a picture. Where a feed gives none, OSMS reads the article page's `<head>`
+  for its link-preview image (`og:image`, `twitter:image`): robots.txt decides, nothing
+  after `</head>` is read or kept, and one picture on several of a source's articles is
+  the site's own, so no article gets it. Podcast enclosures are the only media we download, and only to
   transcribe. Never download YouTube videos or audio.
 - **Newsletter emails are personal.** Before storing, strip tracking pixels, unsubscribe
   links and the recipient's address; link to the web version, not the email.

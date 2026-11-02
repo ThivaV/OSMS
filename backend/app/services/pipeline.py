@@ -1,6 +1,7 @@
 """The story pipeline, one job at a time (AGENTS.md, *Staying up to date*):
 
     fetch-source  → new or changed items, saved first
+    preview-image → an article's link-preview picture, when its feed gives none
     process-item  → rule 3 and noise, language, names
     index-item    → BGE-M3 vectors into Milvus Lite, then the clustering decision
     claims-item   → facts with quotes (claims agent), checked by the verifier
@@ -14,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.agent.kit import AgentKit
@@ -31,7 +32,9 @@ from app.services.clustering import Candidate, Thresholds, decide
 from app.services.embeddings import Embedder, item_text
 from app.services.ingestion import scheduler
 from app.services.ingestion.adapters.feed import UnsafeFeed, parse_feed
+from app.services.ingestion.adapters.page import preview_image
 from app.services.ingestion.fetcher import Fetcher, FetchError
+from app.services.ingestion.robots import Robots
 from app.services.ingestion.safety import UnsafeUrl
 from app.services.language import detect
 from app.services.speech import Checker, Voice
@@ -74,6 +77,13 @@ class Pipeline:
     _embedder: Embedder | None = None
     _index: VectorIndex | None = None
     _voice: Voice | None = None
+    _robots: Robots | None = None
+
+    @property
+    def robots(self) -> Robots:
+        if self._robots is None:
+            self._robots = Robots(self.fetcher)
+        return self._robots
 
     @property
     def embedder(self) -> Embedder:
@@ -93,6 +103,7 @@ class Pipeline:
             return
         handler = {
             "fetch-source": self.fetch_source,
+            "preview-image": self.preview_image,
             "process-item": self.process_item,
             "index-item": self.index_item,
             "claims-item": self.claims_item,
@@ -148,6 +159,8 @@ class Pipeline:
                 db.add(item)
                 db.flush()
                 jobs.enqueue(db, "process-item", item.id)
+                if item.image_url is None and item.link and item.kind != "paper":
+                    jobs.enqueue(db, "preview-image", item.id)
             elif item.content_hash != entry.content_hash:
                 # The source changed it, usually a correction: re-read it, keep its history.
                 item.title, item.text, item.link = entry.title, entry.text, entry.link or item.link
@@ -156,6 +169,31 @@ class Pipeline:
             if entry.image and item.image_url != entry.image:
                 item.image_url = entry.image  # A new or changed picture needs no re-reading.
         scheduler.after_success(source, now, published=published, ttl_minutes=meta.ttl_minutes)
+        db.commit()
+
+    def preview_image(self, db: Session, item_id: int) -> None:
+        """An article whose feed gives no picture: the one its page names for link previews,
+        read from the page's <head> where robots.txt allows. The page itself is never kept."""
+        item = db.get(Item, item_id)
+        if item is None or item.image_url or not item.link or item.kind == "paper" or not self.robots.allowed(item.link):
+            return
+        try:
+            page = self.fetcher.fetch(item.link, head_only=True)
+        except FetchError as error:
+            if error.status in (429, 503):
+                raise  # Asked to slow down: the queue tries again later.
+            return
+        except UnsafeUrl:
+            return
+        image = preview_image(page.body, page.url)
+        if image is None:
+            return
+        same_source = (Item.source_id == item.source_id, Item.image_url == image)
+        if db.scalar(select(Item.id).where(*same_source, Item.id != item.id).limit(1)) is not None:
+            # One picture on several of a source's articles is the site's own, not theirs.
+            db.execute(update(Item).where(*same_source).values(image_url=None))
+        else:
+            item.image_url = image
         db.commit()
 
     # ── 2. Processing ─────────────────────────────────────────────────────────

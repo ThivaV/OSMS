@@ -85,9 +85,16 @@ ROUTES = {
 }
 
 
+#: Article pages by address; anything else (robots.txt too) is a 404, as on most sites.
+PAGES: dict[str, bytes] = {}
+
+
 def _pipeline(db, tmp_path, client, *, available: bool) -> Pipeline:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, content=FEEDS[request.url.host])
+        if request.url.host in FEEDS and request.url.path != "/robots.txt":
+            return httpx.Response(200, content=FEEDS[request.url.host])
+        page = PAGES.get(str(request.url))
+        return httpx.Response(404) if page is None else httpx.Response(200, content=page)
 
     fetcher = Fetcher(httpx.Client(transport=httpx.MockTransport(handler)), resolver=lambda h, p: ["93.184.216.34"], sleep=lambda s: None)
     # As in the worker: the decision log writes on its own connection, so a job that held
@@ -255,6 +262,36 @@ def test_a_feed_picture_is_kept_as_a_link_and_filled_in_later_without_rereading(
     db.refresh(fold)
     assert fold.image_url == "https://cdn.bytebladet.example/fold.jpg"
     assert not jobs.pending(db, "process-item", fold.id), "same text: nothing to re-read"
+
+
+def test_an_article_without_a_feed_picture_gets_its_link_preview_image(seeded, tmp_path, monkeypatch) -> None:
+    db, da, en = seeded
+    page = b'<html><head><meta property="og:image" content="/img/fold.jpg"></head><body>The article itself.</body></html>'
+    monkeypatch.setitem(PAGES, "https://da-fold.example/a", page)
+    monkeypatch.setitem(PAGES, "https://en-fold.example/robots.txt", b"User-agent: OSMS\nDisallow: /")
+    monkeypatch.setitem(PAGES, "https://en-fold.example/a", page)
+    pipeline = _pipeline(db, tmp_path, AgentScript({}), available=False)
+    pipeline.fetch_source(db, da.id)
+    pipeline.fetch_source(db, en.id)
+    assert jobs.pending(db, "preview-image", db.scalar(select(Item.id).where(Item.guid == "da-fold")))
+    _drain(db, pipeline)
+    by_guid = {i.guid: i.image_url for i in db.scalars(select(Item))}
+    assert by_guid["da-fold"] == "https://da-fold.example/img/fold.jpg", "relative to the page, https"
+    assert by_guid["en-fold"] is None, "robots.txt says no to OSMS"
+    assert by_guid["en-kestrel"] is None, "a 404 page: no picture, no retries"
+
+
+def test_one_preview_picture_on_several_articles_is_the_sites_own(seeded, tmp_path, monkeypatch) -> None:
+    db, da, _ = seeded
+    two = [("da-a", "Lumen Fold i butikkerne", "Salget begynder.", NOW), ("da-b", "Kestrel lander igen", "Tredje gang.", NOW)]
+    monkeypatch.setitem(FEEDS, "bytebladet.example", rss(two, "da"))
+    logo = b'<html><head><meta property="og:image" content="https://da.example/share.jpg"></head></html>'
+    monkeypatch.setitem(PAGES, "https://da-a.example/a", logo)
+    monkeypatch.setitem(PAGES, "https://da-b.example/a", logo)
+    pipeline = _pipeline(db, tmp_path, AgentScript({}), available=False)
+    pipeline.fetch_source(db, da.id)
+    _drain(db, pipeline)
+    assert [i.image_url for i in db.scalars(select(Item).where(Item.source_id == da.id))] == [None, None]
 
 
 def test_the_vector_index_reopens_after_a_restart(tmp_path) -> None:

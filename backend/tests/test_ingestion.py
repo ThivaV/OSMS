@@ -11,7 +11,9 @@ from app.db.models import Job, Source, Subscription, Topic, TopicSource, User
 from app.services import jobs
 from app.services.ingestion import scheduler
 from app.services.ingestion.adapters.feed import UnsafeFeed, parse_feed, plain_text
+from app.services.ingestion.adapters.page import preview_image
 from app.services.ingestion.fetcher import Fetcher, FetchError
+from app.services.ingestion.robots import Robots
 from app.services.ingestion.safety import UnsafeUrl
 from app.services.language import detect
 from app.services.names import names
@@ -95,6 +97,41 @@ def test_each_entry_keeps_its_own_picture_as_a_link() -> None:
     assert papers[0].image is None
     _, items = parse_feed(JSON_FEED.replace(b'"content_text"', b'"image": "https://orbit.example/k.jpg", "content_text"'))
     assert items[0].image == "https://orbit.example/k.jpg"
+
+
+def test_an_article_page_names_its_preview_image_in_its_head() -> None:
+    page = b"""<html><head><title>x</title>
+<meta name="twitter:image" content="https://cdn.news.example/t.jpg">
+<meta property="og:image" content="https://cdn.news.example/og.jpg?w=1200&amp;h=630">
+</head><body><meta property="og:image" content="https://evil.example/body.jpg"></body></html>"""
+    assert preview_image(page, "https://news.example/a") == "https://cdn.news.example/og.jpg?w=1200&h=630"
+    relative = b'<head><meta property="og:image" content="/i/1.webp"></head>'
+    assert preview_image(relative, "https://news.example/story/1") == "https://news.example/i/1.webp"
+    assert preview_image(b'<head><meta property="og:image" content="http://news.example/1.jpg"></head>', "https://news.example/") is None
+    assert preview_image(b'<head><meta property="og:image" content="https://news.example/logo-share.png"></head>', "https://news.example/") is None
+    assert preview_image(b"<head><title>no picture</title></head>", "https://news.example/") is None
+
+
+def test_robots_txt_decides_for_article_pages() -> None:
+    answers = {
+        "https://open.example/robots.txt": httpx.Response(404),
+        "https://shut.example/robots.txt": httpx.Response(200, text="User-agent: OSMS\nDisallow: /news/"),
+        "https://down.example/robots.txt": httpx.Response(500),
+    }
+    fetcher = Fetcher(httpx.Client(transport=httpx.MockTransport(lambda r: answers[str(r.url)])),
+                      resolver=lambda h, p: ["93.184.216.34"], sleep=lambda s: None)
+    robots = Robots(fetcher)
+    assert robots.allowed("https://open.example/a")
+    assert not robots.allowed("https://shut.example/news/a") and robots.allowed("https://shut.example/about")
+    assert not robots.allowed("https://down.example/a"), "a server error: nothing, to be safe"
+
+
+def test_a_page_is_read_only_as_far_as_its_head() -> None:
+    page = b"<html><head><meta property='og:image' content='https://x.example/a.jpg'></head><body>" + b"article " * 200_000 + b"</body>"
+    fetcher = Fetcher(httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=page))),
+                      resolver=lambda h, p: ["93.184.216.34"], sleep=lambda s: None)
+    body = fetcher.fetch("https://x.example/a", head_only=True).body
+    assert body.lower().endswith(b"</head>"), "nothing after the head is kept"
 
 
 def test_hostile_feeds_are_refused() -> None:
