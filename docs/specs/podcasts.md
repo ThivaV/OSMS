@@ -27,13 +27,13 @@ Play button is unwired. This spec closes the slice end to end.
   newest first: id, title, excerpt, published date, duration, audio URL, the
   show (id, title, type, language), and the story it joined (id + title, when
   clustered). Rule 7 scoping like `/stories`.
-- App: a Podcasts screen in the list pane (`_nav == 'podcasts'`), grouped by
-  show: each row plays/pauses, shows duration and date, names its show, and
-  links "Discussed in {story}" to the story when clustered. A now-playing card
-  pins the current episode; one audio plays at a time (starting an episode
-  pauses the briefing and vice versa). Entry points: the sidebar Podcasts row
-  (phones get it through the Sources tab) and a ⌘K action. Empty state points
-  at adding a podcast; episodes without audio say so instead of a dead button.
+- App: episodes live in the Listen hub (`_nav == 'listen'`, spec:
+  `docs/specs/listen.md`), grouped by show: each row plays/pauses, shows
+  duration and date, names its show, and links "Discussed in {story}" to the
+  story when clustered. A now-playing card pins the current episode; one audio
+  plays at a time (starting an episode pauses the briefing and vice versa).
+  Entry points: the sidebar Listen row and a ⌘K action. Empty state points at
+  adding a podcast; episodes without audio say so instead of a dead button.
 - `Episode` model + wire parsing, `EpisodePlayback` (just_audio, fakes in
   tests), Widgetbook cases (Normal/Empty/Extreme + playing/failed, plus
   Filtered to one show and Loading older episodes).

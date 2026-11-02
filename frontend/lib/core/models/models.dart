@@ -7,3 +7,4 @@ export 'item.dart';
 export 'research.dart';
 export 'source.dart';
 export 'story.dart';
+export 'video.dart';

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/audio/briefing_playback.dart';
@@ -15,6 +16,7 @@ import '../../core/session/episodes.dart';
 import '../../core/session/research.dart';
 import '../../core/session/session.dart';
 import '../../core/session/stories.dart';
+import '../../core/session/videos.dart';
 import '../../core/theme/tokens.dart';
 import '../../sample/sample_content.dart' as sample;
 import '../../shared/widgets/pill_nav.dart';
@@ -23,7 +25,7 @@ import '../../shared/widgets/source_chip.dart';
 import '../../shared/widgets/story_card.dart';
 import '../auth/demo_banner.dart';
 import '../briefing/briefing_player.dart';
-import '../podcasts/podcasts_screen.dart';
+import '../listen/listen_screen.dart';
 import '../search/command_palette.dart';
 import '../sources/sources_sidebar.dart';
 import '../stories/story_list.dart';
@@ -56,8 +58,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   int _phoneTab = 0;
   StoryCardLayout? _layout;
 
-  /// Sidebar selection: `today`, `saved`, a topic id or a source id.
+  /// Sidebar selection: `today`, `saved`, `listen`, a topic id or a source id.
   String _nav = 'today';
+
+  /// Which shelf of Listen shows; kept while the reader browses.
+  ListenFilter _listenFilter = ListenFilter.all;
 
   /// Ask this story: the last question, its answer, and the request state.
   String? _askQuestion;
@@ -124,6 +129,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     await playback?.play();
   }
 
+  /// Plays a briefing from Listen's shelves, past or present, through the same
+  /// slot as today's: the floating bar, the mini player and the phone tab all
+  /// follow. Tapping the playing briefing pauses it. Choosing a past briefing
+  /// holds the slot until the hero sends it back to today.
+  Future<void> _playBriefing(Briefing briefing, Briefing? latest) async {
+    if (briefing.audioUrl == null) return;
+    final playback = _playbackOf(briefing);
+    if (_playbackFor == briefing.id && (playback?.state.value.playing ?? false)) {
+      await playback?.pause();
+      if (!mounted) return;
+      setState(() {});
+      return;
+    }
+    await _episodePlayback?.pause();
+    if (!mounted) return;
+    ref.read(selectedBriefingProvider.notifier).select(briefing.id == latest?.id ? null : briefing);
+    await _playbackOf(briefing)?.play();
+  }
+
+  /// A video's page, on its publisher's site: OSMS links, never republishes.
+  Future<void> _watchVideo(Video video) async {
+    final uri = Uri.tryParse(video.link);
+    if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +183,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void _refreshNow({bool resumed = false}) {
     ref.invalidate(storiesProvider);
     ref.invalidate(episodesProvider);
+    ref.invalidate(videosProvider);
+    ref.invalidate(briefingsHistoryProvider);
     final playing = _playback?.state.value.playing ?? false;
     if (!playing && (resumed || ref.read(briefingProvider).value == null)) ref.invalidate(briefingProvider);
     if (resumed) unawaited(_session.refreshAccount());
@@ -283,10 +317,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         onRun: () => _selectStory(null),
       ),
       CommandItem(
-        icon: Icons.podcasts_rounded,
-        label: 'Browse podcasts',
+        icon: Icons.headphones_rounded,
+        label: 'Listen',
         group: 'Actions',
-        onRun: () => _selectNav('podcasts', session),
+        onRun: () => _selectNav('listen', session),
       ),
     ]);
   }
@@ -300,11 +334,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final view = loaded.value ?? const StoriesView(stories: []);
     final loading = !loaded.hasValue;
     final podcastsView = ref.watch(episodesProvider);
-    final podcasts = _nav == 'podcasts';
+    final listen = _nav == 'listen';
     // The sample briefing and papers belong to the sample stories; a real briefing comes
-    // with real stories.
-    final briefing = view.samples ? (account == null ? sample.briefing : null) : ref.watch(briefingProvider).value;
+    // with real stories. A past briefing chosen in Listen holds the slot instead.
+    final latest = view.samples ? (account == null ? sample.briefing : null) : ref.watch(briefingProvider).value;
+    final briefing = ref.watch(selectedBriefingProvider) ?? latest;
     final playback = _playbackOf(briefing);
+    // Listen's other shelves: past briefings that replay, and videos that link out.
+    // History includes the latest row too; the hero already plays it.
+    final pastBriefings = listen
+        ? (view.samples
+              ? const <Briefing>[]
+              : [
+                  for (final b in (ref.watch(briefingsHistoryProvider).value ?? const <Briefing>[]))
+                    if (b.id != latest?.id) b,
+                ])
+        : const <Briefing>[];
+    final pastLoading = listen && !view.samples && !ref.watch(briefingsHistoryProvider).hasValue;
+    final videos = listen
+        ? (view.samples ? const <Video>[] : (ref.watch(videosProvider).value ?? const <Video>[]))
+        : const <Video>[];
+    final videosLoading = listen && !view.samples && !ref.watch(videosProvider).hasValue;
     final briefingMaking = account != null && briefing == null && (ref.watch(briefingMakingProvider).value ?? false);
     final research = _nav != 'today'
         ? const <Item>[]
@@ -378,10 +428,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       onSignOut: _session.signOut,
     );
 
-    // Podcasts takes the list pane (and, with nothing open, the reading pane
-    // through `overview` below): every episode, playable, sourced, storied.
-    final podcastsScreen = PodcastsScreen(
-      episodes: podcasts ? podcastsView.episodes : const [],
+    // Listen takes the list pane (and, with nothing open, the reading pane
+    // through `overview` below): briefings with their documents, every episode
+    // playable, sourced and storied, and videos that link out.
+    final listenScreen = ListenScreen(
+      filter: _listenFilter,
+      onFilter: (filter) => setState(() => _listenFilter = filter),
+      latestBriefing: listen ? latest : null,
+      pastBriefings: pastBriefings,
+      briefingLoading: pastLoading,
+      briefingMaking: briefingMaking,
+      playingBriefingId: briefing?.id,
+      briefingPlaying: playback?.state.value.playing ?? false,
+      onPlayBriefing: (b) => _playBriefing(b, latest),
+      onBackToLatest: () => ref.read(selectedBriefingProvider.notifier).clear(),
+      onOpenBriefingStory: _selectStory,
+      episodes: listen ? podcastsView.episodes : const [],
       shows: podcastsView.shows,
       selectedShowId: podcastsView.selectedShowId,
       onSelectShow: (id) => ref.read(episodesProvider.notifier).selectShow(id),
@@ -395,13 +457,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       playback: _episode == null ? null : _episodePlaybackOf(_episode!),
       onPlay: _playEpisode,
       onOpenStory: (e) => _selectStory(e.storyId!),
+      videos: videos,
+      videosLoading: videosLoading,
+      onWatchVideo: _watchVideo,
+      onOpenVideoStory: (v) => _selectStory(v.storyId!),
       banner: banner(),
       bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,
     );
 
     final shell = ThreePaneLayout(
       sidebar: sidebar(),
-      list: podcasts ? podcastsScreen : StoryList(
+      list: listen ? listenScreen : StoryList(
         stories: stories,
         title: _navTitle(listTopics, navSources),
         selectedId: _selected,
@@ -420,8 +486,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _session.setDefaultLayout(l);
         },
       ),
-      overview: podcasts
-          ? podcastsScreen
+      overview: listen
+          ? listenScreen
           : TodayOverview(
         stories: stories,
         title: _nav == 'today' ? null : _navTitle(listTopics, navSources),

@@ -14,8 +14,8 @@ import 'package:osms/features/auth/what_we_keep_page.dart';
 import 'package:osms/features/briefing/briefing_player.dart';
 import 'package:osms/core/theme/appearance.dart';
 import 'package:osms/core/theme/palettes.dart';
+import 'package:osms/features/listen/listen_screen.dart';
 import 'package:osms/features/onboarding/onboarding_flow.dart';
-import 'package:osms/features/podcasts/podcasts_screen.dart';
 import 'package:osms/features/search/command_palette.dart';
 import 'package:osms/features/stories/today_overview.dart';
 import 'package:osms/shared/widgets/source_quote.dart';
@@ -253,8 +253,12 @@ final Map<String, Widget Function()> _screens = {
   'Story list empty, no sources': () =>
       Material(child: StoryList(stories: const [], onChooseSources: () {}, onAddSource: () {})),
   'Story list empty, sources followed': () => const Material(child: StoryList(stories: [], sourceCount: 40)),
-  'Podcasts normal': () => Material(
-    child: PodcastsScreen(
+  'Listen normal': () => Material(
+    child: ListenScreen(
+      onFilter: (_) {},
+      latestBriefing: fx.briefing,
+      onPlayBriefing: (_) {},
+      onOpenBriefingStory: (_) {},
       episodes: fx.sampleEpisodes,
       shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
       onSelectShow: (_) {},
@@ -263,11 +267,27 @@ final Map<String, Widget Function()> _screens = {
       current: fx.sampleEpisodes.first,
       onPlay: (_) {},
       onOpenStory: (_) {},
+      videos: [
+        Video(
+          id: 'v1',
+          title: 'Selene-3 sends its first images',
+          publishedAt: DateTime(2026, 10, 31, 8, 30),
+          duration: const Duration(minutes: 10, seconds: 24),
+          link: 'https://launchpad.example/v1',
+          source: fx.launchpadLens,
+          storyId: fx.halcyon.id,
+          storyTitle: fx.halcyon.title,
+        ),
+      ],
+      onWatchVideo: (_) {},
+      onOpenVideoStory: (_) {},
       onAddSource: () {},
     ),
   ),
-  'Podcasts filtered to one show': () => Material(
-    child: PodcastsScreen(
+  'Listen filtered to one show': () => Material(
+    child: ListenScreen(
+      filter: ListenFilter.episodes,
+      onFilter: (_) {},
       episodes: [fx.sampleEpisodes.first],
       shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
       selectedShowId: fx.gradientHour.id,
@@ -276,8 +296,10 @@ final Map<String, Widget Function()> _screens = {
       onOpenStory: (_) {},
     ),
   ),
-  'Podcasts loading older': () => Material(
-    child: PodcastsScreen(
+  'Listen loading older': () => Material(
+    child: ListenScreen(
+      filter: ListenFilter.episodes,
+      onFilter: (_) {},
       episodes: fx.sampleEpisodes,
       shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
       onSelectShow: (_) {},
@@ -287,8 +309,37 @@ final Map<String, Widget Function()> _screens = {
       onOpenStory: (_) {},
     ),
   ),
-  'Podcasts empty': () => Material(child: PodcastsScreen(episodes: const [], onAddSource: () {})),
-  'Podcasts unavailable': () => const Material(child: PodcastsScreen(episodes: [], unavailable: true)),
+  'Listen briefings': () => Material(
+    child: ListenScreen(
+      filter: ListenFilter.briefings,
+      onFilter: (_) {},
+      latestBriefing: fx.briefing,
+      pastBriefings: [fx.briefing],
+      onPlayBriefing: (_) {},
+      onBackToLatest: () {},
+      onOpenBriefingStory: (_) {},
+    ),
+  ),
+  'Listen videos': () => Material(
+    child: ListenScreen(
+      filter: ListenFilter.videos,
+      onFilter: (_) {},
+      videos: [
+        Video(
+          id: 'v1',
+          title: 'Selene-3 sends its first images',
+          excerpt: 'The landing, live from mission control.',
+          publishedAt: DateTime(2026, 10, 31, 8, 30),
+          link: 'https://launchpad.example/v1',
+          source: fx.launchpadLens,
+        ),
+      ],
+      onWatchVideo: (_) {},
+      onOpenVideoStory: (_) {},
+    ),
+  ),
+  'Listen empty': () => Material(child: ListenScreen(episodes: const [], onAddSource: () {})),
+  'Listen unavailable': () => const Material(child: ListenScreen(episodes: [], unavailable: true)),
   'Today overview extreme': () => Material(
     child: TodayOverview(
       stories: [fx.extremeStory, ...fx.stories],

@@ -133,14 +133,22 @@ void main() {
     expect(find.text('Your first briefing is being made'), findsNothing);
   });
 
-  testWidgets('podcasts: every episode plays, names its show, and links its story', (tester) async {
+  testWidgets('listen: every episode plays, names its show, and links its story', (tester) async {
     final players = <FakePlayback>[];
     await start(tester, players: players);
     go(tester, '/demo');
     await tester.pumpAndSettle();
 
-    await tapText(tester, 'Podcasts');
-    expect(find.textContaining('open weights'), findsWidgets, reason: 'the episodes');
+    await tapText(tester, 'Listen');
+
+    // The hero stands above the episodes: drag until rows lay out.
+    final list = find.byKey(const ValueKey('listenList'));
+    final episodes = find.textContaining('open weights');
+    for (var i = 0; i < 8 && episodes.evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -1500));
+      await tester.pumpAndSettle();
+    }
+    expect(episodes, findsWidgets, reason: 'the episodes');
     expect(find.text('Gradient Hour'), findsWidgets, reason: 'the show, not just the episode');
     expect(find.textContaining('Discussed in'), findsOneWidget, reason: 'the story link');
     expect(
@@ -149,20 +157,32 @@ void main() {
       reason: 'no audio is labelled, never a dead button',
     );
 
-    await tester.tap(find.byTooltip('Play').first);
+    final episodePlay = find.descendant(
+      of: find.byKey(const ValueKey('episode-se-1')),
+      matching: find.byTooltip('Play'),
+    );
+    await tester.tap(episodePlay);
     await tester.pumpAndSettle();
     expect(players.expand((p) => p.calls), contains('play'), reason: 'the enclosure streams');
+    for (var i = 0; i < 8 && find.text('Now playing').evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, 1500));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('Now playing'), findsOneWidget);
 
-    final discussedIn = find.textContaining('Discussed in').first;
-    await tester.ensureVisible(discussedIn);
+    final discussedIn = find.textContaining('Discussed in');
+    for (var i = 0; i < 8 && discussedIn.evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -1500));
+      await tester.pumpAndSettle();
+    }
+    await tester.ensureVisible(discussedIn.first);
     await tester.pumpAndSettle();
-    await tester.tap(discussedIn);
+    await tester.tap(discussedIn.first);
     await tester.pumpAndSettle();
     expect(find.text('Ask this story'), findsOneWidget, reason: 'the episode opens its story');
   });
 
-  testWidgets('podcasts: show chips filter the playlist and older episodes page in', (tester) async {
+  testWidgets('listen: show chips filter the playlist and older episodes page in', (tester) async {
     final history = [
       for (var i = 0; i < 55; i++)
         Episode(
@@ -173,7 +193,7 @@ void main() {
         ),
     ];
     await start(tester, auth: FakeAuth(signedIn: true), onboarded: true, readerEpisodes: history);
-    await tapText(tester, 'Podcasts');
+    await tapText(tester, 'Listen');
 
     final chips = find.byKey(const ValueKey('showFilter'));
     expect(chips, findsOneWidget, reason: 'two shows to choose between');
@@ -182,7 +202,7 @@ void main() {
 
     // The button waits below fifty tall cards: outside the viewport a sliver
     // never lays out, so drag the list until it builds, then expect it.
-    final list = find.byKey(const ValueKey('podcastsList'));
+    final list = find.byKey(const ValueKey('listenList'));
     final older = find.text('Show older episodes');
     for (var i = 0; i < 8 && older.evaluate().isEmpty; i++) {
       await tester.drag(list, const Offset(0, -1500));
@@ -216,6 +236,103 @@ void main() {
     expect(find.text('History 54'), findsOneWidget, reason: 'still the gradient episodes');
     expect(find.text('History 53'), findsNothing, reason: 'the other show filters out');
     expect(find.text('Show older episodes'), findsNothing, reason: 'one show fits on a page');
+  });
+
+  testWidgets('listen: type chips narrow the shelves, past briefings replay, videos link their story', (tester) async {
+    Briefing briefing(String id, DateTime date, String storyId, String title) => Briefing(
+      id: id,
+      date: date,
+      audioUrl: 'https://briefings.example/$id.wav',
+      total: const Duration(minutes: 6),
+      chapters: [BriefingChapter(storyId: storyId, title: title, duration: const Duration(minutes: 6))],
+    );
+    final today = briefing('b-today', DateTime(2026, 11, 1, 7), sample.halcyon.id, sample.halcyon.title);
+    final past = briefing('b-past', DateTime(2026, 10, 31, 7), sample.selene.id, sample.selene.title);
+    final videos = [
+      Video(
+        id: 'v1',
+        title: 'Selene lands, live',
+        source: sample.launchpadLens,
+        publishedAt: DateTime(2026, 10, 31, 8),
+        duration: const Duration(minutes: 10),
+        link: 'https://launchpad.example/v1',
+        storyId: sample.selene.id,
+        storyTitle: sample.selene.title,
+      ),
+      Video(
+        id: 'v2',
+        title: 'A walk around the pad',
+        source: sample.launchpadLens,
+        publishedAt: DateTime(2026, 10, 30, 18),
+        link: 'https://launchpad.example/v0',
+      ),
+    ];
+    final players = <FakePlayback>[];
+    await start(
+      tester,
+      players: players,
+      auth: FakeAuth(signedIn: true),
+      onboarded: true,
+      readerStories: [sample.halcyon, sample.selene],
+      readerEpisodes: [sample.sampleEpisodes.first],
+      briefing: today,
+      readerBriefings: [past],
+      readerVideos: videos,
+    );
+    await tapText(tester, 'Listen');
+
+    expect(find.text('Morning briefing'), findsOneWidget, reason: 'today’s hero');
+    expect(
+      find.text('2 briefings  ·  1 episode from 1 show  ·  2 videos'),
+      findsOneWidget,
+      reason: 'the subtitle counts every shelf',
+    );
+    final types = find.byKey(const ValueKey('typeFilter'));
+    expect(types, findsOneWidget, reason: 'three shelves to choose between');
+
+    // Briefings: the hero, then history, each with its documents.
+    await tester.tap(find.descendant(of: types, matching: find.text('Briefings')));
+    await tester.pumpAndSettle();
+    expect(find.text('Earlier briefings'), findsOneWidget);
+    expect(find.text(sample.selene.title), findsWidgets, reason: 'the past briefing names its story');
+
+    // Replaying the past briefing holds the slot: its audio plays, and the
+    // hero offers the way back to today.
+    final list = find.byKey(const ValueKey('listenList'));
+    final pastRow = find.byKey(const ValueKey('pastBriefing-b-past'));
+    for (var i = 0; i < 8 && pastRow.evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -1500));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.descendant(of: pastRow, matching: find.byTooltip('Play')));
+    await tester.pumpAndSettle();
+    expect(
+      players.where((p) => p.url == 'https://briefings.example/b-past.wav').expand((p) => p.calls),
+      contains('play'),
+      reason: 'the past recording streams',
+    );
+    for (var i = 0; i < 8 && find.text('Back to today’s briefing').evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, 1500));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Back to today’s briefing'), findsOneWidget, reason: 'the slot names its way back');
+    await tester.tap(find.text('Back to today’s briefing'));
+    await tester.pumpAndSettle();
+    expect(find.text('Back to today’s briefing'), findsNothing, reason: 'today holds the slot again');
+
+    // Videos: rows, not a player — a story link where there is one, honesty
+    // where there isn’t.
+    await tester.tap(find.descendant(of: types, matching: find.text('Videos')));
+    await tester.pumpAndSettle();
+    expect(find.text('Selene lands, live'), findsOneWidget);
+    expect(find.text('Not part of a story yet'), findsOneWidget, reason: 'the storiless video says so');
+    expect(find.text('Morning briefing'), findsNothing, reason: 'only the videos shelf');
+    final discussedIn = find.textContaining('Discussed in').first;
+    await tester.ensureVisible(discussedIn);
+    await tester.pumpAndSettle();
+    await tester.tap(discussedIn);
+    await tester.pumpAndSettle();
+    expect(find.text('Ask this story'), findsOneWidget, reason: 'the video opens its story');
   });
 
   testWidgets('the sidebar files sources in topic folders that open, close and narrow the list', (tester) async {

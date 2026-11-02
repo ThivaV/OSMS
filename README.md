@@ -92,10 +92,16 @@ Oct 27 – Nov 4, 2026.
   - **The OSMS logo** on the Mac app, the web app and inside both.
 - [x] **Podcasts: every episode, playable, sourced, storied:** enclosures are kept
   as links (migration `0009`), `GET /episodes` serves a reader's own newest first with
-  each episode's show and the story it joined, and the app's Podcasts screen (sidebar +
-  ⌘K, phones through Sources) groups them by show, plays them through the briefing's
+  each episode's show and the story it joined, and the app's Listen hub (sidebar +
+  ⌘K) groups them by show, plays them through the briefing's
   audio engine with one audio at a time, and links "Discussed in" to the story. The
   demo's samples play openly-licensed sample audio. Spec: `docs/specs/podcasts.md`.
+- [x] **Listen: one hub for every audio and video:** today's briefing as a playable
+  hero with its chapters' stories one tap away, past briefings that replay through
+  the same slot (`GET /briefings`, own rows only), podcast episodes with show chips
+  and history paging, and videos as link-out rows with their story when they joined
+  one (`GET /videos`). Type chips filter the shelves; every row names its source
+  documents. Spec: `docs/specs/listen.md`.
 - [ ] Still to do: related-by-meaning papers, adding sources from the app, the language
   toggle, the editor's review loop and the Muse Wonder trial (see AGENTS.md,
   *Build plan*).

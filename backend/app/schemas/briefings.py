@@ -32,3 +32,7 @@ class BriefingOut(BaseModel):
     #: Signed and short-lived: audio players can't send a sign-in header.
     audio_url: str
     chapters: list[BriefingChapterOut]
+
+
+class BriefingsOut(BaseModel):
+    briefings: list[BriefingOut]

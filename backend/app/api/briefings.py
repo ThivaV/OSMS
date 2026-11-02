@@ -6,13 +6,14 @@ import hashlib
 import hmac
 import time
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
 
 from app.api.deps import Db, Reader
 from app.db.models import Briefing, Claim
-from app.schemas.briefings import BriefingChapterOut, BriefingMakingOut, BriefingOut
+from app.schemas.briefings import BriefingChapterOut, BriefingMakingOut, BriefingOut, BriefingsOut
 from app.schemas.stories import PointOut
 from app.services import briefing as briefing_service
 from app.services import jobs, stories
@@ -67,6 +68,21 @@ def reader_briefing(request: Request, reader: Reader, db: Db) -> BriefingOut:
     return _out(db, request, briefing, stories.reader_source_ids(db, reader.id))
 
 
+@router.get("/briefings")
+def reader_briefings(
+    request: Request,
+    reader: Reader,
+    db: Db,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+) -> BriefingsOut:
+    """The reader's own earlier briefings, newest first — each with a freshly
+    signed audio URL, since signatures are short-lived (rule 7: only theirs)."""
+    followed = stories.reader_source_ids(db, reader.id)
+    return BriefingsOut(
+        briefings=[_out(db, request, briefing, followed) for briefing in briefing_service.history(db, reader.id, limit)]
+    )
+
+
 @router.get("/briefings/making")
 def reader_briefing_making(reader: Reader, db: Db) -> BriefingMakingOut:
     """Whether the reader's next briefing is on its way, so Today can say so before the
@@ -81,6 +97,19 @@ def demo_briefing(request: Request, db: Db) -> BriefingOut:
     if briefing is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No briefing yet.")
     return _out(db, request, briefing, stories.demo_source_ids(db))
+
+
+@router.get("/demo/briefings")
+def demo_briefings(
+    request: Request,
+    db: Db,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+) -> BriefingsOut:
+    """Public: the demo's earlier briefings, for signed-out visitors and judges."""
+    followed = stories.demo_source_ids(db)
+    return BriefingsOut(
+        briefings=[_out(db, request, briefing, followed) for briefing in briefing_service.history(db, None, limit)]
+    )
 
 
 @router.get("/briefings/{briefing_id}/audio", name="briefing_audio")

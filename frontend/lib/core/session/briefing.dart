@@ -15,6 +15,29 @@ final briefingProvider = FutureProvider<Briefing?>((ref) async {
   }
 });
 
+/// The briefing the slot plays: the latest, until the reader replays a past one
+/// from Listen. Home's players all read the slot; clearing it returns to today.
+class SelectedBriefing extends Notifier<Briefing?> {
+  @override
+  Briefing? build() => null;
+
+  void select(Briefing? briefing) => state = briefing;
+  void clear() => state = null;
+}
+
+final selectedBriefingProvider = NotifierProvider<SelectedBriefing, Briefing?>(SelectedBriefing.new);
+
+/// Earlier briefings, newest first: the reader's own, or the demo's signed
+/// out. Empty until the first is made, or when the API can't be reached.
+final briefingsHistoryProvider = FutureProvider<List<Briefing>>((ref) async {
+  final reader = ref.watch(sessionProvider.select((s) => s.value?.account?.user.id));
+  try {
+    return await ref.watch(apiClientProvider).briefings(demo: reader == null);
+  } on ApiException {
+    return const [];
+  }
+});
+
 /// Signed in with no briefing yet: whether one is being made right now. Today asks
 /// again on every refresh, so the player appears as soon as it's ready.
 final briefingMakingProvider = FutureProvider<bool>((ref) async {

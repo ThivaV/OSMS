@@ -182,6 +182,26 @@ EpisodesPage episodesPageFromJson(Json j) => EpisodesPage(
   nextCursor: j['next_cursor'] as String?,
 );
 
+List<Briefing> briefingsFromJson(Json j) => [for (final b in _list(j['briefings'])) briefingFromJson(b)];
+
+/// A video row: the publisher's page plus the story it joined, when it joined one.
+Video videoFromJson(Json j) {
+  final seconds = (j['duration_s'] as num?)?.toInt();
+  return Video(
+    id: j['id'] as String,
+    title: j['title'] as String,
+    excerpt: (j['excerpt'] as String?) ?? '',
+    publishedAt: _time(j['published_at']),
+    duration: seconds == null ? null : Duration(seconds: seconds),
+    link: j['link'] as String,
+    source: storySourceFromJson(j['source'] as Json),
+    storyId: j['story_id'] as String?,
+    storyTitle: j['story_title'] as String?,
+  );
+}
+
+List<Video> videosFromJson(Json j) => [for (final v in _list(j['videos'])) videoFromJson(v)];
+
 Decision decisionFromJson(Json j) => Decision(
   id: j['id'] as String,
   agent: j['agent'] as String,

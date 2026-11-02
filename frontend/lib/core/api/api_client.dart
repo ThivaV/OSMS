@@ -119,6 +119,18 @@ class ApiClient {
     }
   }
 
+  /// Earlier briefings, newest first — the reader's own, or the demo's signed
+  /// out. Each carries a freshly signed audio URL, so history replays.
+  Future<List<Briefing>> briefings({bool demo = false, int limit = 100}) async => briefingsFromJson(
+    (await _send('GET', '${demo ? '/demo' : ''}/briefings?limit=$limit', signedIn: !demo))!,
+  );
+
+  /// Watchable videos from followed sources, newest first — or the demo's
+  /// signed out. Rows link to the publisher's page; OSMS plays no video.
+  Future<List<Video>> videos({bool demo = false, int limit = 100}) async => videosFromJson(
+    (await _send('GET', '${demo ? '/demo' : ''}/videos?limit=$limit', signedIn: !demo))!,
+  );
+
   /// Whether the reader's next briefing is being made: a new reader's first one takes a
   /// while, and Today says it's on its way.
   Future<bool> briefingMaking() async => (await _send('GET', '/briefings/making'))!['making'] == true;

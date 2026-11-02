@@ -201,9 +201,13 @@ flowchart TB
   newest first, each with its show and the story it joined; cursor paging on
   `(published_at, id)` with an opaque `next_cursor` walks the whole history
   without skips or duplicates, `source_id` narrows to one show, and `shows`
-  lists every in-scope show for the app's filter chips. The app's Podcasts
-  screen pages history in behind an explicit older-action and plays episodes
-  through the same audio engine as the briefing, one audio at a time.
+  lists every in-scope show for the app's filter chips. `GET /briefings` serves
+  the reader's own earlier briefings with freshly signed audio URLs, and
+  `GET /videos` their followed sources' videos with publisher links and story
+  links. The app's Listen hub shelves all three behind type chips: today's
+  briefing as a playable hero with its chapters' stories, past briefings that
+  replay through the same slot, episodes paging in behind an explicit
+  older-action, and videos as link-out rows — one audio at a time.
 
 ### Staying up to date
 

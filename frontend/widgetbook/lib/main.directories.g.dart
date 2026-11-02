@@ -19,12 +19,12 @@ import 'package:osms_widgetbook/use_cases/foundations.dart'
     as _osms_widgetbook_use_cases_foundations;
 import 'package:osms_widgetbook/use_cases/layout.dart'
     as _osms_widgetbook_use_cases_layout;
+import 'package:osms_widgetbook/use_cases/listen.dart'
+    as _osms_widgetbook_use_cases_listen;
 import 'package:osms_widgetbook/use_cases/modern.dart'
     as _osms_widgetbook_use_cases_modern;
 import 'package:osms_widgetbook/use_cases/onboarding.dart'
     as _osms_widgetbook_use_cases_onboarding;
-import 'package:osms_widgetbook/use_cases/podcasts.dart'
-    as _osms_widgetbook_use_cases_podcasts;
 import 'package:osms_widgetbook/use_cases/settings.dart'
     as _osms_widgetbook_use_cases_settings;
 import 'package:osms_widgetbook/use_cases/sources.dart'
@@ -248,6 +248,44 @@ final directories = <_widgetbook.WidgetbookNode>[
     ],
   ),
   _widgetbook.WidgetbookCategory(
+    name: 'Listen',
+    children: [
+      _widgetbook.WidgetbookComponent(
+        name: 'ListenScreen',
+        useCases: [
+          _widgetbook.WidgetbookUseCase(
+            name: 'Briefings',
+            builder: _osms_widgetbook_use_cases_listen.listenBriefings,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Empty',
+            builder: _osms_widgetbook_use_cases_listen.listenEmpty,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Extreme content',
+            builder: _osms_widgetbook_use_cases_listen.listenExtreme,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Filtered to one show',
+            builder: _osms_widgetbook_use_cases_listen.listenFiltered,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Loading older episodes',
+            builder: _osms_widgetbook_use_cases_listen.listenLoadingMore,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Normal',
+            builder: _osms_widgetbook_use_cases_listen.listenNormal,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Videos',
+            builder: _osms_widgetbook_use_cases_listen.listenVideos,
+          ),
+        ],
+      ),
+    ],
+  ),
+  _widgetbook.WidgetbookCategory(
     name: 'Onboarding',
     children: [
       _widgetbook.WidgetbookComponent(
@@ -264,36 +302,6 @@ final directories = <_widgetbook.WidgetbookNode>[
           _widgetbook.WidgetbookUseCase(
             name: 'Normal',
             builder: _osms_widgetbook_use_cases_onboarding.onboardingNormal,
-          ),
-        ],
-      ),
-    ],
-  ),
-  _widgetbook.WidgetbookCategory(
-    name: 'Podcasts',
-    children: [
-      _widgetbook.WidgetbookComponent(
-        name: 'PodcastsScreen',
-        useCases: [
-          _widgetbook.WidgetbookUseCase(
-            name: 'Empty',
-            builder: _osms_widgetbook_use_cases_podcasts.podcastsEmpty,
-          ),
-          _widgetbook.WidgetbookUseCase(
-            name: 'Extreme content',
-            builder: _osms_widgetbook_use_cases_podcasts.podcastsExtreme,
-          ),
-          _widgetbook.WidgetbookUseCase(
-            name: 'Filtered to one show',
-            builder: _osms_widgetbook_use_cases_podcasts.podcastsFiltered,
-          ),
-          _widgetbook.WidgetbookUseCase(
-            name: 'Loading older episodes',
-            builder: _osms_widgetbook_use_cases_podcasts.podcastsLoadingMore,
-          ),
-          _widgetbook.WidgetbookUseCase(
-            name: 'Normal',
-            builder: _osms_widgetbook_use_cases_podcasts.podcastsNormal,
           ),
         ],
       ),

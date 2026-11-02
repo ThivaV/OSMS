@@ -178,6 +178,22 @@ class FakeApi extends ApiClient {
   @override
   Future<Briefing?> briefing({bool demo = false}) async => latestBriefing;
 
+  /// Earlier briefings, newest first; the demo's when signed out.
+  List<Briefing> readerBriefings = const [];
+  List<Briefing> demoBriefings = const [];
+
+  @override
+  Future<List<Briefing>> briefings({bool demo = false, int limit = 100}) async =>
+      (demo ? demoBriefings : readerBriefings).take(limit).toList();
+
+  /// Watchable videos; the demo's when signed out.
+  List<Video> readerVideos = const [];
+  List<Video> demoVideos = const [];
+
+  @override
+  Future<List<Video>> videos({bool demo = false, int limit = 100}) async =>
+      (demo ? demoVideos : readerVideos).take(limit).toList();
+
   /// Whether the reader's briefing is being made (a new reader's first one).
   bool briefingInTheMaking = false;
 
@@ -242,6 +258,10 @@ Future<(FakeAuth, FakeApi)> start(
   bool briefingMaking = false,
   List<Episode> readerEpisodes = const [],
   List<Episode> demoEpisodes = const [],
+  List<Briefing> readerBriefings = const [],
+  List<Briefing> demoBriefings = const [],
+  List<Video> readerVideos = const [],
+  List<Video> demoVideos = const [],
   List<FakePlayback>? players,
   String? at,
 }) async {
@@ -261,7 +281,11 @@ Future<(FakeAuth, FakeApi)> start(
     ..latestBriefing = briefing
     ..briefingInTheMaking = briefingMaking
     ..readerEpisodes = readerEpisodes
-    ..demoEpisodes = demoEpisodes;
+    ..demoEpisodes = demoEpisodes
+    ..readerBriefings = readerBriefings
+    ..demoBriefings = demoBriefings
+    ..readerVideos = readerVideos
+    ..demoVideos = demoVideos;
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

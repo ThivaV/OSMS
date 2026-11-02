@@ -264,3 +264,20 @@ def make(
 def latest(db: Session, user_id: str | None) -> Briefing | None:
     where = Briefing.user_id.is_(None) if user_id is None else Briefing.user_id == user_id
     return db.scalar(select(Briefing).where(where, Briefing.audio_path.is_not(None)).order_by(Briefing.id.desc()).limit(1))
+
+
+#: Past briefings per response unless asked for fewer: daily rows stay small.
+MAX_HISTORY = 100
+
+
+def history(db: Session, user_id: str | None, limit: int) -> list[Briefing]:
+    """The reader's own earlier briefings (or the demo's), newest first. Only
+    rows with audio: a briefing whose recording is gone drops out like latest
+    does, instead of offering a dead Play button."""
+    where = Briefing.user_id.is_(None) if user_id is None else Briefing.user_id == user_id
+    page_size = min(max(limit, 1), MAX_HISTORY)
+    return list(
+        db.scalars(
+            select(Briefing).where(where, Briefing.audio_path.is_not(None)).order_by(Briefing.id.desc()).limit(page_size)
+        )
+    )
