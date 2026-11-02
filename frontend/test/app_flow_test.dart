@@ -131,6 +131,36 @@ void main() {
     expect(find.text('Your first briefing is being made'), findsNothing);
   });
 
+  testWidgets('the sidebar files sources in topic folders that open, close and narrow the list', (tester) async {
+    final semantics = tester.ensureSemantics();
+    const blog = Source(id: '9', name: 'A blog no topic suggests', type: SourceType.feed, language: 'en');
+    await start(
+      tester,
+      auth: FakeAuth(signedIn: true),
+      onboarded: true,
+      subscriptions: const [FakeApi.arxiv, FakeApi.nordic, blog],
+      readerStories: [sample.cellcycle, sample.kestrel],
+    );
+    // AI research is followed; Startups and product holds a source; the rest is other.
+    for (final shown in ['AI research', 'arXiv cs.CL', 'Startups and product', 'Nordic Startup Wire', 'Other sources']) {
+      expect(find.text(shown), findsWidgets, reason: shown);
+    }
+    expect(find.text(blog.name), findsOneWidget);
+    expect(find.text('Topics'), findsNothing, reason: 'topics are the folders now, not a second list');
+
+    await tester.tap(find.bySemanticsLabel('Hide Startups and product sources'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nordic Startup Wire'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('1 source')), findsOneWidget, reason: 'a closed folder says what it holds');
+
+    expect(find.text(sample.kestrel.title), findsWidgets);
+    await tapText(tester, 'Startups and product');
+    expect(find.text('Nordic Startup Wire'), findsOneWidget, reason: 'selecting a folder opens it');
+    expect(find.text(sample.cellcycle.title), findsWidgets, reason: 'its stories');
+    expect(find.text(sample.kestrel.title), findsNothing, reason: 'and only its stories');
+    semantics.dispose();
+  });
+
   testWidgets('a returning reader lands on Today and never sees sign-in', (tester) async {
     await start(tester, auth: FakeAuth(signedIn: true), onboarded: true);
     expect(find.text('Your stories will appear here'), findsWidgets);

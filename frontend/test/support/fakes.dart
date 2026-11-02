@@ -68,6 +68,7 @@ class FakeApi extends ApiClient {
     Topic(id: 'startups', name: 'Startups and product', description: 'Funding, launches'),
   ];
   static const arxiv = Source(id: '1', name: 'arXiv cs.CL', type: SourceType.arxiv, language: 'en');
+  static const nordic = Source(id: '2', name: 'Nordic Startup Wire', type: SourceType.feed, language: 'da');
 
   Account get _account => Account(
     user: const User(id: 'ada', displayName: 'Ada Rowan', email: 'ada@users.example', language: 'en'),
@@ -81,7 +82,10 @@ class FakeApi extends ApiClient {
   Future<OnboardingOptions> onboardingOptions() async => const OnboardingOptions(
     languages: [AppLanguage(code: 'en', nativeName: 'English', englishName: 'English')],
     topics: topics,
-    suggestions: [SourceSuggestion(source: arxiv, topicId: 'ai-research', kind: ItemKind.paper)],
+    suggestions: [
+      SourceSuggestion(source: arxiv, topicId: 'ai-research', kind: ItemKind.paper),
+      SourceSuggestion(source: nordic, topicId: 'startups', kind: ItemKind.article),
+    ],
   );
 
   @override

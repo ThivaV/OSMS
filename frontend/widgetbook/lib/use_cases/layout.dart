@@ -220,6 +220,7 @@ class _ShellState extends State<_Shell> {
       sidebar: SourcesSidebar(
         topics: fx.topics,
         sources: widget.sources,
+        suggestions: fx.suggestions,
         interests: interests,
         user: _user,
         onSignIn: _openSignIn,
@@ -270,6 +271,7 @@ class _ShellState extends State<_Shell> {
         3 => SourcesSidebar(
           topics: fx.topics,
           sources: widget.sources,
+          suggestions: fx.suggestions,
           interests: interests,
           user: _user,
           onSignIn: _openSignIn,

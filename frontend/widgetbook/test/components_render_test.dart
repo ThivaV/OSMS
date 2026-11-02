@@ -185,7 +185,14 @@ Widget _shell(
   User? user,
   List<ResearchInterest> interests = const [],
 }) => ThreePaneLayout(
-  sidebar: SourcesSidebar(topics: fx.topics, sources: sources, interests: interests, briefing: briefing, user: user),
+  sidebar: SourcesSidebar(
+    topics: fx.topics,
+    sources: sources,
+    suggestions: fx.suggestions,
+    interests: interests,
+    briefing: briefing,
+    user: user,
+  ),
   list: StoryList(
     stories: stories,
     selectedId: selected,
@@ -258,6 +265,7 @@ final Map<String, Widget Function()> _screens = {
       sidebar: SourcesSidebar(
         topics: fx.topics,
         sources: fx.followedSources,
+        suggestions: fx.suggestions,
         interests: fx.interests,
         user: fx.user,
         onSearch: () {},

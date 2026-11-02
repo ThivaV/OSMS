@@ -272,12 +272,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             for (final story in view.stories)
               for (final source in story.sources) source.id: source,
           }.values.toList();
-    final demoTopics = view.samples
-        ? sample.topics
-        : (ref.watch(onboardingOptionsProvider).value?.topics ?? const <Topic>[]);
-    final navTopics = account?.topics ?? demoTopics;
+    // Every topic and the sources each suggests: the sidebar files each source in its
+    // topic's folder. The demo follows them all.
+    final options = ref.watch(onboardingOptionsProvider).value;
+    final allTopics = view.samples ? sample.topics : (options?.topics ?? const <Topic>[]);
+    final suggestions = view.samples ? sample.suggestions : (options?.suggestions ?? const <SourceSuggestion>[]);
+    final navTopics = account?.topics ?? allTopics;
     final navSources = account?.subscriptions ?? demoSources;
-    final stories = _visibleStories(view.stories, navTopics);
+    // A folder can be a topic the reader doesn't follow; selecting it still narrows the list.
+    final listTopics = [...navTopics, ...allTopics.where((t) => !navTopics.any((n) => n.id == t.id))];
+    final stories = _visibleStories(view.stories, listTopics);
     final saved = _nav == 'saved';
     final story = stories.where((s) => s.id == _selected).firstOrNull;
     final layout = _layout ?? account?.defaultLayout ?? StoryCardLayout.row;
@@ -308,6 +312,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     SourcesSidebar sidebar({bool withSearch = true}) => SourcesSidebar(
       topics: navTopics,
       sources: navSources,
+      allTopics: allTopics,
+      suggestions: suggestions,
       interests: account?.interests ?? const [],
       briefing: withSearch ? briefing : null,
       user: user,
@@ -324,7 +330,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       sidebar: sidebar(),
       list: StoryList(
         stories: stories,
-        title: _navTitle(navTopics, navSources),
+        title: _navTitle(listTopics, navSources),
         selectedId: _selected,
         layout: layout,
         bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,

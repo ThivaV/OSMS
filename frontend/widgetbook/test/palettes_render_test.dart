@@ -18,7 +18,13 @@ const _sizes = {'phone': Size(390, 844), 'tablet': Size(834, 1112), 'desktop': S
 
 final Map<String, Widget Function()> _screens = {
   'shell': () => ThreePaneLayout(
-    sidebar: SourcesSidebar(topics: fx.topics, sources: fx.followedSources, briefing: fx.briefing, user: fx.user),
+    sidebar: SourcesSidebar(
+      topics: fx.topics,
+      sources: fx.followedSources,
+      suggestions: fx.suggestions,
+      briefing: fx.briefing,
+      user: fx.user,
+    ),
     list: StoryList(stories: fx.stories, selectedId: fx.halcyon.id, onLayoutChanged: (_) {}),
     detail: StoryDetailView(story: fx.halcyon),
     onBack: () {},
