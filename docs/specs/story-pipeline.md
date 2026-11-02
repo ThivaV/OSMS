@@ -23,9 +23,15 @@ and illustrations.
   SQLite's write lock across a model call: the decision log writes on its own connection.
   - `fetch-source`: conditional GET (ETag/Last-Modified), per-host gaps (3 s for arXiv),
     every redirect and resolved address re-checked, 5 MB cap; RSS, Atom and JSON Feed to
-    plain-text excerpts (never full articles); new or changed items saved first. The
+    plain-text excerpts (never full articles); new or changed items saved first, each with
+    its own picture as a link (media:content, an image enclosure, an `<img>`, a thumbnail
+    last; https only, never a tracking pixel). The
     source is rescheduled: half its usual gap (5 min–6 h, ±10%), arXiv daily after
     05:15 UTC, errors doubling up to a day.
+  - `preview-image` (since Nov 2): a new article whose feed gives no picture, or only a
+    thumbnail, gets its page's link-preview image (`og:image`, `twitter:image`) where
+    robots.txt allows; the page is read only as far as `</head>` and dropped. One picture
+    on several of a source's articles is the site's own and goes to none.
   - `process-item`: the triage agent (Muse Glimmer; unsure items to Muse Spark; the word
     list without them, and as a rule-3 tripwire): rule 3, noise, language, names. Dropped
     items keep their reason.
@@ -37,16 +43,19 @@ and illustrations.
 - **Tables** (migration `0003`): `items`, `jobs`, `stories`, `story_summaries`, `claims`
   (dated history: corrections supersede, nothing is overwritten), `disagreements`,
   `read_state`; fetch state on `sources`. Later: `0004` briefings, `0005` each agent
-  run's subject, `0006` interest searches and matches, `0007` story illustrations.
+  run's subject, `0006` interest searches and matches, `0007` story illustrations, `0008` item pictures
+  (`items.image_url`).
 - **API:** `GET /stories`, `GET /stories/{id}`, `POST /stories/{id}/read` (signed in);
   `GET /demo/stories`, `GET /demo/stories/{id}` (public, the seed sources). Since Oct 31:
   `.../ask` (`docs/specs/ask-story.md`), `.../decisions` (How OSMS decided), and
-  `GET /visuals/{name}` for illustrations.
+  `GET /visuals/{name}` for illustrations. Since Nov 2 a story carries `image`: its newest
+  report's picture (url, source, link; `small` for a thumbnail by its address).
 - **App:** Today reads the API (refreshing every minute and when the app comes back to
   the front); signed out, real demo stories replace the samples once they exist. The story
   page shows each fact's quote in its language with "Translated by OSMS", "One source so
   far", corrections struck through, links to the original articles, and why the story is
-  in the list.
+  in the list. Story art is the source's picture (credited "Image: <source>"; a thumbnail
+  only in list rows), else the illustration, else the drawn art.
 
 ## Rules
 

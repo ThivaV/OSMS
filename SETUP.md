@@ -42,7 +42,7 @@ triages.
    |---|---|---|
    | `META_API_KEY` | facts, summaries, Ask, the briefing, illustrations | stories still form, titled by their first headline, with no facts |
    | `BASETEN_API_KEY`, `BASETEN_BASE_URL` | the judge on Muse Spark Open | Muse Spark judges instead |
-   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Continue with Google | sign in with an email link from the sign-in log |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google | sign in with an email link from the sign-in log |
 
 3. **Muse Glimmer, once** (skip it to triage with the word list). Start Ollama, either in
    its own terminal or as part of `make up`, then download the model:
@@ -98,7 +98,7 @@ make app                  # 5. the web app in Chrome, http://localhost:8080
 - **The order matters a little.** The worker checks for Muse Glimmer when it starts:
   started before Ollama (or before the model is downloaded), it triages with the word
   list until you restart it. The app needs sign-in and the API to sign in; without them
-  it shows the demo and says sign-in is unavailable.
+  its start page says sign-in is unavailable (the demo is at http://localhost:8080/#/demo).
 - **Other ways to run the app:** `make app DEVICE=macos` (the desktop app, needs Xcode)
   or `make app DEVICE=web-server` (a local web server, no browser opened). The web app
   always uses port 8080: sign-in only trusts the origins it knows.
@@ -164,8 +164,9 @@ make build-macos        # a release build: frontend/build/macos/Build/Products/R
 make test-macos         # with make up running: the real app end to end, and its briefing audio
 ```
 
-On the desktop, **Continue with Google** opens your default browser and brings you back
-signed in. Email links work in the web app only.
+On the desktop, **Sign in with Google** opens your default browser and brings you back
+signed in; when that browser is already signed in to OSMS, it only asks **Continue as
+<you>**. Email links work in the web app only.
 
 ## Checks
 

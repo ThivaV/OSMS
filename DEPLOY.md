@@ -7,7 +7,8 @@ deploys `main` when the tests pass. Running OSMS on your Mac is in [SETUP.md](SE
 
 | | Where |
 |---|---|
-| The web app | `https://app.<name>.duckdns.org` |
+| The web app | `https://app.<name>.duckdns.org` (signed out: sign in or create an account) |
+| The demo, without signing in | `https://app.<name>.duckdns.org/#/demo` (linked from nowhere on the start page) |
 | Sign-in | `https://auth.<name>.duckdns.org` |
 | The API | `https://api.<name>.duckdns.org` |
 | The server | one Compute Engine VM, `e2-highmem-4` (4 vCPU, 32 GB), `europe-north1` (Finland), Ubuntu 24.04, 100 GB disk |
@@ -142,7 +143,8 @@ anyone signed in to the project can run.
 - **No keys in GitHub.** GitHub Actions signs in to Google Cloud with Workload Identity
   Federation, as the `osms-deploy` account, and only from `main` of this repo.
 - **During judging**, to deploy only by hand: `gh variable set DEPLOY_ON_PUSH --body false`.
-  Pushes are still tested; run `deploy` from the Actions tab when you mean it.
+  Pushes are still tested; run `deploy` from the Actions tab when you mean it. Judges who
+  won't sign in with Google: `https://app.<name>.duckdns.org/#/demo`.
 
 ## The macOS app
 
@@ -154,8 +156,9 @@ deploy from your Mac; to build it alone:
 make build-macos-prod      # frontend/build/macos/Build/Products/Release/OSMS.app
 ```
 
-**Continue with Google** opens your browser at the deployed sign-in and hands the session
-back to the app. Email sign-in links are off in production.
+**Sign in with Google** opens your browser at the deployed sign-in and hands the session
+back to the app; when that browser is already signed in to OSMS (the web app), it only
+asks **Continue as <you>**, no Google. Email sign-in links are off in production.
 
 ## Running it
 
@@ -189,5 +192,8 @@ make deploy                        # deploy what is committed, and build the mac
 - The services run as the unprivileged `osms` user, and can write only to
   `/var/lib/osms`.
 - `make seed-server` refuses to send a copy that still holds reader data.
+- Story pictures are shown from their publishers, never copied. For an article whose feed
+  gives none, the worker reads its page only as far as `</head>`, for its link-preview
+  image, and only where the site's robots.txt allows OSMS.
 - The speech models' weights are CC-BY-NC 4.0: fine for the hackathon demo, never sell
   the audio.

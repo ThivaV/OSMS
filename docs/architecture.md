@@ -77,7 +77,7 @@ sequenceDiagram
     participant G as Google
     participant P as OSMS API
 
-    R->>A: Continue with Google
+    R->>A: Sign in with Google (or Sign up)
     A->>S: start Google sign-in
     S-->>R: go to Google
     R->>G: sign in, share email and profile
@@ -99,7 +99,10 @@ sequenceDiagram
   `127.0.0.1` for the answer (the loopback redirect of RFC 8252). The sign-in service
   sends the browser back there with a one-time token (three minutes, used once, only for
   a sign-in that browser started); the app checks its random state, trades the token
-  for a session token, keeps it in the Keychain and sends it as a bearer token.
+  for a session token, keeps it in the Keychain and sends it as a bearer token. When the
+  browser is already signed in to OSMS, the sign-in service shows its own **Continue as
+  <name>** page instead of Google: one click (a POST from that page, its origin checked)
+  hands the session over.
 - **Local development:** with `OSMS_DEV_SIGN_IN=1`, the sign-in page also offers an
   email link, printed in the sign-in log instead of emailed. Refused in production.
 - **The API** takes the reader's id only from the token's `sub`, and every query on a
@@ -182,13 +185,16 @@ flowchart TB
 - **The scheduler** checks every source at least one reader follows, each on its own
   schedule, and fetches a new subscription straight away (see *Staying up to date*).
 - **The fetcher** uses conditional requests, per-host rate limits and backs off on
-  `429`. It only follows public http(s) links, re-checked after every redirect.
+  `429`. It only follows public http(s) links, re-checked after every redirect. An article
+  page is read only as far as `</head>`, for its link-preview image, and only where
+  robots.txt allows.
 - **One adapter per source type** turns feeds, papers, posts, videos, episodes and
   newsletters into the same `Item`: source, kind, title, text, link, time, language, media
   links. A paper also carries its authors, categories, arXiv id and version.
 - **Podcasts** are the only media we download, and only to transcribe them with Muse Voice
   Transcribe, biased towards the source's and story's names; the audio is deleted
-  afterwards. Images and videos stay where they are, and no model sees them.
+  afterwards. Images and videos stay where they are, and no model sees them: a story
+  shows its newest report's picture from the publisher, credited and linking back.
 
 ### Staying up to date
 
@@ -548,7 +554,7 @@ flowchart LR
 | **Muse Spark Open** | Open weights on Baseten | The judge: same event or not? Backup for claims and verifier |
 | **Muse Glimmer 30B** | Open weights: Ollama locally; a GPU or hosted provider when deployed | The triage agent, on every item |
 | **Muse Wonder** | Meta Model API | The editor, if the agent task set favours it; Harness²'s proposer |
-| **Muse Image** | Meta Model API | One illustration per story, in one house style |
+| **Muse Image** | Meta Model API | An illustration for a story no source has a picture for, in one house style |
 | **SAM 3.1** | Meta Model API | Checks each illustration for people, faces, logos and text; crops it around its subject |
 | **Muse Voice Transcribe** | Meta Model API | Podcast episodes; checks the briefing audio against its script |
 | **Muse Code** | CLI | A coding agent for parts of the build (listed in the README) |
@@ -569,7 +575,8 @@ flowchart LR
   faces, logos and text; a flagged illustration is redrawn once, then the card keeps the
   drawn art. Every illustration is labelled as one.
 - **Not used:** web search grounding, arXiv PDFs, YouTube video, and third-party images
-  (charts in newsletters, source thumbnails) unless the author decides otherwise.
+  as model input (charts in newsletters, source thumbnails) unless the author decides
+  otherwise. Stories show their sources' pictures to readers, never to a model.
   Contributor variants run only on public fixtures.
 
 Meta Model API has no text-to-speech model, so the briefing audio uses Meta's open

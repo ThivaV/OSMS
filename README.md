@@ -77,6 +77,19 @@ Oct 27 – Nov 4, 2026.
   the API and the worker, the databases on its disk with nightly snapshots; GitHub
   Actions tests every push and deploys `main` when the tests pass, keyless. See
   [DEPLOY.md](DEPLOY.md).
+- [x] **From testing the deployed apps (Nov 2):**
+  - **Sign-in and sign-up are the start page**, on the web and the Mac: two tabs, nothing
+    else. The demo, without signing in: https://app.onestory-osms.duckdns.org/#/demo.
+  - **Single sign-on for the Mac app:** a browser already signed in to OSMS hands its
+    session over with one click (**Continue as <you>**), no Google again. Setting up once
+    is enough on any device.
+  - **The briefing, sooner:** a new reader's first one is made right after onboarding,
+    Today says it's on its way, and a story's **Listen** plays its chapter.
+  - **Sources in topic folders** in the sidebar.
+  - **Story pictures from the sources:** each story shows its newest report's own picture,
+    from its feed or the article's link-preview image (where robots.txt allows), credited
+    and linking back, never copied; Muse Image's illustration where none has one.
+  - **The OSMS logo** on the Mac app, the web app and inside both.
 - [ ] Still to do: related-by-meaning papers, adding sources from the app, the language
   toggle, podcasts, the editor's review loop and the Muse Wonder trial (see AGENTS.md,
   *Build plan*).
@@ -88,7 +101,7 @@ Oct 27 – Nov 4, 2026.
 | Impact | One story, not ten summaries: `StoryCard`, `WhatsNewSection`, `DisagreementPanel`, `TodayOverview` |
 | Meta AI tooling | Table below; agents in `backend/app/agent/`, routing in `backend/app/config.py` |
 | Technical depth | Clustering + eval in `eval/`, decision log (`agent_runs`, `agent_steps`), `docs/architecture.md` |
-| Demo | 3-min video + `make widgetbook` catalogue + clickable shell (`[Layout]` → shell use cases) |
+| Demo | 3-min video + the live site (https://app.onestory-osms.duckdns.org; without signing in, `/#/demo`) + `make widgetbook` catalogue + clickable shell (`[Layout]` → shell use cases) |
 
 ## Which Meta models do what
 
@@ -101,7 +114,7 @@ output before a reader sees it.
 | Muse Spark Open (open weights; Fireworks, or Baseten) | The judge: are two items about the same event? | On Fireworks when deployed; Muse Spark judges where neither is set up |
 | Muse Glimmer (open weights) | Triage of every incoming item | In use locally (Ollama); deployed, Muse Spark triages, since Fireworks serves Glimmer only from a paid dedicated deployment |
 | Muse Wonder | The overnight editor, if our agent tests favour it | Not yet |
-| Muse Image | One illustration per story | In use, from three sources |
+| Muse Image | An illustration for a story no source has a picture for | In use, from three sources |
 | SAM 3.1 | Checks and crops each illustration | In use |
 | Muse Voice Transcribe | A check on the briefing audio; podcast episodes later | In use for the check (English, Tamil) |
 | SeamlessM4T v2 (open weights) | The briefing's voice in English and Danish | In use |
@@ -169,8 +182,8 @@ make app DEVICE=web-server  # the app as a local web server, no browser opened
 make widgetbook             # the component catalogue in Chrome
 ```
 
-The app needs `auth` and `api` running to sign in; without them it shows the demo and
-says sign-in is unavailable. Real stories need the `worker`: its first run fetches every
+The app needs `auth` and `api` running to sign in; without them its start page says
+sign-in is unavailable (the demo is at http://localhost:8080/#/demo). Real stories need the `worker`: its first run fetches every
 seed source and embeds the news with BGE-M3 (`make setup` installs it; the model, about
 2.3 GB, downloads on first use). For facts, disagreements and summaries, put
 `META_API_KEY` in `.env` (and `BASETEN_API_KEY` + `BASETEN_BASE_URL` for the judge on
@@ -191,8 +204,9 @@ make build-macos            # a release build: frontend/build/macos/Build/Produc
 make test-macos             # with make up running: the real app end to end, and its briefing audio (opens a window)
 ```
 
-On the desktop, sign in with **Continue with Google**: it opens your default browser,
-and when you're done the browser tab says so and OSMS comes back with you signed in.
+On the desktop, **Sign in with Google** opens your default browser, and when you're done
+the browser tab says so and OSMS comes back with you signed in. If that browser is already
+signed in to OSMS (the web app), it only asks **Continue as <you>**.
 Email links work in the web app only. If Google says the app is blocked, add your Google
 account as a test user on the OAuth consent screen.
 
@@ -233,10 +247,11 @@ already running). The first start takes a minute or two while Flutter compiles.
 - **With Google:** create an OAuth client (type *Web application*) in Google Cloud,
   with the redirect URI `http://localhost:3000/api/auth/callback/google`. Put its id and
   secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then restart
-  sign-in. **Continue with Google** appears on its own.
+  sign-in. **Sign in with Google** appears on its own.
 - The first sign-in creates your account and goes to onboarding; afterwards you land on
   Today. It stays empty until OSMS has collected stories from your sources; with no
-  sources, it offers **Choose topics and sources**. Signed out, the demo's stories are
+  sources, it offers **Choose topics and sources**. Signed out, the app opens on the
+  sign-in page; the demo (http://localhost:8080/#/demo) shows the seed sources' stories,
   labelled samples until OSMS starts collecting real ones.
 
 ### Stop and check what's running
@@ -272,6 +287,7 @@ make ci              # start everything with Tilt, wait until it is healthy, the
 ```bash
 make widgetbook-gen    # regenerate Widgetbook's navigation after adding a use case
 make widgetbook-build  # build Widgetbook as a static site (frontend/widgetbook/build/web)
+make icons             # redraw the app icons (macOS, web) from frontend/assets/brand, with Chrome
 make clean             # stop everything, remove build output and run files
 ```
 

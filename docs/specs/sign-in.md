@@ -17,16 +17,19 @@ research interests. "Delete my account" removes everything. Open source througho
 ## Outputs
 
 - **`auth/`**: Better Auth on Node, users and sessions in `data/auth.db`. Routes:
-  `/api/auth/*` (Better Auth), `/providers` (which methods are on), `/native/sign-in`
-  and `/native/done` (the macOS hand-off), `/health`.
+  `/api/auth/*` (Better Auth), `/providers` (which methods are on), `/native/sign-in`,
+  `/native/done` and `/native/continue` (the macOS hand-off: Google, or one click for a
+  browser already signed in), `/health`.
 - **`backend/`**: `GET /onboarding/options`, `GET /me`, `PUT /me/onboarding`,
   `PUT /me/interests`, `PATCH /me/settings`, `DELETE /me`, `GET /health`. Readers and
   their picks in `data/osms.db` (Alembic migration `0001`).
 - **`frontend/`**: the real app. Session and routing (Riverpod, go_router), sign-in,
   onboarding, Today, Settings, research interests, "What OSMS keeps". Signed in, only
   the reader's own stories: an empty Today until OSMS collects them, which with no
-  sources offers onboarding again to choose some. Signed out, the demo's invented sample
-  stories, under a banner that says so.
+  sources offers onboarding again to choose some. Signed out, the start page is sign-in
+  and sign-up (two tabs, nothing else; since Nov 2), and the demo, at `/demo` (`/#/demo` on
+  the web), shows the seed sources' stories (invented samples until real ones exist)
+  under a banner that says so.
 
 ## Rules
 
@@ -40,6 +43,12 @@ research interests. "Delete my account" removes everything. Open source througho
   hashed, minted only by the server after a real sign-in, sent only to
   `http://127.0.0.1:<port>/callback?state=<random>` (that exact shape), and only for a
   sign-in the same browser started (flow cookie). The app accepts only its own state.
+- A browser already signed in to OSMS gets the service's own **Continue as <name>** page
+  instead of Google: a POST from that page (origin checked; SameSite cookies; no framing;
+  Referrer-Policy `same-origin`, since `no-referrer` makes browsers send `Origin: null`),
+  tied to the same flow cookie. **Use another Google account** goes to Google.
+- Onboarding lives with the account: an open onboarding screen moves on when it is
+  finished on another device; a reader changing their picks stays put.
 - Development sign-in (`OSMS_DEV_SIGN_IN=1`) is refused in production; its links go to
   the local log, and the address never does.
 - CORS and redirects only for `OSMS_APP_ORIGINS`. Inputs are strict: known values,
@@ -52,14 +61,16 @@ research interests. "Delete my account" removes everything. Open source througho
 - `make check-auth`: the real auth server on an in-memory database. It covers which
   methods are on, CORS, API tokens verified against the published keys, signed bearer
   tokens only, the desktop hand-off (only to the app's loopback address, only for a
-  sign-in the browser started, once), no client-minted hand-off tokens, and unsafe
-  settings refused.
+  sign-in the browser started, once), the one-click page for a signed-in browser (and
+  nothing handed over for another site's form, no origin or an opaque one), no
+  client-minted hand-off tokens, and unsafe settings refused.
 - `make check-backend`: any token that isn't valid is refused (wrong audience, issuer,
   key or algorithm, expired, `none`); first sign-in creates the reader; onboarding,
   settings and interests saved and validated; one reader never sees another's data;
   deletion removes everything the reader owns and keeps shared sources.
-- `make check-flutter`: the app's flows against fake clients. They cover the demo
-  signed out (labelled samples), first sign-in to onboarding to an empty Today with no
+- `make check-flutter`: the app's flows against fake clients. They cover the start page
+  (two tabs, no examples) and the demo at `/demo` (labelled samples), onboarding finished
+  on another device, first sign-in to onboarding to an empty Today with no
   samples, skipping onboarding and choosing sources again from the empty Today, a
   returning reader, the dev email link, sign-in down, and "Delete my account". The macOS sign-in
   client against a real loopback listener and a fake browser: success, a stranger's
@@ -71,9 +82,9 @@ research interests. "Delete my account" removes everything. Open source througho
   onboards, reaches an empty Today and Settings, and deletes its account. Saves
   screenshots. Since Oct 31 the same target also plays a briefing in the real app
   (`integration_test/briefing_audio_test.dart`), one test file at a time.
-- By hand: `make up`, open http://localhost:8080, **Create an account**, then
-  **Email me a sign-in link** and open the link from the `auth` log. On macOS, **Continue
-  with Google** in the app.
+- By hand: `make up`, open http://localhost:8080, **Create account**, then **Email me a
+  sign-in link** and open the link from the `auth` log. On macOS, **Sign in with Google**
+  in the app (with the browser already signed in: **Continue as <you>**).
 
 ## Not yet
 

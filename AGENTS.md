@@ -113,7 +113,7 @@ editor drives the other models through tools (see *Agents*).
 | **Muse Spark Open** | Open weights, hosted on Baseten (`meta-models/muse-spark-open-1026`) or, deployed, on Fireworks (Baseten not activated, Nov 1) | The judge agent ("same event or not?"); backup for the claims and verifier agents when Meta Model API is down. Targets the Best Open Weight Build bonus. | The judge runs on its backup, Muse Spark (what runs until Baseten approves the account) |
 | **Muse Glimmer 30B** | Open weights (Apache 2.0): Ollama on the author's Mac; deployed, none yet (Fireworks has it only as a paid dedicated deployment), so Muse Spark triages there | The triage agent: every new item, before any other model sees it (Q4_K_M, 18 GB, about 5 s an item on the author's Mac; through Ollama's raw API, see *Runtime*) | A word list stands in: rule 3 rests on it and on source choice, and Muse Spark spends tokens on noise |
 | **Muse Wonder** (`muse-wonder-1.0`) | Meta Model API | Candidate model for the editor, which plans a long run and delegates to sub-agents; the agent task set decides. Harness²'s proposer. | The editor stays on Muse Spark |
-| **Muse Image** | Meta Model API (also fal, Runway, OpenRouter) | One illustration per story, in one house style anchored on OSMS's own reference images | Cards keep the drawn `StoryVisual` |
+| **Muse Image** | Meta Model API (also fal, Runway, OpenRouter) | An illustration for a story no source has a picture for (since Nov 2 a source's own picture comes first), in one house style anchored on OSMS's own reference images | Cards keep the source's picture or the drawn `StoryVisual` |
 | **SAM 3.1** (`sam-3.1`) | Meta Model API | Checks every illustration for people, faces, logos and text before anyone sees it, and finds its subject so each card shape crops around it | Illustrations can't ship: the check is required |
 | **Muse Voice Transcribe** (`muse-voice-transcribe-1.0`) | Meta Model API | Podcast episodes, biased towards the source's and story's names; and a check on every briefing, transcribed back and compared with its script. English and Tamil, not Danish (Danish chapters: SeamlessM4T v2's own speech recognition, a weaker check — **the author decides**) | Podcasts can't join stories; a garbled briefing goes out unnoticed |
 | **Muse Code** | CLI on macOS, powered by Muse Spark | Building parts of OSMS from the specs in `docs/specs/`; the README lists which parts | – |
@@ -253,8 +253,8 @@ checks every generated output before a reader sees it.
 
 Single-purpose model steps, called from plain code: **Muse Voice Transcribe** turns podcast
 episodes into text and checks the briefing audio; **Muse Image** draws a story's
-illustration when the story first has three sources (tunable); **SAM 3.1** checks and
-crops each illustration.
+illustration when the story first has three sources (tunable), shown only where no report
+has a picture of its own; **SAM 3.1** checks and crops each illustration.
 
 The triage, judge, claims and verifier agents run as items arrive, so the app only ever
 shows verified facts; the writer then updates the story's title and summary. The interest
@@ -417,7 +417,8 @@ A single box accepts any of these:
   autodiscovery on the results. Needs a search API: ask before adding one; its key goes in
   the secret store.
 - **An OPML file** exported from another reader → preview, de-duplicate against existing
-  sources, keep its folders (stored now; the folders UI is post-hackathon).
+  sources, keep its folders (stored now; the sidebar's folders are the onboarding topics, and
+  folders of your own are post-hackathon).
 
 Before subscribing, show what was found: source type, title, language and the latest few
 items. Subscribing adds the source to the user's account (see *Accounts*).
@@ -669,22 +670,34 @@ projects, and it can hand a session to a native app, which NextAuth can't.
   there with a one-time token; the app checks the state, trades the token for a session
   token, keeps that in the Keychain and sends it as a bearer token. (Apple's sign-in
   window, ASWebAuthenticationSession, was dropped: it has an open, unfixed failure when
-  Chrome is the default browser.)
+  Chrome is the default browser.) **Single sign-on (Nov 2):** when that browser is already
+  signed in to OSMS (the web app), the sign-in service shows its own one-click **Continue
+  as <name>** page instead of Google: a POST from that page (`/native/continue`; its
+  origin checked, SameSite cookies, no framing, Referrer-Policy `same-origin`, since
+  `no-referrer` makes browsers send `Origin: null`), tied to the same flow cookie. **Use
+  another Google account** goes to Google.
 - **Development sign-in:** with `OSMS_DEV_SIGN_IN=1` (local only; refused in
   production), the sign-in page also offers an email link, printed in the auth log
   instead of emailed, so the whole flow runs without Google keys.
 - **Google keys:** an OAuth client from Google Cloud with redirect URI
   `<BETTER_AUTH_URL>/api/auth/callback/google`. Its id and secret go in `.env` (the secret
   store when deployed). Without them Google sign-in is off and the page says so.
-- **One page signs in and signs up.** The first sign-in creates the account and goes to
-  onboarding; returning readers go to Today. "Create an account" and "Sign in" only
-  change the wording, never the flow.
+- **One page signs in and signs up, and it is the start.** Signed out, `/` (the web app
+  and the Mac app's first screen) is the sign-in page: two tabs, **Sign in** ("Sign in with
+  Google") and **Create account** ("Sign up with Google"), and nothing else: no examples,
+  no demo button (the author's call, Nov 2). Either tab signs a returning reader in or
+  creates the account; the first sign-in goes to onboarding, returning readers to Today.
+  `/sign-in` forwards to `/`, and `/?intent=create` (on the web `/#/?intent=create`) opens
+  the second tab.
+- **Set up once, on any device.** Onboarding lives with the account: a device whose
+  onboarding screen is open moves on to Today when it is finished on another (the app
+  re-reads `/me` every 10 s and on coming back). A reader changing their picks stays put.
 - **Use each provider's official button and mark**, following its branding guidelines
   (Google's sign-in rules in particular). Widgetbook shows a placeholder mark; never
   draw an imitation of a provider's logo.
-- **Signed-out visitors get the demo account**, read-only: the seed sources and their
-  stories. Judges can try OSMS without an account; signing in is only needed to choose
-  your own sources.
+- **The demo account** stays, read-only, at `/demo` (on the web `/#/demo`, linked from
+  nowhere on the start page): the seed sources and their stories, so judges can try OSMS
+  without an account. Signing in is only needed to choose your own sources.
 - Before judging, check that any Google account can sign in: a consent screen left in
   testing mode admits only listed test users.
 - **The macOS app:** macOS 12 or later; sandboxed, allowed outgoing connections and a
@@ -838,7 +851,8 @@ count-free timeline with what's-new signals, add-source sheet, the research inte
 editor, item cards for articles, papers, episodes, posts and videos, sign-in and
 onboarding, and the OSMS-only components.
 **Post-hackathon:** more view modes, rules, keyboard shortcuts, share extension,
-folders, photo and comic cards.
+folders of your own (since Nov 2 the sidebar files sources in topic folders), photo and
+comic cards.
 
 ---
 
@@ -919,13 +933,14 @@ osms/
 │   ├── src/
 │   │   ├── config.ts          # settings from .env; refuses dev sign-in in production
 │   │   ├── auth.ts            # Google, sessions in data/auth.db, API tokens (JWT + JWKS)
-│   │   ├── server.ts          # /api/auth/*, /providers, the desktop hand-off (/native/*)
+│   │   ├── server.ts          # /api/auth/*, /providers, the desktop hand-off (/native/*: Google, or one click)
 │   │   └── main.ts
 │   ├── scripts/dev-session.sh # development only: a test reader's session, for make test-macos
 │   └── test/                  # the real server on an in-memory database
 │
 ├── frontend/                  # ONE Flutter project for all platforms
 │   ├── pubspec.yaml
+│   ├── assets/brand/          # the OSMS logo: SVGs and render.mjs (`make icons` redraws the app icons)
 │   ├── android/ ios/ macos/ windows/ web/   # generated by Flutter
 │   ├── lib/
 │   │   ├── main.dart
@@ -947,7 +962,7 @@ osms/
 │   │   │   ├── briefing/      # audio briefing player
 │   │   │   ├── sources/       # add (link, handle, OPML), manage sources, interests_editor.dart
 │   │   │   └── settings/      # language (EN/DA/TA), theme, view mode, delete account
-│   │   ├── shared/widgets/    # StoryCard, ItemCard, SourceChip, WhatsNewSection, SourceQuote, DecisionLogSection, ...
+│   │   ├── shared/widgets/    # StoryCard, StoryVisual, OsmsLogo, ItemCard, SourceChip, WhatsNewSection, SourceQuote, DecisionLogSection, ...
 │   │   └── sample/            # FAKE stories, sources, people (invented, .example), for
 │   │                          # Widgetbook, tests, and the signed-out demo's labelled samples
 │   ├── test/                  # palettes' contrast, the sign-in and onboarding flows
@@ -969,7 +984,7 @@ osms/
 │   │   ├── worker.py          # the story pipeline's process: schedule, queue, agents (`make worker`)
 │   │   ├── config.py          # reads env vars; model routing: agent → model id, endpoint, backup
 │   │   ├── auth/              # tokens.py: verify Better Auth's JWTs against its JWKS
-│   │   ├── api/               # routes: me (onboarding, interests, suggestions, research, settings), stories (+ demo, ask, decisions, illustrations), briefings (+ sources later)
+│   │   ├── api/               # routes: me (onboarding, interests, suggestions, research, settings), stories (+ demo, ask, decisions, illustrations; each with its source's picture), briefings (+ making; sources later)
 │   │   ├── schemas/           # Pydantic models: strict inputs, capped sizes
 │   │   ├── db/
 │   │   │   ├── models.py      # readers and picks; items, jobs, stories, claims (dated history), read state, briefings, interest matches
@@ -982,12 +997,13 @@ osms/
 │   │   │   ├── ingestion/     # one pipeline for every source type
 │   │   │   │   ├── scheduler.py   # fetch what someone follows; new subscriptions at once
 │   │   │   │   ├── fetcher.py     # polite HTTP; every redirect and resolved address re-checked
+│   │   │   │   ├── robots.py      # robots.txt, for article pages (read only for their preview image)
 │   │   │   │   ├── safety.py      # link safety (no network) and untrusted OPML
 │   │   │   │   ├── discovery.py   # link or handle → source type + feed URL
 │   │   │   │   ├── opml.py        # OPML import (also loads onboarding topics)
 │   │   │   │   ├── connections.py # platform OAuth, encrypted tokens (post-hackathon)
-│   │   │   │   └── adapters/      # one file per source type: feed, arxiv, youtube, mastodon, ...
-│   │   │   ├── pipeline.py    # the jobs: fetch → process → index and cluster → claims → write
+│   │   │   │   └── adapters/      # one file per source type: feed, arxiv, youtube, mastodon, ...; page.py: an article's preview image
+│   │   │   ├── pipeline.py    # the jobs: fetch (+ an article's preview image) → process → index and cluster → claims → write
 │   │   │   ├── jobs.py        # the queue in SQLite: deduped, retried, safe across restarts
 │   │   │   ├── interests.py   # research interests: arXiv searches, backfill, matches by their words
 │   │   │   ├── interest_agent.py # the interest agent: related terms, categories, rule-3 flags
@@ -1082,9 +1098,9 @@ usage reporting is switched off in `widgetbook/build.yaml`; keep it off.
    was found before subscribing.
 10. `Onboarding` — language, topic and kind pickers, research on arXiv (when a research
     topic is picked), then suggested sources (all ticked; untick to drop).
-11. `SignInPage` — sign in and create account on one page (provider buttons, "Look
-    around the demo first", link to what OSMS keeps); signing-in, error and
-    sign-in-unavailable states.
+11. `SignInPage` — the signed-out start page: the OSMS mark and name, two tabs (Sign in,
+    Create account) over the provider buttons, and a link to what OSMS keeps; nothing else.
+    Signing-in, error and sign-in-unavailable states.
 12. `WhatWeKeepPage` — the short privacy page linked from sign-in.
 13. `AccountRow` and `DemoBanner` — the account at the foot of the sidebar, and the
     signed-out banner above the story list, which says the demo's stories are invented
@@ -1162,10 +1178,14 @@ readable line length (~65–75 characters) in the reading view.
   Saved, Sources) with the mini player above it. ⌘K / Ctrl+K opens the command palette.
 - **Citations:** each summary sentence ends with publisher-first source chips (name and
   format glyph), never bare numbers.
-- **Story art:** `StoryVisual` draws one thread per source converging into one story
-  thread. Renders of it are Muse Image's style references, and it stays the fallback
-  whenever an illustration is missing or fails its SAM 3.1 check. Muse Image
-  illustrations carry a small "Illustration" label.
+- **Story art:** a source's own picture first (the newest report's, from its feed or its
+  article's link preview; credited "Image: <source>", linking back; a thumbnail only in
+  list rows), else Muse Image's illustration, else `StoryVisual`, which draws one thread
+  per source converging into one story thread. Renders of it are Muse Image's style
+  references, and it stands in while a picture loads and whenever one is missing or fails.
+  Muse Image illustrations carry a small "Illustration" label.
+- **Logo:** the same thread art as a mark (four source threads into one story thread, on
+  ink), in `frontend/assets/brand/`; the app draws it with `OsmsLogo`.
 
 ---
 
@@ -1181,7 +1201,7 @@ readable line length (~65–75 characters) in the reading view.
 | 5 | Oct 31 | **Built Oct 30:** BGE-M3 → Milvus Lite (embedded in the worker; since Oct 31 its own child process), each item saved first and indexed by a job that retries; incremental clustering with the Oct 30 rule (provisional thresholds in `services/clustering.py`, yours to set with the eval); the judge agent (Muse Spark Open, Muse Spark as backup); the model client and routing table with backups and the route check at startup; `make eval` exports predictions. **Needs:** your labels for the first eval numbers; `META_API_KEY` (and Baseten for the judge) for real model calls |
 | 6 | Nov 1 | **Built Oct 30:** claims agent (each claim with its quote in the source's language, an English translation, and the model and prompt version) and verifier agent (relations new, repeat, corrects, conflicts; unsure cases at maximum effort); the dated story history; what's new per reader, disagreements, corrections in the timeline; writer agent: titles and cited summaries; the stories API (`/stories`, `/demo/stories`, read state) and the app wired to it (quotes with labelled translations, "One source so far", corrections struck through, links to originals). **Still to do:** the agent task set in `eval/agents/` |
 | 7 | Nov 2 | **Built Oct 31:** the triage agent (Muse Glimmer through Ollama, names and language included; unsure items to Muse Spark; the word list as fallback and tripwire). The morning briefing (editor picks, writer scripts with every sentence cited, SeamlessM4T v2 and MMS-TTS voice it, Muse Voice Transcribe checks every chapter, one signed audio file, `GET /briefings/latest` and `/demo/briefing`, the app plays it; daily from 06:00 UTC and **Make briefing now**; spec `docs/specs/morning-briefing.md`). Papers v1 (each research interest one shared arXiv search, fetched daily with a 30-day backfill; new papers matched to readers by their words, the reason kept; `GET /me/research` and "New research for you"; spec `docs/specs/arxiv-interests.md`). Illustrations (Muse Image in the house style with a motif from OSMS's own summary title; SAM 3.1 checks for people, faces, logos and text, one redraw without the motif, then the drawn art; cropped around the bright thread; from three sources; served as `/visuals/<name>.webp`, labelled in the app). The interest agent (Muse Spark, no backup, keywords redacted from the log): related terms, categories and rule-3 flags as the reader types (`POST /me/interests/suggest`), its suggestions also run past the rule-3 word list. **Still to do:** related-by-meaning paper matches; paper examples in the eval; the editor's review loop and Muse Spark vs Muse Wonder (the task set decides); renders of `StoryVisual` as Muse Image's style references; Google consent screen for any Google account; Google sign-in on the macOS app checked by hand |
-| 8 | Nov 3 | **Built Nov 1:** deployment and CI/CD: one Google Cloud VM (web app, sign-in, API, worker; the databases on its disk, nightly snapshots), Fireworks for Muse Spark Open (Muse Glimmer isn't serverless there, so Muse Spark triages on the server), GitHub Actions testing every push and deploying `main` keyless; the macOS app built against it (DEPLOY.md). **Built Oct 31:** Ask this story (agent, routes, app); the "How OSMS decided" view (every run tagged with the story or item it decided about, never a reader; `GET /stories/{id}/decisions` and the demo's; a section on the story page, loaded when opened). **Still to do:** Muse Voice Transcribe for podcasts, newsletters (dedicated inbox), adding sources from the app (link, handle, OPML import), YouTube/Mastodon/Bluesky/Reddit adapters, language toggle; hardening, deploy (one backend machine with a disk; Muse Glimmer on a GPU or a hosted provider), the replayable demo set and fallback data; README comparison table (dense, sparse, hybrid, hybrid + judge); Harness² run if time allows (stretch); **feature freeze** |
+| 8 | Nov 3 | **Built Nov 2**, from testing the deployed apps: the start page is sign-in and sign-up (two tabs, nothing else; the demo at `/#/demo`); single sign-on for the macOS app (**Continue as <name>** when the browser is signed in); onboarding once across devices; a new reader's first briefing made at onboarding, Today saying it's on its way; **Listen** plays a story's briefing chapter; sources in topic folders in the sidebar; story art is the source's own picture (its feed's, else the article's link-preview image under robots.txt; credited, never re-hosted); the OSMS logo on the macOS and web apps; the move to `onestory-osms.duckdns.org` (Chrome took the `meta-` name for phishing); no older release can replace a newer one. **Built Nov 1:** deployment and CI/CD: one Google Cloud VM (web app, sign-in, API, worker; the databases on its disk, nightly snapshots), Fireworks for Muse Spark Open (Muse Glimmer isn't serverless there, so Muse Spark triages on the server), GitHub Actions testing every push and deploying `main` keyless; the macOS app built against it (DEPLOY.md). **Built Oct 31:** Ask this story (agent, routes, app); the "How OSMS decided" view (every run tagged with the story or item it decided about, never a reader; `GET /stories/{id}/decisions` and the demo's; a section on the story page, loaded when opened). **Still to do:** Muse Voice Transcribe for podcasts, newsletters (dedicated inbox), adding sources from the app (link, handle, OPML import), YouTube/Mastodon/Bluesky/Reddit adapters, language toggle; hardening, deploy (one backend machine with a disk; Muse Glimmer on a GPU or a hosted provider), the replayable demo set and fallback data; README comparison table (dense, sparse, hybrid, hybrid + judge); Harness² run if time allows (stretch); **feature freeze** |
 | 9 | Nov 4 | 3-min demo video, showing real model calls and what each changed; submit (deadline 03:00 Nov 5, Danish time); post on X |
 
 **If behind, cut in this order:** Harness² (stretch) → Ask this story → the Muse Wonder editor trial (the
@@ -1423,6 +1443,7 @@ make server-setup                          # once: Caddy, Node, uv, the osms use
 make deploy                                # what is committed, then the macOS app for it (GitHub deploys every green push to main)
 make seed-server                           # your local stories, without readers
 make build-macos-prod                      # the macOS app against the deployed site
+make icons                                 # redraw the app icons from frontend/assets/brand (Google Chrome)
 make server-status                         # server-logs SERVICE=worker, server-check-models, server-ssh
 
 # local services without Tilt

@@ -20,14 +20,18 @@ AGENTS.md *Podcasts* sets what makes each part.
   chapters (story, spoken title, cited sentences, new-fact count, start and length in the
   audio, which model checked it and how closely), one WAV in `data/briefings/`.
 - Worker job `make-briefing` (ref: a reader's id, or `demo`): from 06:00 UTC daily for the
-  demo and each onboarded reader; `make briefing`, Tilt's **Make briefing now**.
-- API: `GET /briefings/latest` (signed in, only the reader's own), `GET /demo/briefing`,
+  demo and each onboarded reader; for a new reader right after onboarding (since Nov 2),
+  not at the next morning's run; `make briefing`, Tilt's **Make briefing now**.
+- API: `GET /briefings/latest` (signed in, only the reader's own), `GET /briefings/making`
+  (signed in: whether one is being made), `GET /demo/briefing`,
   `GET /briefings/{id}/audio?expires=&signature=` (signed for 12 hours with a key that
   lives as long as the API process; byte ranges for seeking).
 - App: the floating bar and the full player play the real audio (just_audio), on the
   web (an `<audio>` element) and on macOS (AVPlayer, with App Transport Security's
   local-networking exception for plain http to localhost); samples and Widgetbook keep
-  simulated playback.
+  simulated playback. Until a reader's first briefing exists, Today asks again every
+  minute (never while one plays) and says it is being made; a story page's **Listen**
+  plays that story's chapter, greyed out for a story the briefing doesn't cover.
 - Deleting an account deletes its briefings and their audio files.
 
 ## Steps
