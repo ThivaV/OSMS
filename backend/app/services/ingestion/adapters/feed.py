@@ -115,6 +115,20 @@ _ATTR = re.compile(r"([\w-]+)\s*=\s*[\"']([^\"']*)[\"']")
 _PIXEL = re.compile(r"pixel|beacon|track|feedburner\.com/~r/|//stats\.|\.gif(?:$|[?#])", re.IGNORECASE)
 
 
+#: Sizes publishers write into a picture's address: WordPress's `name-300x188.jpg`,
+#: GSMArena's `/-184x111/`; Phys.org keeps its thumbnails under `/tmb/`.
+_STATED_WIDTH = re.compile(r"[-/](\d{2,4})x\d{2,4}(?:[./]|$)")
+#: Narrower than this, a picture blurs on a large card: it stays a list thumbnail.
+SMALL_IMAGE_WIDTH = 600
+
+
+def is_thumbnail(url: str) -> bool:
+    """Known to be small, by what its address says (OSMS never downloads it to look)."""
+    path = url.split("?", 1)[0]
+    widths = [int(w) for w in _STATED_WIDTH.findall(path)]
+    return "/tmb/" in path or bool(widths and widths[-1] < SMALL_IMAGE_WIDTH)
+
+
 def safe_image(url: str | None) -> str | None:
     """An image the reader's app can show from the publisher: https only (the macOS app's
     sandbox and the web app's HTTPS page refuse plain http), checked like any link."""

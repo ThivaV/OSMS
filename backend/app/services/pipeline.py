@@ -31,7 +31,7 @@ from app.services import writer as writer_agent
 from app.services.clustering import Candidate, Thresholds, decide
 from app.services.embeddings import Embedder, item_text
 from app.services.ingestion import scheduler
-from app.services.ingestion.adapters.feed import UnsafeFeed, parse_feed
+from app.services.ingestion.adapters.feed import UnsafeFeed, is_thumbnail, parse_feed
 from app.services.ingestion.adapters.page import preview_image
 from app.services.ingestion.fetcher import Fetcher, FetchError
 from app.services.ingestion.robots import Robots
@@ -159,23 +159,30 @@ class Pipeline:
                 db.add(item)
                 db.flush()
                 jobs.enqueue(db, "process-item", item.id)
-                if item.image_url is None and item.link and item.kind != "paper":
+                if (item.image_url is None or is_thumbnail(item.image_url)) and item.link and item.kind != "paper":
                     jobs.enqueue(db, "preview-image", item.id)
             elif item.content_hash != entry.content_hash:
                 # The source changed it, usually a correction: re-read it, keep its history.
                 item.title, item.text, item.link = entry.title, entry.text, entry.link or item.link
                 item.content_hash, item.updated_at = entry.content_hash, now
                 jobs.enqueue(db, "process-item", item.id)
-            if entry.image and item.image_url != entry.image:
-                item.image_url = entry.image  # A new or changed picture needs no re-reading.
+            if entry.image and item.image_url != entry.image and (
+                item.image_url is None or is_thumbnail(item.image_url) or not is_thumbnail(entry.image)
+            ):
+                # A new or changed picture needs no re-reading; a feed's thumbnail never
+                # replaces the full-size picture found on the article's page.
+                item.image_url = entry.image
         scheduler.after_success(source, now, published=published, ttl_minutes=meta.ttl_minutes)
         db.commit()
 
     def preview_image(self, db: Session, item_id: int) -> None:
-        """An article whose feed gives no picture: the one its page names for link previews,
-        read from the page's <head> where robots.txt allows. The page itself is never kept."""
+        """An article whose feed gives no picture, or only a thumbnail: the one its page names
+        for link previews, read from the page's <head> where robots.txt allows. The page
+        itself is never kept."""
         item = db.get(Item, item_id)
-        if item is None or item.image_url or not item.link or item.kind == "paper" or not self.robots.allowed(item.link):
+        if item is None or not item.link or item.kind == "paper":
+            return
+        if (item.image_url and not is_thumbnail(item.image_url)) or not self.robots.allowed(item.link):
             return
         try:
             page = self.fetcher.fetch(item.link, head_only=True)
@@ -186,8 +193,8 @@ class Pipeline:
         except UnsafeUrl:
             return
         image = preview_image(page.body, page.url)
-        if image is None:
-            return
+        if image is None or is_thumbnail(image):
+            return  # Nothing better than what the feed gave.
         same_source = (Item.source_id == item.source_id, Item.image_url == image)
         if db.scalar(select(Item.id).where(*same_source, Item.id != item.id).limit(1)) is not None:
             # One picture on several of a source's articles is the site's own, not theirs.

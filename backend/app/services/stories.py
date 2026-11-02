@@ -3,7 +3,6 @@ source (AGENTS.md, *Collecting what users pick*). What's new is what the verifie
 after the reader last opened the story; corrections and the timeline come from the same
 history, which is never overwritten."""
 
-import re
 from collections import Counter
 from datetime import UTC, datetime
 
@@ -21,6 +20,7 @@ from app.schemas.stories import (
     StorySourceOut,
     TimelineEventOut,
 )
+from app.services.ingestion.adapters.feed import is_thumbnail
 from app.services.writer import latest_summary
 
 MAX_STORIES = 100
@@ -82,28 +82,14 @@ def _illustration(story: Story) -> dict:
     return {"has_illustration": True, "illustration_url": f"/visuals/{record['path']}", "illustration_focus": record.get("focus")}
 
 
-#: Sizes publishers write into a picture's address: WordPress's `name-300x188.jpg`,
-#: GSMArena's `/-184x111/`; Phys.org keeps its thumbnails under `/tmb/`.
-_STATED_WIDTH = re.compile(r"[-/](\d{2,4})x\d{2,4}(?:[./]|$)")
-#: Narrower than this, a picture blurs on a large card: it stays a list thumbnail.
-SMALL_IMAGE_WIDTH = 600
-
-
-def _small(url: str) -> bool:
-    """Known to be a thumbnail, by what its address says (OSMS never downloads it to look)."""
-    path = url.split("?", 1)[0]
-    widths = [int(w) for w in _STATED_WIDTH.findall(path)]
-    return "/tmb/" in path or bool(widths and widths[-1] < SMALL_IMAGE_WIDTH)
-
-
 def _image(items: list[Item]) -> StoryImageOut | None:
     """The newest report's picture, as its feed gave it: a large one from any of the
     story's reports first, a thumbnail only when that is all there is."""
     pictured = [i for i in reversed(items) if i.image_url]
-    item = next((i for i in pictured if not _small(i.image_url)), pictured[0] if pictured else None)
+    item = next((i for i in pictured if not is_thumbnail(i.image_url)), pictured[0] if pictured else None)
     if item is None:
         return None
-    return StoryImageOut(url=item.image_url, source=item.source.title, link=item.link, small=_small(item.image_url))
+    return StoryImageOut(url=item.image_url, source=item.source.title, link=item.link, small=is_thumbnail(item.image_url))
 
 
 def story_out(db: Session, story: Story, *, followed: set[int], read_at: datetime | None) -> StoryOut:

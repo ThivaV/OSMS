@@ -281,6 +281,23 @@ def test_an_article_without_a_feed_picture_gets_its_link_preview_image(seeded, t
     assert by_guid["en-kestrel"] is None, "a 404 page: no picture, no retries"
 
 
+def test_a_feed_thumbnail_gives_way_to_the_pages_full_size_picture_and_stays_replaced(seeded, tmp_path, monkeypatch) -> None:
+    db, da, _ = seeded
+    thumb = b'<enclosure url="https://cdn.bytebladet.example/fold-184x111.jpg" type="image/jpeg" length="1"/>'
+    monkeypatch.setitem(FEEDS, "bytebladet.example", FEEDS["bytebladet.example"].replace(b"<description>Lumen Fold koster", thumb + b"<description>Lumen Fold koster"))
+    monkeypatch.setitem(PAGES, "https://da-fold.example/a", b'<head><meta property="og:image" content="https://cdn.bytebladet.example/fold.jpg"></head>')
+    pipeline = _pipeline(db, tmp_path, AgentScript({}), available=False)
+    pipeline.fetch_source(db, da.id)
+    fold = db.scalar(select(Item).where(Item.guid == "da-fold"))
+    assert fold.image_url.endswith("fold-184x111.jpg")
+    _drain(db, pipeline)
+    db.refresh(fold)
+    assert fold.image_url == "https://cdn.bytebladet.example/fold.jpg", "the page's full-size picture"
+    pipeline.fetch_source(db, da.id)
+    db.refresh(fold)
+    assert fold.image_url == "https://cdn.bytebladet.example/fold.jpg", "the feed's thumbnail doesn't come back"
+
+
 def test_one_preview_picture_on_several_articles_is_the_sites_own(seeded, tmp_path, monkeypatch) -> None:
     db, da, _ = seeded
     two = [("da-a", "Lumen Fold i butikkerne", "Salget begynder.", NOW), ("da-b", "Kestrel lander igen", "Tredje gang.", NOW)]
