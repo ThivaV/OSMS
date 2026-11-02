@@ -162,6 +162,24 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('on a phone, picking a folder in the Sources tab shows its stories', (tester) async {
+    await start(
+      tester,
+      auth: FakeAuth(signedIn: true),
+      onboarded: true,
+      subscriptions: const [FakeApi.arxiv, FakeApi.nordic],
+      readerStories: [sample.cellcycle, sample.kestrel],
+    );
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Sources');
+    await tester.tap(find.text('Startups and product'));
+    await tester.pumpAndSettle();
+    expect(find.text(sample.cellcycle.title), findsWidgets, reason: 'back on the stories, narrowed');
+    expect(find.text(sample.kestrel.title), findsNothing);
+    expect(find.text('Startups and product'), findsWidgets, reason: 'titled after the folder');
+  });
+
   testWidgets('a returning reader lands on Today and never sees sign-in', (tester) async {
     await start(tester, auth: FakeAuth(signedIn: true), onboarded: true);
     expect(find.text('Your stories will appear here'), findsWidgets);

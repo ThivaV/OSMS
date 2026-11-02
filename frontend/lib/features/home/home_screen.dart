@@ -309,7 +309,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           )
         : null;
 
-    SourcesSidebar sidebar({bool withSearch = true}) => SourcesSidebar(
+    // On a phone the sidebar is its own tab: picking a topic or source shows its stories.
+    SourcesSidebar sidebar({bool withSearch = true, bool phone = false}) => SourcesSidebar(
       topics: navTopics,
       sources: navSources,
       allTopics: allTopics,
@@ -318,7 +319,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       briefing: withSearch ? briefing : null,
       user: user,
       selected: _nav,
-      onSelect: (id) => _selectNav(id, session),
+      onSelect: (id) {
+        _selectNav(id, session);
+        if (phone) setState(() => _phoneTab = 0);
+      },
       onSignIn: () => context.go('/'),
       onSearch: withSearch ? () => _openPalette(context, session, view, navSources) : null,
       onSettings: () => context.go('/settings'),
@@ -393,7 +397,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             body: 'Save a story from its toolbar and it waits for you here.',
           ),
         ),
-        3 => sidebar(withSearch: false),
+        3 => sidebar(withSearch: false, phone: true),
         _ => null,
       },
       onBack: () => _selectStory(null),
