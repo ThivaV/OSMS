@@ -42,6 +42,8 @@ class Entry:
     text: str
     published_at: datetime | None
     kind: str
+    #: The entry's own picture, as a link (AGENTS.md: media stays where it is).
+    image: str | None = None
 
     @property
     def content_hash(self) -> str:
@@ -105,6 +107,43 @@ def _safe_link(link: str | None) -> str | None:
         return None
 
 
+#: Media URLs that name an image file.
+_IMAGE_FILE = re.compile(r"\.(?:jpe?g|png|webp|gif|avif)(?:$|[?#])", re.IGNORECASE)
+_IMG_TAG = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+_ATTR = re.compile(r"([\w-]+)\s*=\s*[\"']([^\"']*)[\"']")
+#: Trackers dressed as images: pixels, beacons, feed statistics, and GIFs.
+_PIXEL = re.compile(r"pixel|beacon|track|feedburner\.com/~r/|//stats\.|\.gif(?:$|[?#])", re.IGNORECASE)
+
+
+def _safe_image(url: str | None) -> str | None:
+    """An image the reader's app can show from the publisher: https only (the macOS app's
+    sandbox and the web app's HTTPS page refuse plain http), checked like any link."""
+    url = html.unescape((url or "").strip())
+    if not url.startswith("https://") or len(url) > 2000:
+        return None
+    return _safe_link(url)
+
+
+def _image(raw) -> str | None:
+    """The entry's own image, as its feed gives it: media:content or media:thumbnail, an
+    image enclosure, else the first real <img> in its HTML (never a tracking pixel). Only
+    the link is kept: OSMS never downloads, re-hosts or shows it to a model."""
+    candidates = [
+        m.get("url")
+        for m in raw.get("media_content") or []
+        if m.get("medium") == "image" or str(m.get("type", "")).startswith("image/") or _IMAGE_FILE.search(m.get("url", ""))
+    ]
+    candidates += [m.get("url") for m in raw.get("media_thumbnail") or []]
+    candidates += [e.get("href") for e in raw.get("enclosures") or [] if str(e.get("type", "")).startswith("image/")]
+    for markup in [c.get("value", "") for c in raw.get("content") or []] + [raw.get("summary", "")]:
+        for tag in _IMG_TAG.findall(markup or ""):
+            attrs = {key.lower(): value for key, value in _ATTR.findall(tag)}
+            if attrs.get("width") in {"0", "1"} or attrs.get("height") in {"0", "1"} or _PIXEL.search(attrs.get("src", "")):
+                continue
+            candidates.append(attrs.get("src"))
+    return next((safe for url in candidates if (safe := _safe_image(url))), None)
+
+
 def _json_feed(body: bytes, source_type: str) -> tuple[FeedMeta, list[Entry]]:
     try:
         feed = json.loads(body)
@@ -129,7 +168,8 @@ def _json_feed(body: bytes, source_type: str) -> tuple[FeedMeta, list[Entry]]:
                 published = None
         guid = str(raw.get("id") or link or hashlib.sha256(f"{title}\n{text}".encode()).hexdigest())[:1000]
         kind = "paper" if source_type.startswith("arxiv") else ("post" if not title else "article")
-        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=published, kind=kind))
+        image = _safe_image(str(raw.get("image") or raw.get("banner_image") or ""))
+        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=published, kind=kind, image=image))
     meta = FeedMeta(title=plain_text(str(feed.get("title") or ""), MAX_TITLE), language=normalise(feed.get("language")), ttl_minutes=None)
     return meta, entries
 
@@ -162,5 +202,6 @@ def parse_feed(body: bytes, *, source_type: str = "feed") -> tuple[FeedMeta, lis
         if not title and not text:
             continue
         kind = "paper" if source_type.startswith("arxiv") else ("post" if not title else "article")
-        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=_published(raw), kind=kind))
+        image = None if kind == "paper" else _image(raw)
+        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=_published(raw), kind=kind, image=image))
     return meta, entries

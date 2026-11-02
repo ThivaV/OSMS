@@ -94,6 +94,23 @@ def test_stories_need_sign_in_and_deleting_the_reader_deletes_read_state(client,
         assert db.get(Story, ids["launch"]) is not None  # shared stories stay
 
 
+def test_a_story_shows_its_newest_reports_picture_with_credit(client) -> None:
+    ids = _seed(client)
+    assert client.get("/demo/stories").json()["stories"][0]["image"] is None, "no picture: the drawn art stays"
+    with client.app.state.sessions() as db:
+        older = Item(source_id=ids["demo"], guid="k0", link="https://orbit.example/k0", title="Kestrel ready", text="Soon.",
+                     image_url="https://orbit.example/old.jpg", published_at=NOW - timedelta(hours=5), content_hash="h0",
+                     story_id=ids["launch"], status="ready")
+        db.add(older)
+        db.commit()
+    image = client.get("/demo/stories").json()["stories"][0]["image"]
+    assert image == {"url": "https://orbit.example/old.jpg", "source": "Orbit Notes", "link": "https://orbit.example/k0"}
+    with client.app.state.sessions() as db:
+        db.get(Item, db.scalar(select(Item.id).where(Item.guid == "k1"))).image_url = "https://orbit.example/new.jpg"
+        db.commit()
+    assert client.get("/demo/stories").json()["stories"][0]["image"]["url"] == "https://orbit.example/new.jpg", "the newest wins"
+
+
 def test_one_article_in_two_feeds_counts_once(client) -> None:
     with client.app.state.sessions() as db:
         db.add(Topic(id="test-science", name="Science"))

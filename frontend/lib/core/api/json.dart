@@ -205,6 +205,14 @@ TimelineEvent timelineEventFromJson(Json j) => TimelineEvent(
 String? _illustrationUrl(Object? path, Uri? base) =>
     path is String ? (base == null ? path : base.resolve(path).toString()) : null;
 
+/// A source's picture: https only, as the server sends it.
+StoryImage? _image(Object? value) {
+  if (value is! Map<String, Object?>) return null;
+  final url = value['url'];
+  if (url is! String || !url.startsWith('https://')) return null;
+  return StoryImage(url: url, source: (value['source'] as String?) ?? '', link: value['link'] as String?);
+}
+
 Alignment _focus(Object? value) {
   final xy = value is List && value.length == 2 ? value.cast<num>() : null;
   return xy == null ? Alignment.center : Alignment(xy[0] * 2 - 1, xy[1] * 2 - 1);
@@ -230,6 +238,7 @@ Story storyFromJson(Json j, {Uri? base}) => Story(
   hasIllustration: j['has_illustration'] == true,
   illustrationUrl: _illustrationUrl(j['illustration_url'], base),
   illustrationFocus: _focus(j['illustration_focus']),
+  image: _image(j['image']),
   lastReadAt: j['last_read_at'] == null ? null : _time(j['last_read_at']),
   whatsNew: _list(j['whats_new']).map(claimFromJson).toList(),
   disagreements: _list(j['disagreements']).map(disagreementFromJson).toList(),

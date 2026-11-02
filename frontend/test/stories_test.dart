@@ -175,6 +175,31 @@ void main() {
     expect(correction, findsOneWidget);
   });
 
+  test('a story’s picture comes with its credit and link, https only', () {
+    final pictured = storyFromJson({
+      ...wire,
+      'image': {'url': 'https://cdn.launchdesk.example/fold.jpg', 'source': 'The Launch Desk', 'link': 'https://launchdesk.example/fold'},
+    });
+    expect([pictured.image!.url, pictured.image!.source, pictured.image!.link], [
+      'https://cdn.launchdesk.example/fold.jpg',
+      'The Launch Desk',
+      'https://launchdesk.example/fold',
+    ]);
+    expect(storyFromJson({...wire, 'image': {'url': 'http://cdn.example/x.jpg', 'source': 'x'}}).image, isNull);
+    expect(storyFromJson(wire).image, isNull, reason: 'no picture: the illustration or the drawn art');
+  });
+
+  testWidgets('a picture that can’t load leaves the drawn art, and the story page still works', (tester) async {
+    final story = storyFromJson({
+      ...wire,
+      'image': {'url': 'https://cdn.launchdesk.example/missing.jpg', 'source': 'The Launch Desk', 'link': null},
+    });
+    await start(tester, demo: [story], at: '/demo');
+    await tapText(tester, story.title);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Image: The Launch Desk'), findsNothing, reason: 'no credit for a picture that never showed');
+  });
+
   testWidgets('signed out, real demo stories replace the samples, and the banner stops calling them invented', (
     tester,
   ) async {

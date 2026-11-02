@@ -61,6 +61,39 @@ def test_atom_json_feed_and_arxiv() -> None:
     assert papers[0].kind == "paper" and papers[0].text == "We study things."
 
 
+MEDIA_RSS = b"""<?xml version="1.0"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>Pictures</title>
+<item><guid>m1</guid><title>Media content</title><link>https://pics.example/1</link>
+<media:content url="https://cdn.pics.example/1.jpg" medium="image"/></item>
+<item><guid>m2</guid><title>Thumbnail</title><link>https://pics.example/2</link>
+<media:thumbnail url="https://cdn.pics.example/2.webp"/></item>
+<item><guid>m3</guid><title>Enclosure</title><link>https://pics.example/3</link>
+<enclosure url="https://cdn.pics.example/3.png" type="image/png" length="1"/></item>
+<item><guid>m4</guid><title>Inline</title><link>https://pics.example/4</link>
+<description><![CDATA[<img src="https://pics.example/b.png" width="1" height="1"><img src="https://pics.example/pixel.png">
+<img src="https://cdn.pics.example/4.jpg?w=1200&amp;q=80" alt="">]]></description></item>
+<item><guid>m5</guid><title>Plain http</title><link>https://pics.example/5</link>
+<media:content url="http://cdn.pics.example/5.jpg" medium="image"/></item>
+</channel></rss>"""
+
+
+def test_each_entry_keeps_its_own_picture_as_a_link() -> None:
+    _, entries = parse_feed(MEDIA_RSS)
+    assert [e.image for e in entries] == [
+        "https://cdn.pics.example/1.jpg",
+        "https://cdn.pics.example/2.webp",
+        "https://cdn.pics.example/3.png",
+        "https://cdn.pics.example/4.jpg?w=1200&q=80",  # Past two trackers, entities decoded.
+        None,  # Plain http: the apps refuse it.
+    ]
+    _, rss = parse_feed(RSS)
+    assert rss[0].image is None, "a tracking pixel is not a picture"
+    _, papers = parse_feed(ARXIV, source_type="arxiv")
+    assert papers[0].image is None
+    _, items = parse_feed(JSON_FEED.replace(b'"content_text"', b'"image": "https://orbit.example/k.jpg", "content_text"'))
+    assert items[0].image == "https://orbit.example/k.jpg"
+
+
 def test_hostile_feeds_are_refused() -> None:
     with pytest.raises(UnsafeFeed):
         parse_feed(b'<?xml version="1.0"?><!DOCTYPE r [<!ENTITY a "aaaa">]><rss><channel><item><title>&a;</title></item></channel></rss>')

@@ -2,14 +2,15 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
 
-/// Story art: drawn threads until Muse Image provides an illustration.
-/// One thread per source, all converging into a single story thread.
-/// Deterministic per [seed]. Generated illustrations set [isIllustration] so
-/// the required "Illustration" label shows; the fallback never carries it.
-/// With [imageUrl], the illustration itself shows, cropped at [focus]; the
-/// drawn art stands in while it loads and if it can't.
+/// Story art: the publisher's own picture when a source has one ([photo], credited),
+/// else Muse Image's illustration, else drawn threads: one thread per source, all
+/// converging into a single story thread, deterministic per [seed]. Generated
+/// illustrations set [isIllustration] so the required "Illustration" label shows; the
+/// drawn art never carries it. With [imageUrl], the illustration itself shows, cropped at
+/// [focus]. The drawn art stands in while a picture loads and if it can't.
 class StoryVisual extends StatelessWidget {
   const StoryVisual({
     super.key,
@@ -19,6 +20,9 @@ class StoryVisual extends StatelessWidget {
     this.isIllustration = false,
     this.imageUrl,
     this.focus = Alignment.center,
+    this.photo,
+    this.showCredit = true,
+    this.onCredit,
   });
 
   final int seed;
@@ -31,6 +35,17 @@ class StoryVisual extends StatelessWidget {
   final bool isIllustration;
   final String? imageUrl;
   final Alignment focus;
+
+  /// A picture from one of the story's sources, shown from the publisher (AGENTS.md:
+  /// media stays where it is) with "Image: <source>" on it.
+  final StoryImage? photo;
+
+  /// False where the picture is too small to carry the credit (list thumbnails); the
+  /// story page always shows it.
+  final bool showCredit;
+
+  /// Tapping the credit opens the report it came from (the story page).
+  final VoidCallback? onCredit;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +62,26 @@ class StoryVisual extends StatelessWidget {
         ),
       ),
     );
+    final fallback = _illustrationOr(context, art);
+    final picture = photo;
+    if (picture == null) return fallback;
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: Image.network(
+        picture.url,
+        fit: BoxFit.cover,
+        // Publishers rarely let an app read their pictures' pixels (CORS); the web app then
+        // shows it as an ordinary <img>, as any page linking to it would.
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+        frameBuilder: (context, image, frame, sync) => frame == null && !sync
+            ? ExcludeSemantics(child: art)
+            : _credited(context, picture, SizedBox.expand(child: image)),
+        errorBuilder: (context, error, stack) => fallback,
+      ),
+    );
+  }
+
+  Widget _illustrationOr(BuildContext context, Widget art) {
     final url = imageUrl;
     if (!isIllustration) return ExcludeSemantics(child: art);
     if (url == null) return _labelled(context, art);
@@ -59,6 +94,53 @@ class StoryVisual extends StatelessWidget {
         frameBuilder: (context, image, frame, sync) =>
             frame == null && !sync ? ExcludeSemantics(child: art) : _labelled(context, SizedBox.expand(child: image)),
         errorBuilder: (context, error, stack) => ExcludeSemantics(child: art),
+      ),
+    );
+  }
+
+  Widget _credited(BuildContext context, StoryImage picture, Widget image) {
+    final c = context.colors;
+    final t = context.text;
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
+      decoration: BoxDecoration(
+        color: c.surface.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(Radii.pill),
+        border: Border.all(color: c.border),
+      ),
+      child: Text(
+        'Image: ${picture.source}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: t.caption.copyWith(color: c.textSecondary, fontWeight: FontWeight.w600),
+      ),
+    );
+    final credit = onCredit;
+    return Semantics(
+      image: true,
+      label: 'Picture from ${picture.source}',
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          image,
+          if (showCredit)
+            Positioned(
+              left: Space.md,
+              right: Space.md,
+              bottom: Space.md,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: credit == null
+                    ? chip
+                    : Semantics(
+                        link: true,
+                        label: 'Open the report on ${picture.source}',
+                        excludeSemantics: true,
+                        child: InkWell(onTap: credit, borderRadius: BorderRadius.circular(Radii.pill), child: chip),
+                      ),
+              ),
+            ),
+        ],
       ),
     );
   }

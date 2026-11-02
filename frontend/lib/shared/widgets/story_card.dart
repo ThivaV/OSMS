@@ -76,6 +76,7 @@ class _CardLayout extends StatelessWidget {
               isIllustration: story.hasIllustration,
               imageUrl: story.illustrationUrl,
               focus: story.illustrationFocus,
+              photo: story.image,
             ),
             Padding(
               padding: const EdgeInsets.all(Space.lg),
@@ -177,7 +178,13 @@ class _RowLayout extends StatelessWidget {
                 child: SizedBox(
                   width: Sizes.thumbnail,
                   height: Sizes.thumbnail,
-                  child: StoryVisual(seed: story.visualSeed, threads: story.sources.length, aspectRatio: 1),
+                  child: StoryVisual(
+                    seed: story.visualSeed,
+                    threads: story.sources.length,
+                    aspectRatio: 1,
+                    photo: story.image,
+                    showCredit: false,
+                  ),
                 ),
               ),
             ],

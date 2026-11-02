@@ -545,7 +545,10 @@ before saving, and authors and categories on the paper.
 - **Media stays where it is.** Store links to images, thumbnails and videos, not the files.
   Show them from the original with credit and a link back. Never re-host them, and never
   pass them to a model (Muse Image, SAM 3.1, Muse Spark's image or video reading) without
-  the author's say. Podcast enclosures are the only media we download, and only to
+  the author's say. Story art works this way since Nov 2 (the author's call): the newest
+  report's own picture from its feed (`items.image_url`, https only), credited "Image:
+  <source>" and linking back; Muse Image's illustration, then the drawn art, only where no
+  source has a picture. Podcast enclosures are the only media we download, and only to
   transcribe. Never download YouTube videos or audio.
 - **Newsletter emails are personal.** Before storing, strip tracking pixels, unsubscribe
   links and the recipient's address; link to the web version, not the email.

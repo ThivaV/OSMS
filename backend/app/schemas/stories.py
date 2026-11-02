@@ -60,6 +60,17 @@ class TimelineEventOut(BaseModel):
     corrected_from: str | None = None
 
 
+class StoryImageOut(BaseModel):
+    """A picture from one of the story's sources: the publisher's own link, shown from the
+    original, never re-hosted (AGENTS.md: media stays where it is)."""
+
+    url: str
+    #: Who it is from: credited wherever it shows.
+    source: str
+    #: The report it belongs to: the credit links back to it.
+    link: str | None
+
+
 class StoryOut(BaseModel):
     id: str
     title: str
@@ -76,6 +87,8 @@ class StoryOut(BaseModel):
     illustration_url: str | None = None
     #: Where its subject is, 0–1 from the left and top, so each card shape crops around it.
     illustration_focus: list[float] | None = None
+    #: The newest report's picture, from its publisher; shown before any illustration.
+    image: StoryImageOut | None = None
     last_read_at: datetime | None
     whats_new: list[ClaimOut]
     disagreements: list[DisagreementOut]

@@ -135,6 +135,7 @@ class Pipeline:
                     source_id=source.id,
                     guid=entry.guid,
                     link=entry.link,
+                    image_url=entry.image,
                     title=entry.title,
                     text=entry.text,
                     language=detect(f"{entry.title}\n{entry.text}", hint),
@@ -152,6 +153,8 @@ class Pipeline:
                 item.title, item.text, item.link = entry.title, entry.text, entry.link or item.link
                 item.content_hash, item.updated_at = entry.content_hash, now
                 jobs.enqueue(db, "process-item", item.id)
+            if entry.image and item.image_url != entry.image:
+                item.image_url = entry.image  # A new or changed picture needs no re-reading.
         scheduler.after_success(source, now, published=published, ttl_minutes=meta.ttl_minutes)
         db.commit()
 

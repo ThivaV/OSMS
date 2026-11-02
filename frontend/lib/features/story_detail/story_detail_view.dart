@@ -153,6 +153,8 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                           isIllustration: story.hasIllustration,
                           imageUrl: story.illustrationUrl,
                           focus: story.illustrationFocus,
+                          photo: story.image,
+                          onCredit: story.image?.link == null ? null : () => _openOriginal(story.image!.link!),
                         ),
                       ),
                       const SizedBox(height: Space.xl),

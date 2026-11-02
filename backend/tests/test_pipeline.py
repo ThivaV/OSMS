@@ -237,6 +237,26 @@ def test_without_model_keys_stories_form_and_say_only_what_is_known(seeded, tmp_
     assert len(db.scalars(select(Story)).all()) == 2
 
 
+def test_a_feed_picture_is_kept_as_a_link_and_filled_in_later_without_rereading(seeded, tmp_path, monkeypatch) -> None:
+    db, da, _ = seeded
+    pipeline = _pipeline(db, tmp_path, AgentScript({}), available=False)
+    plain = FEEDS["bytebladet.example"]
+    pictured = plain.replace(
+        b"<description>Lumen Fold koster",
+        b'<enclosure url="https://cdn.bytebladet.example/fold.jpg" type="image/jpeg" length="1"/><description>Lumen Fold koster',
+    )
+    pipeline.fetch_source(db, da.id)
+    fold = db.scalar(select(Item).where(Item.guid == "da-fold"))
+    assert fold.image_url is None
+    _drain(db, pipeline)
+
+    monkeypatch.setitem(FEEDS, "bytebladet.example", pictured)
+    pipeline.fetch_source(db, da.id)
+    db.refresh(fold)
+    assert fold.image_url == "https://cdn.bytebladet.example/fold.jpg"
+    assert not jobs.pending(db, "process-item", fold.id), "same text: nothing to re-read"
+
+
 def test_the_vector_index_reopens_after_a_restart(tmp_path) -> None:
     path = str(tmp_path / "milvus.db")
     first = VectorIndex(path, dim=3)

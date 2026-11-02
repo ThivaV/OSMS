@@ -15,6 +15,7 @@ from app.schemas.stories import (
     DisagreementOut,
     PointOut,
     SideOut,
+    StoryImageOut,
     StoryOut,
     StorySourceOut,
     TimelineEventOut,
@@ -78,6 +79,12 @@ def _illustration(story: Story) -> dict:
     if record.get("status") != "ready" or not record.get("path"):
         return {}
     return {"has_illustration": True, "illustration_url": f"/visuals/{record['path']}", "illustration_focus": record.get("focus")}
+
+
+def _image(items: list[Item]) -> StoryImageOut | None:
+    """The newest report's picture, as its feed gave it."""
+    item = next((i for i in reversed(items) if i.image_url), None)
+    return None if item is None else StoryImageOut(url=item.image_url, source=item.source.title, link=item.link)
 
 
 def story_out(db: Session, story: Story, *, followed: set[int], read_at: datetime | None) -> StoryOut:
@@ -196,6 +203,7 @@ def story_out(db: Session, story: Story, *, followed: set[int], read_at: datetim
         languages=languages,
         visual_seed=story.id,
         **_illustration(story),
+        image=_image(items),
         last_read_at=since,
         whats_new=whats_new,
         disagreements=disagreements,

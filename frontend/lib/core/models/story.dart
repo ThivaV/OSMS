@@ -89,6 +89,20 @@ class TimelineEvent {
   final String? correctedFrom;
 }
 
+/// A picture from one of a story's sources, shown from the publisher's own address with
+/// credit and a link back; OSMS never copies it (AGENTS.md: media stays where it is).
+class StoryImage {
+  const StoryImage({required this.url, required this.source, this.link});
+
+  final String url;
+
+  /// Who it is from: credited wherever it shows.
+  final String source;
+
+  /// The report it belongs to.
+  final String? link;
+}
+
 class Story {
   const Story({
     required this.id,
@@ -103,6 +117,7 @@ class Story {
     this.hasIllustration = false,
     this.illustrationUrl,
     this.illustrationFocus = Alignment.center,
+    this.image,
     this.lastReadAt,
     this.summaryPoints = const [],
     this.whatsNew = const [],
@@ -141,6 +156,9 @@ class Story {
   /// Where its subject is, so every card shape crops around it.
   final Alignment illustrationFocus;
 
+  /// The newest report's picture, from its publisher: shown before any illustration.
+  final StoryImage? image;
+
   /// When the reader last opened it. Null if never.
   final DateTime? lastReadAt;
 
@@ -168,6 +186,7 @@ class Story {
     hasIllustration: hasIllustration ?? this.hasIllustration,
     illustrationUrl: illustrationUrl,
     illustrationFocus: illustrationFocus,
+    image: image,
     lastReadAt: lastReadAt ?? this.lastReadAt,
     summaryPoints: summaryPoints,
     whatsNew: whatsNew ?? this.whatsNew,

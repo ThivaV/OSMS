@@ -193,6 +193,8 @@ class Item(Base):
     source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), index=True)
     guid: Mapped[str] = mapped_column(Text)
     link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The publisher's picture for it, from the feed: a link, never the file.
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     title: Mapped[str] = mapped_column(Text, default="")
     text: Mapped[str] = mapped_column(Text, default="")
     language: Mapped[str] = mapped_column(String(8), default="en")
