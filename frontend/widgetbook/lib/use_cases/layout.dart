@@ -56,16 +56,14 @@ class _ShellState extends State<_Shell> {
   Appearance _appearance = const Appearance();
   StoryCardLayout _layout = StoryCardLayout.row;
   _Screen _screen = _Screen.shell;
-  SignInIntent _intent = SignInIntent.signIn;
+  // The first sign-in is a new account (onboarding); later ones go straight to Today.
+  bool _onboarded = false;
   bool _signingIn = false;
   int _phoneTab = 0;
 
   void _go(_Screen screen) => setState(() => _screen = screen);
 
-  void _openSignIn(SignInIntent intent) => setState(() {
-    _intent = intent;
-    _screen = _Screen.signIn;
-  });
+  void _openSignIn() => _go(_Screen.signIn);
 
   void _continue(SignInProvider provider) {
     setState(() => _signingIn = true);
@@ -74,7 +72,7 @@ class _ShellState extends State<_Shell> {
       setState(() {
         _signingIn = false;
         _user = fx.user;
-        _screen = _intent == SignInIntent.createAccount ? _Screen.onboarding : _Screen.shell;
+        _screen = _onboarded ? _Screen.shell : _Screen.onboarding;
       });
     });
   }
@@ -141,12 +139,11 @@ class _ShellState extends State<_Shell> {
 
   Widget _buildScreen(BuildContext context) => switch (_screen) {
     _Screen.signIn => SignInPage(
-      initialIntent: _intent,
       status: _signingIn ? SignInStatus.signingIn : SignInStatus.idle,
       pending: SignInProvider.google,
       onContinue: _continue,
-      onTryDemo: () => _go(_Screen.shell),
       onWhatWeKeep: () => _go(_Screen.whatWeKeep),
+      onBack: () => _go(_Screen.shell),
     ),
     _Screen.whatWeKeep => WhatWeKeepPage(
       contactEmail: fx.privacyContact,
@@ -161,7 +158,10 @@ class _ShellState extends State<_Shell> {
             topics: fx.topics,
             suggestions: fx.suggestions,
             researchSuggestions: fx.researchSuggestions,
-            onDone: (_) => _go(_Screen.shell),
+            onDone: (_) => setState(() {
+              _onboarded = true;
+              _screen = _Screen.shell;
+            }),
           ),
         ),
       ),
@@ -222,7 +222,7 @@ class _ShellState extends State<_Shell> {
         sources: widget.sources,
         interests: interests,
         user: _user,
-        onSignIn: () => _openSignIn(SignInIntent.signIn),
+        onSignIn: _openSignIn,
         onSearch: () => _openPalette(context),
         onSettings: () => _go(_Screen.settings),
         onWhatWeKeep: () => _go(_Screen.whatWeKeep),
@@ -235,11 +235,7 @@ class _ShellState extends State<_Shell> {
         bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,
         banner: _user != null
             ? null
-            : DemoBanner(
-                samples: true,
-                onCreateAccount: () => _openSignIn(SignInIntent.createAccount),
-                onSignIn: () => _openSignIn(SignInIntent.signIn),
-              ),
+            : DemoBanner(samples: true, onSignIn: _openSignIn),
         sourceCount: widget.sources.length,
         onChooseSources: chooseSources,
         onSelect: (s) => setState(() => _selected = s.id),
@@ -276,7 +272,7 @@ class _ShellState extends State<_Shell> {
           sources: widget.sources,
           interests: interests,
           user: _user,
-          onSignIn: () => _openSignIn(SignInIntent.signIn),
+          onSignIn: _openSignIn,
           onSettings: () => _go(_Screen.settings),
         ),
         _ => null,

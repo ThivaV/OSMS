@@ -142,6 +142,12 @@ class FakeApi extends ApiClient {
   @override
   Future<Briefing?> briefing({bool demo = false}) async => latestBriefing;
 
+  /// Whether the reader's briefing is being made (a new reader's first one).
+  bool briefingInTheMaking = false;
+
+  @override
+  Future<bool> briefingMaking() async => briefingInTheMaking;
+
   /// What [ask] answers; null fails like an unavailable service. Records each question.
   AskResult? answer;
   final List<(String, String, bool)> asked = [];
@@ -197,6 +203,7 @@ Future<(FakeAuth, FakeApi)> start(
   List<Story> readerStories = const [],
   List<Story> demo = const [],
   Briefing? briefing,
+  bool briefingMaking = false,
   List<FakePlayback>? players,
 }) async {
   tester.view.physicalSize = const Size(1440, 900);
@@ -206,7 +213,8 @@ Future<(FakeAuth, FakeApi)> start(
   final fakeApi = FakeApi(fakeAuth, onboarded: onboarded, subscriptions: subscriptions)
     ..readerStories = readerStories
     ..demo = demo
-    ..latestBriefing = briefing;
+    ..latestBriefing = briefing
+    ..briefingInTheMaking = briefingMaking;
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

@@ -34,10 +34,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) => redirectFor(ref.read(sessionProvider).value, state.matchedLocation),
     routes: [
       GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
-      GoRoute(
-        path: '/sign-in',
-        builder: (_, state) => SignInScreen(createAccount: state.uri.queryParameters['intent'] == 'create'),
-      ),
+      GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/interests', builder: (_, _) => const InterestsScreen()),

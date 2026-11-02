@@ -9,6 +9,7 @@ import 'package:osms/core/models/models.dart';
 import 'package:osms/core/session/account.dart';
 import 'package:osms/core/session/session.dart';
 import 'package:osms/core/theme/appearance.dart';
+import 'package:osms/features/auth/demo_banner.dart';
 import 'package:osms/features/briefing/briefing_player.dart';
 import 'package:osms/sample/sample_content.dart' as sample;
 
@@ -24,19 +25,40 @@ void expectNoSamples() {
 }
 
 void main() {
-  testWidgets('signed out: the demo, labelled, with a way to sign in', (tester) async {
+  testWidgets('signed out: the demo, labelled, with one way in', (tester) async {
     await start(tester);
     expect(find.text('You’re reading the demo'), findsWidgets);
     expect(find.textContaining('Its stories are invented samples'), findsWidgets);
     expect(find.text(sample.stories.first.title), findsWidgets);
-    await tapText(tester, 'Create an account');
+    expect(find.text('Create an account'), findsNothing, reason: 'signing in creates the account');
+    await tapText(tester, 'Sign in');
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Email me a sign-in link'), findsOneWidget);
+    expect(find.text('New here? This creates your account.'), findsOneWidget);
+  });
+
+  testWidgets('the sign-in page is only the way in: no examples, demo or second path', (tester) async {
+    await start(tester);
+    go(tester, '/sign-in');
+    await tester.pumpAndSettle();
+    for (final gone in [
+      'Sixty items become seven stories',
+      'Only what changed',
+      'A morning briefing',
+      'Look around the demo first',
+      'New to OSMS? Create an account',
+      'Create your account',
+    ]) {
+      expect(find.text(gone), findsNothing, reason: gone);
+    }
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.text('You’re reading the demo'), findsWidgets);
   });
 
   testWidgets('first sign-in goes to onboarding, then an empty Today waiting for its sources', (tester) async {
     final (auth, api) = await start(tester);
-    await tapText(tester, 'Create an account');
+    await tapText(tester, 'Sign in');
     await tapText(tester, 'Continue with Google');
     expect(auth.signedIn, isTrue);
     expect(find.text('Which language should OSMS write in?'), findsOneWidget);
@@ -72,6 +94,8 @@ void main() {
 
     await tapText(tester, 'Choose topics and sources');
     expect(find.text('Which language should OSMS write in?'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 11));
+    expect(find.text('Which language should OSMS write in?'), findsOneWidget, reason: 'changing picks stays put');
     await tapText(tester, 'Continue'); // language
     await tapText(tester, 'AI research');
     await tapText(tester, 'Continue'); // topics
@@ -81,6 +105,30 @@ void main() {
     expect(api.subscriptions, [FakeApi.arxiv]);
     expect(find.text('The first stories from your source appear here once OSMS has collected them.'), findsWidgets);
     expect(find.text('Choose topics and sources'), findsNothing);
+  });
+
+  testWidgets('setting up on one device is enough: this one moves on when another finishes', (tester) async {
+    final (_, api) = await start(tester, auth: FakeAuth(signedIn: true));
+    expect(find.text('Which language should OSMS write in?'), findsOneWidget);
+    api.onboarded = true; // Finished on the web meanwhile.
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+    expect(find.text('Which language should OSMS write in?'), findsNothing);
+    expect(find.text('You finished setting up on another device.'), findsOneWidget);
+  });
+
+  testWidgets('a new reader’s first briefing: Today says it’s being made, then the player appears', (tester) async {
+    final (_, api) = await start(tester, auth: FakeAuth(signedIn: true), onboarded: true, briefingMaking: true);
+    expect(find.text('Your first briefing is being made'), findsWidgets);
+    expect(find.byType(BriefingFloatingBar), findsNothing);
+
+    api
+      ..latestBriefing = sample.briefing
+      ..briefingInTheMaking = false;
+    await tester.pump(const Duration(minutes: 1));
+    await tester.pumpAndSettle();
+    expect(find.byType(BriefingFloatingBar), findsOneWidget, reason: 'no restart needed');
+    expect(find.text('Your first briefing is being made'), findsNothing);
   });
 
   testWidgets('a returning reader lands on Today and never sees sign-in', (tester) async {
@@ -101,7 +149,7 @@ void main() {
 
   testWidgets('development sign-in link: asks for an address, then says where the link is', (tester) async {
     final (auth, _) = await start(tester);
-    await tapText(tester, 'Create an account');
+    await tapText(tester, 'Sign in');
     await tapText(tester, 'Email me a sign-in link');
     await tester.enterText(find.byType(TextField), 'ada@users.example');
     await tapText(tester, 'Send link');
@@ -112,7 +160,7 @@ void main() {
   testWidgets('when sign-in is down, the demo still works and says so', (tester) async {
     await start(tester, auth: FakeAuth(available: false));
     expect(find.textContaining('Sign-in is unavailable right now'), findsWidgets);
-    expect(find.text('Create an account'), findsNothing);
+    expect(find.descendant(of: find.byType(DemoBanner), matching: find.text('Sign in')), findsNothing);
   });
 
   testWidgets('Delete my account removes OSMS data, then the sign-in account', (tester) async {

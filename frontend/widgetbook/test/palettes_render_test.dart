@@ -23,7 +23,7 @@ final Map<String, Widget Function()> _screens = {
     detail: StoryDetailView(story: fx.halcyon),
     onBack: () {},
   ),
-  'sign in': () => SignInPage(onContinue: (_) {}, onTryDemo: () {}),
+  'sign in': () => SignInPage(onContinue: (_) {}, onBack: () {}),
   'settings': () => SettingsPage(
     appearance: const Appearance(),
     onAppearanceChanged: (_) {},

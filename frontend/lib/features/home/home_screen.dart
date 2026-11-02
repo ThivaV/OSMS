@@ -83,7 +83,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _refresh = Timer.periodic(_refreshEvery, (_) => ref.invalidate(storiesProvider));
+    _refresh = Timer.periodic(_refreshEvery, (_) => _refreshNow());
   }
 
   @override
@@ -96,7 +96,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) ref.invalidate(storiesProvider);
+    if (state == AppLifecycleState.resumed) _refreshNow(resumed: true);
+  }
+
+  /// Stories every minute. The briefing while there is none yet (a new reader's first is
+  /// being made), and on coming back to the app; never while one is playing, which a new
+  /// briefing would cut off. Coming back also picks up changes made on another device.
+  void _refreshNow({bool resumed = false}) {
+    ref.invalidate(storiesProvider);
+    final playing = _playback?.state.value.playing ?? false;
+    if (!playing && (resumed || ref.read(briefingProvider).value == null)) ref.invalidate(briefingProvider);
+    if (resumed) unawaited(_session.refreshAccount());
   }
 
   void _selectStory(String? id) {
@@ -240,6 +250,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     // with real stories.
     final briefing = view.samples ? (account == null ? sample.briefing : null) : ref.watch(briefingProvider).value;
     final playback = _playbackOf(briefing);
+    final briefingMaking = account != null && briefing == null && (ref.watch(briefingMakingProvider).value ?? false);
     final research = _nav != 'today'
         ? const <Item>[]
         : (view.samples ? sample.research : (ref.watch(researchProvider).value ?? const <Item>[]));
@@ -267,7 +278,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ? DemoBanner(
             signInAvailable: session.available && session.providers.any,
             samples: view.samples,
-            onCreateAccount: () => context.go('/sign-in?intent=create'),
             onSignIn: () => context.go('/sign-in'),
           )
         : view.unavailable
@@ -275,6 +285,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             icon: Icons.cloud_off_rounded,
             title: 'Your stories didn’t load',
             body: 'OSMS couldn’t reach its server. Today tries again every minute.',
+          )
+        : briefingMaking
+        ? const QuietNote(
+            icon: Icons.graphic_eq_rounded,
+            title: 'Your first briefing is being made',
+            body: 'It takes about 15 minutes. It appears here, ready to play, when it’s done.',
           )
         : null;
 

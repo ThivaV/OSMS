@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/layout/breakpoints.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
 import '../../shared/widgets/section_header.dart';
-import '../../shared/widgets/story_visual.dart';
 
 enum SignInStatus {
   idle,
@@ -17,23 +15,19 @@ enum SignInStatus {
   unavailable,
 }
 
-/// Which wording the page opens with. Both run the same flow: continuing signs
-/// a returning reader in, or creates the account on first use.
-enum SignInIntent { signIn, createAccount }
-
-/// Sign in and sign up in one page. No passwords: every option goes through a
-/// provider. A new account continues to onboarding; a returning reader to Today.
-class SignInPage extends StatefulWidget {
+/// Sign in and sign up in one page, and nothing else on it. No passwords: every option
+/// goes through a provider. A new account continues to onboarding; a returning reader,
+/// on any device, straight to their stories.
+class SignInPage extends StatelessWidget {
   const SignInPage({
     super.key,
     this.providers = const [SignInProvider.google],
     this.status = SignInStatus.idle,
     this.pending,
     this.error,
-    this.initialIntent = SignInIntent.signIn,
     this.onContinue,
-    this.onTryDemo,
     this.onWhatWeKeep,
+    this.onBack,
   });
 
   final List<SignInProvider> providers;
@@ -44,137 +38,33 @@ class SignInPage extends StatefulWidget {
 
   /// Shown while [status] is `error`.
   final String? error;
-  final SignInIntent initialIntent;
   final ValueChanged<SignInProvider>? onContinue;
-  final VoidCallback? onTryDemo;
   final VoidCallback? onWhatWeKeep;
 
-  @override
-  State<SignInPage> createState() => _SignInPageState();
-}
-
-class _SignInPageState extends State<SignInPage> {
-  late SignInIntent _intent = widget.initialIntent;
+  /// Back to where the reader came from (the desktop app has no browser back button).
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    final panel = _SignInPanel(
-      page: widget,
-      intent: _intent,
-      onSwitchIntent: () => setState(
-        () => _intent = _intent == SignInIntent.signIn ? SignInIntent.createAccount : SignInIntent.signIn,
-      ),
-    );
-
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (WindowSize.fromWidth(constraints.maxWidth) == WindowSize.desktop) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: ColoredBox(
-                      color: c.surfaceMuted,
-                      child: const Center(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.all(Space.xxxl),
-                          child: _Brand(large: true),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const VerticalDivider(width: Sizes.hairline),
-                  SizedBox(
-                    width: Sizes.signInPanelWidth,
-                    child: Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(Space.xxl),
-                        child: panel,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(Space.xl),
-              child: Center(
+        child: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(Space.xl),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: Sizes.sheetMaxWidth),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const _Brand(large: false),
-                      const SizedBox(height: Space.xxl),
-                      panel,
-                    ],
-                  ),
+                  constraints: const BoxConstraints(maxWidth: Sizes.signInPanelWidth),
+                  child: _SignInPanel(page: this),
                 ),
               ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-/// Wordmark, the story-thread art and what OSMS does, in three lines.
-class _Brand extends StatelessWidget {
-  const _Brand({required this.large});
-
-  final bool large;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final t = context.text;
-    const points = [
-      (Icons.layers_outlined, 'Sixty items become seven stories', 'Articles, podcasts, videos and posts about the same event, together.'),
-      (Icons.update_rounded, 'Only what changed', 'New facts since you last looked, and where sources disagree.'),
-      (Icons.wb_twilight_rounded, 'A morning briefing', 'Your stories, read aloud, in English, Danish or Tamil.'),
-    ];
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: Sizes.sheetMaxWidth),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('OSMS', style: large ? t.display : t.title),
-            const SizedBox(height: Space.xs),
-            Text('One story, many sources', style: t.reading.copyWith(color: c.textSecondary)),
-            SizedBox(height: large ? Space.xxl : Space.xl),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(Radii.lg),
-              child: StoryVisual(seed: 7, threads: 12, aspectRatio: large ? 1.6 : 2.6),
             ),
-            if (large) ...[
-              const SizedBox(height: Space.xxl),
-              for (final (icon, title, body) in points) ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(icon, size: Sizes.iconLg, color: c.textSecondary),
-                    const SizedBox(width: Space.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title, style: t.subhead),
-                          const SizedBox(height: Space.xxs),
-                          Text(body, style: t.bodySmall.copyWith(color: c.textSecondary)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: Space.lg),
-              ],
-            ],
+            if (onBack != null)
+              Positioned(
+                top: Space.sm,
+                left: Space.sm,
+                child: IconButton(tooltip: 'Back', icon: const Icon(Icons.arrow_back_rounded), onPressed: onBack),
+              ),
           ],
         ),
       ),
@@ -183,42 +73,34 @@ class _Brand extends StatelessWidget {
 }
 
 class _SignInPanel extends StatelessWidget {
-  const _SignInPanel({required this.page, required this.intent, required this.onSwitchIntent});
+  const _SignInPanel({required this.page});
 
   final SignInPage page;
-  final SignInIntent intent;
-  final VoidCallback onSwitchIntent;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final t = context.text;
     final busy = page.status == SignInStatus.signingIn;
-    final unavailable = page.status == SignInStatus.unavailable;
-    final creating = intent == SignInIntent.createAccount;
-    final onlyGoogle = page.providers.length == 1 && page.providers.first == SignInProvider.google;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(creating ? 'Create your account' : 'Welcome back', style: t.title),
-        const SizedBox(height: Space.sm),
-        Text(
-          creating
-              ? 'Pick your own topics and sources. It takes about a minute.'
-              : 'Sign in to your stories and your morning briefing.',
-          style: t.body.copyWith(color: c.textSecondary),
-        ),
-        const SizedBox(height: Space.xl),
+        Text('OSMS', style: t.display),
+        const SizedBox(height: Space.xs),
+        Text('One story, many sources', style: t.reading.copyWith(color: c.textSecondary)),
+        const SizedBox(height: Space.xxl),
+        Text('Sign in', style: t.title),
+        const SizedBox(height: Space.lg),
         if (page.status == SignInStatus.error) ...[
           _ErrorNote(message: page.error ?? 'Something went wrong. Please try again.'),
           const SizedBox(height: Space.lg),
         ],
-        if (unavailable)
+        if (page.status == SignInStatus.unavailable)
           const QuietNote(
             icon: Icons.cloud_off_rounded,
             title: 'Sign-in is unavailable right now',
-            body: 'You can still look around the demo. Your own sources need an account, so please try again later.',
+            body: 'Please try again in a little while.',
           )
         else ...[
           for (final provider in page.providers) ...[
@@ -230,74 +112,21 @@ class _SignInPanel extends StatelessWidget {
             const SizedBox(height: Space.sm),
           ],
           const SizedBox(height: Space.xs),
-          Text(
-            onlyGoogle
-                ? 'Continuing with Google signs you in, or creates your account if you’re new. '
-                    'OSMS never sees your password.'
-                : 'Continuing signs you in, or creates your account if you’re new. '
-                    'OSMS never sees your password.',
-            style: t.caption.copyWith(color: c.textTertiary),
-          ),
+          Text('New here? This creates your account.', style: t.caption.copyWith(color: c.textTertiary)),
         ],
         const SizedBox(height: Space.xl),
-        Row(
-          children: [
-            const Expanded(child: Divider()),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Space.md),
-              child: Text('or', style: t.caption.copyWith(color: c.textTertiary)),
-            ),
-            const Expanded(child: Divider()),
-          ],
-        ),
-        const SizedBox(height: Space.xl),
-        SizedBox(
-          height: Sizes.buttonHeight,
-          child: unavailable
-              ? FilledButton.icon(
-                  onPressed: page.onTryDemo,
-                  icon: const Icon(Icons.visibility_outlined, size: Sizes.iconMd),
-                  label: const Text('Look around the demo'),
-                )
-              : OutlinedButton.icon(
-                  onPressed: busy ? null : page.onTryDemo,
-                  icon: const Icon(Icons.visibility_outlined, size: Sizes.iconMd),
-                  label: const Text('Look around the demo first'),
-                ),
-        ),
-        if (!unavailable) ...[
-          const SizedBox(height: Space.lg),
-          Center(
-            child: TextButton(
-              onPressed: busy ? null : onSwitchIntent,
-              child: Text(creating ? 'Already have an account? Sign in' : 'New to OSMS? Create an account'),
-            ),
-          ),
-        ],
-        const SizedBox(height: Space.lg),
-        Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(text: 'OSMS keeps your email, your name and what you pick. '),
-              WidgetSpan(
-                alignment: PlaceholderAlignment.baseline,
-                baseline: TextBaseline.alphabetic,
-                child: InkWell(
-                  onTap: page.onWhatWeKeep,
-                  child: Text(
-                    'What OSMS keeps',
-                    style: t.caption.copyWith(
-                      color: c.text,
-                      decoration: TextDecoration.underline,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Semantics(
+            link: true,
+            child: InkWell(
+              onTap: page.onWhatWeKeep,
+              child: Text(
+                'What OSMS keeps',
+                style: t.caption.copyWith(color: c.text, decoration: TextDecoration.underline, fontWeight: FontWeight.w600),
               ),
-            ],
+            ),
           ),
-          textAlign: TextAlign.center,
-          style: t.caption.copyWith(color: c.textTertiary),
         ),
       ],
     );

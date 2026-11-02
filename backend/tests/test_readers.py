@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 
 from app.config import Settings
-from app.db.models import Interest, Source, Subscription, UserTopic
+from app.db.models import Interest, Job, Source, Subscription, UserTopic
 
 INTEREST = {"keywords": ["retrieval-augmented generation", "RAG"], "related_terms": ["reranking"], "categories": ["cs.CL"]}
 
@@ -51,6 +51,22 @@ def test_onboarding_again_keeps_what_overlaps(client: TestClient, auth) -> None:
     me = onboard(client, auth("ada"), source_ids=sources[:2], interests=[])
     assert {s["id"] for s in me["subscriptions"]} == set(sources[:2])
     assert me["interests"] == []
+
+
+def test_onboarding_queues_the_first_briefing_and_today_can_say_so(
+    client: TestClient, auth, settings: Settings
+) -> None:
+    client.get("/me", headers=auth("ada"))
+    assert client.get("/briefings/making", headers=auth("ada")).json() == {"making": False}
+    onboard(client, auth("ada"))
+    assert client.get("/briefings/making", headers=auth("ada")).json() == {"making": True}
+    onboard(client, auth("ada"), language="en")  # Changing the picks later queues nothing more.
+    with create_engine(settings.database_url).connect() as db:
+        refs = db.scalars(select(Job.ref).where(Job.kind == "make-briefing")).all()
+    assert refs == [client.get("/me", headers=auth("ada")).json()["id"]]
+    client.get("/me", headers=auth("grace"))
+    assert client.get("/briefings/making", headers=auth("grace")).json() == {"making": False}, "only her own"
+    assert client.get("/briefings/making").status_code == 401
 
 
 def test_onboarding_refuses_bad_picks(client: TestClient, auth) -> None:

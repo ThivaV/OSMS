@@ -13,13 +13,20 @@ MAX_ATTEMPTS = 5
 BASE_BACKOFF = timedelta(seconds=30)
 
 
+def pending(db: Session, kind: str, ref: object) -> bool:
+    """Whether `kind` for `ref` is queued or running."""
+    return (
+        db.scalar(
+            select(Job.id).where(Job.kind == kind, Job.ref == str(ref), Job.status.in_(("queued", "running"))).limit(1)
+        )
+        is not None
+    )
+
+
 def enqueue(db: Session, kind: str, ref: object, *, run_after: datetime | None = None) -> bool:
     """Queue `kind` for `ref` unless it is already queued or running. True if queued."""
     ref = str(ref)
-    exists = db.scalar(
-        select(Job.id).where(Job.kind == kind, Job.ref == ref, Job.status.in_(("queued", "running"))).limit(1)
-    )
-    if exists:
+    if pending(db, kind, ref):
         return False
     now = datetime.now(UTC)
     db.add(Job(kind=kind, ref=ref, run_after=run_after or now, created_at=now, updated_at=now))

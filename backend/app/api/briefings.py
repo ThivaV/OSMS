@@ -12,10 +12,10 @@ from fastapi.responses import FileResponse
 
 from app.api.deps import Db, Reader
 from app.db.models import Briefing, Claim
-from app.schemas.briefings import BriefingChapterOut, BriefingOut
+from app.schemas.briefings import BriefingChapterOut, BriefingMakingOut, BriefingOut
 from app.schemas.stories import PointOut
 from app.services import briefing as briefing_service
-from app.services import stories
+from app.services import jobs, stories
 
 router = APIRouter()
 
@@ -65,6 +65,13 @@ def reader_briefing(request: Request, reader: Reader, db: Db) -> BriefingOut:
     if briefing is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No briefing yet.")
     return _out(db, request, briefing, stories.reader_source_ids(db, reader.id))
+
+
+@router.get("/briefings/making")
+def reader_briefing_making(reader: Reader, db: Db) -> BriefingMakingOut:
+    """Whether the reader's next briefing is on its way, so Today can say so before the
+    first one exists."""
+    return BriefingMakingOut(making=jobs.pending(db, "make-briefing", reader.id))
 
 
 @router.get("/demo/briefing")

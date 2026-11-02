@@ -219,16 +219,14 @@ final Map<String, Widget Function()> _screens = {
   ),
   for (final status in SignInStatus.values)
     for (final providers in [const [SignInProvider.google], fx.allSignInProviders])
-      for (final intent in SignInIntent.values)
-        'Sign in ${status.name} ${providers.length} ${intent.name}': () => SignInPage(
-          status: status,
-          providers: providers,
-          pending: SignInProvider.google,
-          error: fx.signedUpElsewhere,
-          initialIntent: intent,
-          onContinue: (_) {},
-          onTryDemo: () {},
-        ),
+      'Sign in ${status.name} ${providers.length}': () => SignInPage(
+        status: status,
+        providers: providers,
+        pending: SignInProvider.google,
+        error: fx.signedUpElsewhere,
+        onContinue: (_) {},
+        onBack: () {},
+      ),
   'What OSMS keeps': () => WhatWeKeepPage(contactEmail: fx.longUser.email, onBack: () {}),
   'Today overview': () => Material(child: TodayOverview(stories: fx.stories, briefing: fx.briefing, user: fx.user)),
   'Today overview with research': () => Material(

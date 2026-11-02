@@ -5,14 +5,16 @@ import '../../core/theme/tokens.dart';
 /// Above the story list while signed out: this is the demo, and how to get
 /// your own. Judges can keep reading without an account.
 class DemoBanner extends StatelessWidget {
-  const DemoBanner({super.key, this.signInAvailable = true, this.samples = false, this.onCreateAccount, this.onSignIn});
+  const DemoBanner({super.key, this.signInAvailable = true, this.samples = false, this.onSignIn});
 
   final bool signInAvailable;
 
   /// The demo's stories are invented samples, until OSMS collects real ones. Invented
   /// stories never pass for real ones, so the banner says so.
   final bool samples;
-  final VoidCallback? onCreateAccount;
+
+  /// One way in: signing in creates the account for someone new, and takes a reader who
+  /// has one, on any device, straight to their stories.
   final VoidCallback? onSignIn;
 
   @override
@@ -28,21 +30,14 @@ class DemoBanner extends StatelessWidget {
           [
             if (samples) 'Its stories are invented samples until OSMS starts collecting real ones.',
             signInAvailable
-                ? 'Create an account to choose your own topics and sources. It takes about a minute.'
+                ? 'Sign in to choose your own topics and sources. New here? Signing in creates your account.'
                 : 'Sign-in is unavailable right now. You can keep reading the demo.',
           ].join(' '),
           style: t.bodySmall.copyWith(color: c.textSecondary),
         ),
       ],
     );
-    final actions = Wrap(
-      spacing: Space.sm,
-      runSpacing: Space.sm,
-      children: [
-        FilledButton(onPressed: onCreateAccount ?? () {}, child: const Text('Create an account')),
-        TextButton(onPressed: onSignIn ?? () {}, child: const Text('Sign in')),
-      ],
-    );
+    final actions = FilledButton(onPressed: onSignIn ?? () {}, child: const Text('Sign in'));
 
     return Container(
       padding: const EdgeInsets.all(Space.lg),

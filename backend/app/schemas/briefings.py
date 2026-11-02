@@ -19,6 +19,11 @@ class BriefingChapterOut(BaseModel):
     checked_by: str
 
 
+class BriefingMakingOut(BaseModel):
+    #: A briefing for the reader is queued or being made.
+    making: bool
+
+
 class BriefingOut(BaseModel):
     id: str
     created_at: datetime

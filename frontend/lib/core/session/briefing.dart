@@ -14,3 +14,15 @@ final briefingProvider = FutureProvider<Briefing?>((ref) async {
     return null;
   }
 });
+
+/// Signed in with no briefing yet: whether one is being made right now. Today asks
+/// again on every refresh, so the player appears as soon as it's ready.
+final briefingMakingProvider = FutureProvider<bool>((ref) async {
+  final reader = ref.watch(sessionProvider.select((s) => s.value?.account?.user.id));
+  if (reader == null || await ref.watch(briefingProvider.future) != null) return false;
+  try {
+    return await ref.watch(apiClientProvider).briefingMaking();
+  } on ApiException {
+    return false;
+  }
+});

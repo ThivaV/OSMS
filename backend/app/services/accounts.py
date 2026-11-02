@@ -23,6 +23,7 @@ from app.schemas.account import (
     TopicOut,
 )
 from app.services import interests as research
+from app.services import jobs
 
 # Recording "last seen" on every request would make every read a write.
 LAST_SEEN_EVERY = timedelta(hours=1)
@@ -125,6 +126,10 @@ def complete_onboarding(db: Session, user: User, picks: OnboardingIn) -> User:
     user.subscriptions = kept + [Subscription(source_id=i) for i in sorted(added)]
     _replace_interests(user, picks.interests)
     research.sync_sources(db, user)
+    if user.onboarded_at is None and not db.scalar(select(Briefing.id).where(Briefing.user_id == user.id).limit(1)):
+        # The first briefing now, not at the next morning's run: making it takes a while,
+        # and Today says it is on its way (GET /briefings/making).
+        jobs.enqueue(db, "make-briefing", user.id)
     user.onboarded_at = user.onboarded_at or datetime.now(UTC)
     db.commit()
     return user

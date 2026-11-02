@@ -95,6 +95,17 @@ class SessionController extends AsyncNotifier<Session> {
   /// Throws [AuthException] with a message for the reader.
   Future<void> sendEmailLink(String email) => _auth.sendEmailLink(email);
 
+  /// The account again from the API, so picks made on another device show up here.
+  /// Kept as it is when the API can't be reached; the next refresh tries again.
+  Future<void> refreshAccount() async {
+    if (_now.account == null) return;
+    try {
+      _accountChanged(await _api.me());
+    } on ApiException {
+      return;
+    }
+  }
+
   /// Throws [ApiException] with a message for the reader.
   Future<void> completeOnboarding(OnboardingPicks picks) async =>
       _accountChanged(await _api.completeOnboarding(picks));

@@ -171,6 +171,70 @@ describe("auth service", () => {
     assert.notEqual((await trade()).status, 200, "a one-time token works once");
   });
 
+  it("skips Google for a browser already signed in to OSMS: one click hands the session over", async () => {
+    const { cookie } = await signIn("margaret@users.example");
+    const page = await fetch(`${base}/native/sign-in?provider=google&${q(APP_RETURN)}`, {
+      headers: { Cookie: cookie },
+      redirect: "manual",
+    });
+    assert.equal(page.status, 200, "no detour through Google");
+    const html = await page.text();
+    assert.ok(html.includes("margaret@users.example"), "the page says which account");
+    assert.ok(html.includes('action="/native/continue"'));
+    assert.ok(html.includes("another=1"), "another Google account is one link away");
+    assert.match(page.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
+    assert.match(page.headers.get("content-security-policy") ?? "", /form-action 'self' http:\/\/127\.0\.0\.1:53682/);
+    const flow = cookiesFrom(page).find((c) => c.startsWith("osms_native_flow="))!;
+    assert.ok(flow, "the flow is tied to this browser");
+
+    const done = await fetch(`${base}/native/continue`, {
+      method: "POST",
+      headers: { Cookie: `${cookie}; ${flow}`, Origin: "http://localhost:3000", "Content-Type": "application/x-www-form-urlencoded" },
+      body: q(APP_RETURN),
+      redirect: "manual",
+    });
+    assert.equal(done.status, 302);
+    const back = new URL(done.headers.get("location") ?? "");
+    assert.equal(`${back.origin}${back.pathname}`, "http://127.0.0.1:53682/callback");
+    const token = back.searchParams.get("token");
+    assert.ok(token);
+    const traded = await fetch(`${base}/api/auth/one-time-token/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    assert.equal(traded.status, 200);
+    assert.ok(traded.headers.get("set-auth-token"), "the app gets a session of its own");
+  });
+
+  it("never hands a session over for another site's form, or without this browser's flow", async () => {
+    const { cookie } = await signIn("eve@users.example");
+    const page = await fetch(`${base}/native/sign-in?provider=google&${q(APP_RETURN)}`, { headers: { Cookie: cookie } });
+    const flow = cookiesFrom(page).find((c) => c.startsWith("osms_native_flow="))!;
+    const post = (headers: Record<string, string>) =>
+      fetch(`${base}/native/continue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", ...headers },
+        body: q(APP_RETURN),
+        redirect: "manual",
+      });
+    assert.equal((await post({ Cookie: `${cookie}; ${flow}`, Origin: "https://evil.example" })).status, 403);
+    assert.equal((await post({ Cookie: `${cookie}; ${flow}` })).status, 403, "no origin, no hand-over");
+    const noFlow = await post({ Cookie: cookie, Origin: "http://localhost:3000" });
+    assert.equal(new URL(noFlow.headers.get("location") ?? "").searchParams.get("error"), "expired");
+    assert.equal(new URL(noFlow.headers.get("location") ?? "").searchParams.get("token"), null);
+  });
+
+  it("goes to Google for another account even when signed in", async () => {
+    const { cookie } = await signIn("ida@users.example");
+    const res = await fetch(`${base}/native/sign-in?provider=google&another=1&${q(APP_RETURN)}`, {
+      headers: { Cookie: cookie },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+    assert.equal(new URL(res.headers.get("location") ?? "").host, "accounts.google.com");
+  });
+
   it("passes a failed Google sign-in back to the desktop app", async () => {
     const res = await fetch(`${base}/native/error?error=access_denied&${q(APP_RETURN)}`, { redirect: "manual" });
     assert.equal(new URL(res.headers.get("location") ?? "").searchParams.get("error"), "access_denied");

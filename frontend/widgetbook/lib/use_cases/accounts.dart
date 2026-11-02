@@ -23,11 +23,6 @@ Widget _largeText(Widget child) => Builder(
 
 @widgetbook.UseCase(name: 'Normal', type: SignInPage, path: '[Accounts]')
 Widget signInNormal(BuildContext context) {
-  final intent = context.knobs.object.segmented(
-    label: 'Opens as',
-    options: SignInIntent.values,
-    labelBuilder: (i) => i == SignInIntent.signIn ? 'Sign in' : 'Create account',
-  );
   final status = context.knobs.object.dropdown(
     label: 'State',
     options: const [SignInStatus.idle, SignInStatus.signingIn, SignInStatus.error],
@@ -35,21 +30,20 @@ Widget signInNormal(BuildContext context) {
   );
   final allProviders = context.knobs.boolean(label: 'All providers (post-hackathon)');
   return SignInPage(
-    key: ValueKey((intent, status)),
-    initialIntent: intent,
+    key: ValueKey(status),
     status: status,
     pending: SignInProvider.google,
     error: fx.popupBlocked,
     providers: allProviders ? fx.allSignInProviders : const [SignInProvider.google],
     onContinue: (_) {},
-    onTryDemo: () {},
     onWhatWeKeep: () {},
+    onBack: () {},
   );
 }
 
 @widgetbook.UseCase(name: 'Empty', type: SignInPage, path: '[Accounts]')
 Widget signInEmpty(BuildContext context) =>
-    SignInPage(status: SignInStatus.unavailable, onTryDemo: () {}, onWhatWeKeep: () {});
+    SignInPage(status: SignInStatus.unavailable, onWhatWeKeep: () {}, onBack: () {});
 
 @widgetbook.UseCase(name: 'Extreme content', type: SignInPage, path: '[Accounts]')
 Widget signInExtreme(BuildContext context) => _largeText(
@@ -57,10 +51,9 @@ Widget signInExtreme(BuildContext context) => _largeText(
     status: SignInStatus.error,
     error: fx.signedUpElsewhere,
     providers: fx.allSignInProviders,
-    initialIntent: SignInIntent.createAccount,
     onContinue: (_) {},
-    onTryDemo: () {},
     onWhatWeKeep: () {},
+    onBack: () {},
   ),
 );
 
@@ -100,14 +93,14 @@ Widget accountExtreme(BuildContext context) => Frame(
 /// The demo shows invented sample stories until OSMS collects real ones, and says so.
 @widgetbook.UseCase(name: 'Normal', type: DemoBanner, path: '[Accounts]')
 Widget demoBannerNormal(BuildContext context) =>
-    Frame(child: DemoBanner(samples: true, onCreateAccount: () {}, onSignIn: () {}));
+    Frame(child: DemoBanner(samples: true, onSignIn: () {}));
 
 @widgetbook.UseCase(name: 'Real stories', type: DemoBanner, path: '[Accounts]')
-Widget demoBannerReal(BuildContext context) => Frame(child: DemoBanner(onCreateAccount: () {}, onSignIn: () {}));
+Widget demoBannerReal(BuildContext context) => Frame(child: DemoBanner(onSignIn: () {}));
 
 @widgetbook.UseCase(name: 'Empty', type: DemoBanner, path: '[Accounts]')
 Widget demoBannerEmpty(BuildContext context) => const Frame(child: DemoBanner(signInAvailable: false, samples: true));
 
 @widgetbook.UseCase(name: 'Extreme content', type: DemoBanner, path: '[Accounts]')
 Widget demoBannerExtreme(BuildContext context) =>
-    _largeText(Frame(child: DemoBanner(samples: true, onCreateAccount: () {}, onSignIn: () {})));
+    _largeText(Frame(child: DemoBanner(samples: true, onSignIn: () {})));

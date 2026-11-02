@@ -9,7 +9,7 @@ from typing import Any, ClassVar
 # Tests never reach a real model. pymilvus loads the repo's .env into the environment
 # when it is imported (python-dotenv), but never over a variable already set: blank the
 # keys first, and every Settings below ignores the .env file too.
-for _key in ("META_API_KEY", "BASETEN_API_KEY", "BASETEN_BASE_URL", "GLIMMER_API_KEY", "GLIMMER_BASE_URL"):
+for _key in ("META_API_KEY", "BASETEN_API_KEY", "BASETEN_BASE_URL", "GLIMMER_API_KEY", "GLIMMER_BASE_URL", "FIREWORKS_API_KEY"):
     os.environ[_key] = ""
 
 import jwt

@@ -18,6 +18,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:osms/app.dart';
 import 'package:osms/core/api/auth_client_io.dart';
 import 'package:osms/core/config/env.dart';
+import 'package:osms/features/auth/demo_banner.dart';
 
 const sessionCookie = String.fromEnvironment('OSMS_TEST_SESSION_COOKIE');
 
@@ -86,9 +87,10 @@ void main() {
     await const KeychainStore().delete();
     await startApp(tester);
     // Only shown when the sandboxed app reached the sign-in service.
-    await waitFor(tester, find.text('Create an account'));
+    final signIn = find.descendant(of: find.byType(DemoBanner), matching: find.text('Sign in'));
+    await waitFor(tester, signIn);
     await shot(tester, '1-signed-out');
-    await tester.tap(find.text('Create an account').first);
+    await tester.tap(signIn.first);
     await waitFor(tester, find.text('Continue with Google'));
     expect(find.text('Email me a sign-in link'), findsNothing, reason: 'email links are web-only');
     await shot(tester, '2-sign-in');

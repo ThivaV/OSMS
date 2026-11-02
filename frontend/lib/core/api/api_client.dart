@@ -109,6 +109,10 @@ class ApiClient {
     }
   }
 
+  /// Whether the reader's next briefing is being made: a new reader's first one takes a
+  /// while, and Today says it's on its way.
+  Future<bool> briefingMaking() async => (await _send('GET', '/briefings/making'))!['making'] == true;
+
   /// The interest agent's related terms, categories and rule-3 flags for keywords being
   /// edited. Nothing is stored.
   Future<InterestSuggestions> suggestInterest(List<String> keywords) async {
