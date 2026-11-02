@@ -141,6 +141,56 @@ def test_hostile_feeds_are_refused() -> None:
         parse_feed(b"this is not a feed at all")
 
 
+PODCAST_RSS = b"""<?xml version="1.0"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel><title>Gradient Hour</title>
+<item><guid>gh-1</guid><title>Diffusion normals</title><link>https://gradienthour.example/1</link>
+<description>Normals for breakfast.</description>
+<enclosure url="https://cdn.gradienthour.example/1.mp3" type="audio/mpeg" length="99"/>
+<itunes:duration>42:10</itunes:duration></item>
+<item><guid>gh-2</guid><title>Trailer</title><link>https://gradienthour.example/0</link>
+<description>Coming soon.</description>
+<enclosure url="http://127.0.0.1/0.mp3" type="audio/mpeg" length="1"/>
+<itunes:duration>3600</itunes:duration></item>
+<item><guid>gh-3</guid><title>Shownotes</title><link>https://gradienthour.example/notes</link>
+<description>Just links.</description></item>
+</channel></rss>"""
+
+PODCAST_JSON = b"""{"version": "https://jsonfeed.org/version/1.1", "title": "Soundwaves",
+"items": [{"id": "s1", "url": "https://soundwaves.example/1", "title": "Chip tide", "content_text": "Chips.",
+"attachments": [{"url": "https://cdn.soundwaves.example/1.m4a", "mime_type": "audio/mp4", "duration_in_seconds": 3723}]}]}"""
+
+
+def test_audio_enclosures_become_episodes_with_audio_links() -> None:
+    _, entries = parse_feed(PODCAST_RSS)
+    first, trailer, notes = entries
+    assert first.kind == "episode"
+    assert first.audio == "https://cdn.gradienthour.example/1.mp3"
+    assert first.duration_s == 42 * 60 + 10
+    assert trailer.kind == "episode" and trailer.audio is None, "a hostile enclosure fails closed, the item stays"
+    assert trailer.duration_s == 3600
+    assert notes.kind == "article" and notes.audio is None and notes.duration_s is None
+    _, items = parse_feed(PODCAST_JSON)
+    assert items[0].kind == "episode"
+    assert items[0].audio == "https://cdn.soundwaves.example/1.m4a"
+    assert items[0].duration_s == 3723
+
+
+def test_durations_accept_seconds_and_reject_nonsense() -> None:
+    from app.services.ingestion.adapters.feed import _duration
+
+    assert _duration(90) == 90
+    assert _duration("90") == 90
+    assert _duration("1:02:03") == 3723
+    assert _duration(" 7:05 ") == 425
+    assert _duration(None) is None
+    assert _duration("soon") is None
+    assert _duration("1:2:3:4") is None
+    assert _duration(0) is None
+    assert _duration(-5) is None
+    assert _duration(25 * 3600) is None
+    assert _duration(True) is None
+
+
 def test_plain_text_caps_and_collapses() -> None:
     assert plain_text("<p>a   b</p><p>c</p>") == "a b\nc"
     assert len(plain_text("x" * 10_000)) == 4000

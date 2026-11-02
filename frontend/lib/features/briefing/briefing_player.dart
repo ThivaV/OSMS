@@ -19,11 +19,16 @@ class BriefingPlayer extends StatefulWidget {
     this.playback,
     this.initialChapter = 0,
     this.initialProgress = 0.35,
+    this.onBeforePlay,
   });
 
   /// Null until the first briefing has been made.
   final Briefing? briefing;
   final BriefingPlayback? playback;
+
+  /// Runs before audio starts (never before a pause): the app pauses its
+  /// episode here, keeping one audio at a time.
+  final VoidCallback? onBeforePlay;
   final int initialChapter;
 
   /// Progress through the current chapter, 0–1.
@@ -65,8 +70,11 @@ class _BriefingPlayerState extends State<BriefingPlayer> {
     final playback = widget.playback;
     if (playback == null) {
       setState(() => _playing = !_playing);
+    } else if (playing) {
+      playback.pause();
     } else {
-      playing ? playback.pause() : playback.play();
+      widget.onBeforePlay?.call();
+      playback.play();
     }
   }
 
@@ -424,6 +432,7 @@ class BriefingFloatingBar extends StatefulWidget {
     this.chapter = 0,
     this.progress = 0.35,
     this.onOpen,
+    this.onBeforePlay,
   });
 
   final Briefing briefing;
@@ -433,6 +442,10 @@ class BriefingFloatingBar extends StatefulWidget {
   final int chapter;
   final double progress;
   final VoidCallback? onOpen;
+
+  /// Runs before audio starts (never before a pause): the app pauses its
+  /// episode here, keeping one audio at a time.
+  final VoidCallback? onBeforePlay;
 
   static const height = 60.0;
 
@@ -470,7 +483,12 @@ class _BriefingFloatingBarState extends State<BriefingFloatingBar> {
           chapter,
           state.position,
           state.playing,
-          onToggle: state.playing ? playback.pause : playback.play,
+          onToggle: state.playing
+              ? playback.pause
+              : () {
+                  widget.onBeforePlay?.call();
+                  playback.play();
+                },
           onNext: () => playback.seek(briefing.startOf(chapter + 1)),
         );
       },

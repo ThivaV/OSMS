@@ -9,6 +9,7 @@ import 'package:osms/app.dart';
 import 'package:osms/core/api/api_client.dart';
 import 'package:osms/core/api/auth_client.dart';
 import 'package:osms/core/audio/briefing_playback.dart';
+import 'package:osms/core/audio/episode_playback.dart';
 import 'package:osms/core/models/models.dart';
 import 'package:osms/core/session/account.dart';
 import 'package:osms/core/session/session.dart';
@@ -140,6 +141,15 @@ class FakeApi extends ApiClient {
   @override
   Future<List<Item>> research() async => papers;
 
+  /// The reader's episodes; the demo's when signed out. Empty demo means the
+  /// app shows its labelled samples.
+  List<Episode> readerEpisodes = const [];
+  List<Episode> demoEpisodes = const [];
+
+  @override
+  Future<List<Episode>> episodes({bool demo = false, int limit = 50}) async =>
+      (demo ? demoEpisodes : readerEpisodes).take(limit).toList();
+
   /// The latest briefing, signed in or the demo's; null before the first.
   Briefing? latestBriefing;
 
@@ -208,6 +218,8 @@ Future<(FakeAuth, FakeApi)> start(
   List<Story> demo = const [],
   Briefing? briefing,
   bool briefingMaking = false,
+  List<Episode> readerEpisodes = const [],
+  List<Episode> demoEpisodes = const [],
   List<FakePlayback>? players,
   String? at,
 }) async {
@@ -215,21 +227,26 @@ Future<(FakeAuth, FakeApi)> start(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final fakeAuth = auth ?? FakeAuth();
+  FakePlayback newPlayer(String url) {
+    final player = FakePlayback(url);
+    players?.add(player);
+    return player;
+  }
+
   final fakeApi = FakeApi(fakeAuth, onboarded: onboarded, subscriptions: subscriptions)
     ..readerStories = readerStories
     ..demo = demo
     ..latestBriefing = briefing
-    ..briefingInTheMaking = briefingMaking;
+    ..briefingInTheMaking = briefingMaking
+    ..readerEpisodes = readerEpisodes
+    ..demoEpisodes = demoEpisodes;
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         authClientProvider.overrideWithValue(fakeAuth),
         apiClientProvider.overrideWithValue(fakeApi),
-        briefingPlaybackProvider.overrideWithValue((url) {
-          final player = FakePlayback(url);
-          players?.add(player);
-          return player;
-        }),
+        briefingPlaybackProvider.overrideWithValue(newPlayer),
+        episodePlaybackProvider.overrideWithValue(newPlayer),
       ],
       child: const OsmsApp(),
     ),

@@ -2,6 +2,7 @@ export 'account.dart';
 export 'ask.dart';
 export 'briefing.dart';
 export 'decision.dart';
+export 'episode.dart';
 export 'item.dart';
 export 'research.dart';
 export 'source.dart';

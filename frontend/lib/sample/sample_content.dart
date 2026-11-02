@@ -44,6 +44,13 @@ const gradientHour = Source(
   language: 'en',
   followed: true,
 );
+const soundwavesDaily = Source(
+  id: 'soundwaves-daily',
+  name: 'Soundwaves Daily',
+  type: SourceType.podcast,
+  language: 'en',
+  followed: true,
+);
 const tinkerersAudio = Source(
   id: 'tinkerers-audio',
   name: 'Tinkerers Audio',
@@ -718,6 +725,44 @@ final extremePaper = Item(
 );
 
 final items = [paperRag, articleItem, postItem, videoItem, episodeItem, photoItem, comicItem];
+
+// ── Podcasts ──────────────────────────────────────────────────────────────────
+
+/// Demo-only sample audio (open test tracks): judges can press play in the
+/// demo. Real episodes stream their own enclosures.
+const _demoAudio1 = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+const _demoAudio2 = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3';
+
+/// The demo's podcasts: playable samples, one still waiting for its audio.
+final sampleEpisodes = [
+  Episode(
+    id: 'se-1',
+    title: 'Ep. 112: What “open weights” actually means',
+    excerpt: 'Licences, usage caps and who gets to build on top.',
+    publishedAt: ago(d: 1),
+    duration: const Duration(minutes: 48),
+    audioUrl: _demoAudio1,
+    show: gradientHour,
+    storyId: halcyon.id,
+    storyTitle: halcyon.title,
+  ),
+  Episode(
+    id: 'se-2',
+    title: 'Chip tide: the week in silicon',
+    excerpt: 'Fabs, shortages and one very large order.',
+    publishedAt: ago(h: 5),
+    duration: const Duration(minutes: 31, seconds: 12),
+    audioUrl: _demoAudio2,
+    show: soundwavesDaily,
+  ),
+  Episode(
+    id: 'se-3',
+    title: 'Workstation builds for local inference',
+    excerpt: 'What fits, what is slow, and what breaks.',
+    publishedAt: ago(h: 9),
+    show: tinkerersAudio,
+  ),
+];
 
 final emptyItems = [
   Item(id: 'e-paper', source: arxivCsCl, kind: ItemKind.paper, publishedAt: ago(m: 1)),

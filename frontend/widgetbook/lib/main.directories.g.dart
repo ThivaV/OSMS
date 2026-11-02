@@ -23,6 +23,8 @@ import 'package:osms_widgetbook/use_cases/modern.dart'
     as _osms_widgetbook_use_cases_modern;
 import 'package:osms_widgetbook/use_cases/onboarding.dart'
     as _osms_widgetbook_use_cases_onboarding;
+import 'package:osms_widgetbook/use_cases/podcasts.dart'
+    as _osms_widgetbook_use_cases_podcasts;
 import 'package:osms_widgetbook/use_cases/settings.dart'
     as _osms_widgetbook_use_cases_settings;
 import 'package:osms_widgetbook/use_cases/sources.dart'
@@ -262,6 +264,28 @@ final directories = <_widgetbook.WidgetbookNode>[
           _widgetbook.WidgetbookUseCase(
             name: 'Normal',
             builder: _osms_widgetbook_use_cases_onboarding.onboardingNormal,
+          ),
+        ],
+      ),
+    ],
+  ),
+  _widgetbook.WidgetbookCategory(
+    name: 'Podcasts',
+    children: [
+      _widgetbook.WidgetbookComponent(
+        name: 'PodcastsScreen',
+        useCases: [
+          _widgetbook.WidgetbookUseCase(
+            name: 'Empty',
+            builder: _osms_widgetbook_use_cases_podcasts.podcastsEmpty,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Extreme content',
+            builder: _osms_widgetbook_use_cases_podcasts.podcastsExtreme,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Normal',
+            builder: _osms_widgetbook_use_cases_podcasts.podcastsNormal,
           ),
         ],
       ),

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import briefings, me, stories
+from app.api import briefings, episodes, me, stories
 from app.auth.tokens import JwksKeys, TokenVerifier
 from app.clients.openai_compat import models_from_settings
 from app.config import SEED_OPML, Settings, check_routes
@@ -55,6 +55,7 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
     app.include_router(me.router)
     app.include_router(stories.router)
     app.include_router(briefings.router)
+    app.include_router(episodes.router)
     return app
 
 

@@ -99,6 +99,11 @@ class ApiClient {
   /// The reader opened the story: what's new starts again from now.
   Future<void> markRead(String storyId) => _send('POST', '/stories/$storyId/read');
 
+  /// The reader's podcasts, newest first — or the demo's signed out.
+  Future<List<Episode>> episodes({bool demo = false, int limit = 50}) async => episodesFromJson(
+    (await _send('GET', '${demo ? '/demo' : ''}/episodes?limit=$limit', signedIn: !demo))!,
+  );
+
   /// The reader's latest briefing, or the demo's signed out; null before the first.
   Future<Briefing?> briefing({bool demo = false}) async {
     try {

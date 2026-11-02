@@ -147,6 +147,8 @@ class Pipeline:
                     guid=entry.guid,
                     link=entry.link,
                     image_url=entry.image,
+                    audio_url=entry.audio,
+                    duration_s=entry.duration_s,
                     title=entry.title,
                     text=entry.text,
                     language=detect(f"{entry.title}\n{entry.text}", hint),
@@ -172,6 +174,10 @@ class Pipeline:
                 # A new or changed picture needs no re-reading; a feed's thumbnail never
                 # replaces the full-size picture found on the article's page.
                 item.image_url = entry.image
+            if (entry.audio, entry.duration_s) != (item.audio_url, item.duration_s):
+                # A new or changed enclosure needs no re-reading either; the audio
+                # stays a link, and playback streams it from the publisher.
+                item.audio_url, item.duration_s = entry.audio, entry.duration_s
         scheduler.after_success(source, now, published=published, ttl_minutes=meta.ttl_minutes)
         db.commit()
 

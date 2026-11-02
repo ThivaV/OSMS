@@ -90,8 +90,14 @@ Oct 27 – Nov 4, 2026.
     from its feed or the article's link-preview image (where robots.txt allows), credited
     and linking back, never copied; Muse Image's illustration where none has one.
   - **The OSMS logo** on the Mac app, the web app and inside both.
+- [x] **Podcasts: every episode, playable, sourced, storied:** enclosures are kept
+  as links (migration `0009`), `GET /episodes` serves a reader's own newest first with
+  each episode's show and the story it joined, and the app's Podcasts screen (sidebar +
+  ⌘K, phones through Sources) groups them by show, plays them through the briefing's
+  audio engine with one audio at a time, and links "Discussed in" to the story. The
+  demo's samples play openly-licensed sample audio. Spec: `docs/specs/podcasts.md`.
 - [ ] Still to do: related-by-meaning papers, adding sources from the app, the language
-  toggle, podcasts, the editor's review loop and the Muse Wonder trial (see AGENTS.md,
+  toggle, the editor's review loop and the Muse Wonder trial (see AGENTS.md,
   *Build plan*).
 
 ## How judging maps to the repo

@@ -177,6 +177,12 @@ class _SourcesSidebarState extends State<SourcesSidebar> {
                 selected: selected == 'saved',
                 onTap: onSelect == null ? null : () => onSelect('saved'),
               ),
+              _NavRow(
+                icon: Icons.podcasts_rounded,
+                label: 'Podcasts',
+                selected: selected == 'podcasts',
+                onTap: onSelect == null ? null : () => onSelect('podcasts'),
+              ),
               _Heading(user == null ? 'Demo sources' : 'Sources'),
               for (final g in groups) ...[
                 _FolderRow(

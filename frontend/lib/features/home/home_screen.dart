@@ -7,9 +7,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/audio/briefing_playback.dart';
+import '../../core/audio/episode_playback.dart';
 import '../../core/layout/three_pane_layout.dart';
 import '../../core/models/models.dart';
 import '../../core/session/briefing.dart';
+import '../../core/session/episodes.dart';
 import '../../core/session/research.dart';
 import '../../core/session/session.dart';
 import '../../core/session/stories.dart';
@@ -21,6 +23,7 @@ import '../../shared/widgets/source_chip.dart';
 import '../../shared/widgets/story_card.dart';
 import '../auth/demo_banner.dart';
 import '../briefing/briefing_player.dart';
+import '../podcasts/podcasts_screen.dart';
 import '../search/command_palette.dart';
 import '../sources/sources_sidebar.dart';
 import '../stories/story_list.dart';
@@ -67,6 +70,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   BriefingPlayback? _playback;
   String? _playbackFor;
 
+  /// The episode's audio, same engine: one audio plays at a time, so starting
+  /// an episode pauses the briefing and starting the briefing pauses it.
+  EpisodePlayback? _episodePlayback;
+  String? _episodeFor;
+  Episode? _episode;
+
   SessionController get _session => ref.read(sessionProvider.notifier);
 
   BriefingPlayback? _playbackOf(Briefing? briefing) {
@@ -85,9 +94,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final chapter = briefing?.chapters.indexWhere((c) => c.storyId == story.id) ?? -1;
     if (briefing == null || playback == null || chapter < 0) return null;
     return () => unawaited(() async {
+      await _episodePlayback?.pause();
       await playback.seek(briefing.startOf(chapter));
       await playback.play();
     }());
+  }
+
+  EpisodePlayback? _episodePlaybackOf(Episode episode) {
+    if (episode.audioUrl != _episodeFor) {
+      _episodePlayback?.dispose();
+      _episodePlayback = episode.audioUrl == null ? null : ref.read(episodePlaybackProvider)(episode.audioUrl!);
+      _episodeFor = episode.audioUrl;
+    }
+    return _episodePlayback;
+  }
+
+  /// Plays an episode, pausing the briefing first: one audio at a time. Tapping
+  /// the playing episode pauses it.
+  Future<void> _playEpisode(Episode episode) async {
+    if (episode.audioUrl == null) return;
+    final playback = _episodePlaybackOf(episode);
+    if (_episode?.id == episode.id && (playback?.state.value.playing ?? false)) {
+      await playback?.pause();
+      return;
+    }
+    await _playback?.pause();
+    if (!mounted) return;
+    setState(() => _episode = episode);
+    await playback?.play();
   }
 
   @override
@@ -101,6 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void dispose() {
     _refresh?.cancel();
     _playback?.dispose();
+    _episodePlayback?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -115,6 +150,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   /// briefing would cut off. Coming back also picks up changes made on another device.
   void _refreshNow({bool resumed = false}) {
     ref.invalidate(storiesProvider);
+    ref.invalidate(episodesProvider);
     final playing = _playback?.state.value.playing ?? false;
     if (!playing && (resumed || ref.read(briefingProvider).value == null)) ref.invalidate(briefingProvider);
     if (resumed) unawaited(_session.refreshAccount());
@@ -246,6 +282,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         group: 'Actions',
         onRun: () => _selectStory(null),
       ),
+      CommandItem(
+        icon: Icons.podcasts_rounded,
+        label: 'Browse podcasts',
+        group: 'Actions',
+        onRun: () => _selectNav('podcasts', session),
+      ),
     ]);
   }
 
@@ -257,6 +299,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final loaded = ref.watch(storiesProvider);
     final view = loaded.value ?? const StoriesView(stories: []);
     final loading = !loaded.hasValue;
+    final episodesLoaded = ref.watch(episodesProvider);
+    final episodesView = episodesLoaded.value ?? const EpisodesView(episodes: []);
+    final episodesLoading = !episodesLoaded.hasValue;
+    final podcasts = _nav == 'podcasts';
     // The sample briefing and papers belong to the sample stories; a real briefing comes
     // with real stories.
     final briefing = view.samples ? (account == null ? sample.briefing : null) : ref.watch(briefingProvider).value;
@@ -283,7 +329,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final listTopics = [...navTopics, ...allTopics.where((t) => !navTopics.any((n) => n.id == t.id))];
     final stories = _visibleStories(view.stories, listTopics);
     final saved = _nav == 'saved';
-    final story = stories.where((s) => s.id == _selected).firstOrNull;
+    // An episode's "Discussed in" opens its story wherever it is, keeping the
+    // podcasts list behind it.
+    final story =
+        stories.where((s) => s.id == _selected).firstOrNull ??
+        view.stories.where((s) => s.id == _selected).firstOrNull;
     final layout = _layout ?? account?.defaultLayout ?? StoryCardLayout.row;
     final sourceCount = account?.subscriptions.length ?? 0;
     // Until sources can be added one by one from the app, onboarding is where a reader picks them.
@@ -330,9 +380,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       onSignOut: _session.signOut,
     );
 
+    // Podcasts takes the list pane (and, with nothing open, the reading pane
+    // through `overview` below): every episode, playable, sourced, storied.
+    final podcastsScreen = PodcastsScreen(
+      episodes: podcasts ? episodesView.episodes : const [],
+      loading: episodesLoading,
+      unavailable: episodesView.unavailable,
+      samples: episodesView.samples,
+      current: _episode,
+      playback: _episode == null ? null : _episodePlaybackOf(_episode!),
+      onPlay: _playEpisode,
+      onOpenStory: (e) => _selectStory(e.storyId!),
+      banner: banner(),
+      bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,
+    );
+
     final shell = ThreePaneLayout(
       sidebar: sidebar(),
-      list: StoryList(
+      list: podcasts ? podcastsScreen : StoryList(
         stories: stories,
         title: _navTitle(listTopics, navSources),
         selectedId: _selected,
@@ -351,7 +416,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _session.setDefaultLayout(l);
         },
       ),
-      overview: TodayOverview(
+      overview: podcasts
+          ? podcastsScreen
+          : TodayOverview(
         stories: stories,
         title: _nav == 'today' ? null : _navTitle(listTopics, navSources),
         research: research,
@@ -382,12 +449,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   ? null
                   : () => ref.read(apiClientProvider).decisions(story.id, demo: !session.signedIn),
             ),
-      floatingPlayer: briefing == null ? null : BriefingFloatingBar(briefing: briefing, playback: playback),
+      floatingPlayer: briefing == null
+          ? null
+          : BriefingFloatingBar(
+              briefing: briefing,
+              playback: playback,
+              onBeforePlay: () => unawaited(_episodePlayback?.pause()),
+            ),
       phoneNav: PillNav(destinations: _phoneTabs, selected: _phoneTab, onSelect: (i) => setState(() => _phoneTab = i)),
       phoneBody: switch (_phoneTab) {
         1 => SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, ThreePaneLayout.floatingInset),
-          child: BriefingPlayer(briefing: briefing, playback: playback),
+          child: BriefingPlayer(
+            briefing: briefing,
+            playback: playback,
+            onBeforePlay: () => unawaited(_episodePlayback?.pause()),
+          ),
         ),
         2 => const Padding(
           padding: EdgeInsets.all(Space.lg),

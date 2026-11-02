@@ -133,6 +133,35 @@ void main() {
     expect(find.text('Your first briefing is being made'), findsNothing);
   });
 
+  testWidgets('podcasts: every episode plays, names its show, and links its story', (tester) async {
+    final players = <FakePlayback>[];
+    await start(tester, players: players);
+    go(tester, '/demo');
+    await tester.pumpAndSettle();
+
+    await tapText(tester, 'Podcasts');
+    expect(find.textContaining('open weights'), findsWidgets, reason: 'the episodes');
+    expect(find.text('Gradient Hour'), findsWidgets, reason: 'the show, not just the episode');
+    expect(find.textContaining('Discussed in'), findsOneWidget, reason: 'the story link');
+    expect(
+      find.byTooltip('No audio for this episode yet'),
+      findsOneWidget,
+      reason: 'no audio is labelled, never a dead button',
+    );
+
+    await tester.tap(find.byTooltip('Play').first);
+    await tester.pumpAndSettle();
+    expect(players.expand((p) => p.calls), contains('play'), reason: 'the enclosure streams');
+    expect(find.text('Now playing'), findsOneWidget);
+
+    final discussedIn = find.textContaining('Discussed in').first;
+    await tester.ensureVisible(discussedIn);
+    await tester.pumpAndSettle();
+    await tester.tap(discussedIn);
+    await tester.pumpAndSettle();
+    expect(find.text('Ask this story'), findsOneWidget, reason: 'the episode opens its story');
+  });
+
   testWidgets('the sidebar files sources in topic folders that open, close and narrow the list', (tester) async {
     final semantics = tester.ensureSemantics();
     const blog = Source(id: '9', name: 'A blog no topic suggests', type: SourceType.feed, language: 'en');

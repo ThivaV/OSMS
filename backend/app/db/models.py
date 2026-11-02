@@ -195,6 +195,11 @@ class Item(Base):
     link: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: The publisher's picture for it, from the feed: a link, never the file.
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: A podcast episode's audio enclosure: a link, never the file. Playback
+    #: streams from the publisher; a bad enclosure fails closed to null.
+    audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The episode's length in seconds, when the feed states one.
+    duration_s: Mapped[int | None] = mapped_column(Integer, nullable=True)
     title: Mapped[str] = mapped_column(Text, default="")
     text: Mapped[str] = mapped_column(Text, default="")
     language: Mapped[str] = mapped_column(String(8), default="en")

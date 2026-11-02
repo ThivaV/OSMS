@@ -158,6 +158,24 @@ Item paperFromJson(Json j) => Item(
   matchedTerms: [for (final t in (j['matched_terms'] as List?) ?? const []) t as String],
 );
 
+/// An episode of the reader's podcasts, with its show and its story link.
+Episode episodeFromJson(Json j) {
+  final seconds = (j['duration_s'] as num?)?.toInt();
+  return Episode(
+    id: j['id'] as String,
+    title: j['title'] as String,
+    excerpt: (j['excerpt'] as String?) ?? '',
+    publishedAt: j['published_at'] == null ? null : _time(j['published_at']),
+    duration: seconds == null ? null : Duration(seconds: seconds),
+    audioUrl: j['audio_url'] as String?,
+    show: sourceFromJson(j['show'] as Json),
+    storyId: j['story_id'] as String?,
+    storyTitle: j['story_title'] as String?,
+  );
+}
+
+List<Episode> episodesFromJson(Json j) => [for (final e in _list(j['episodes'])) episodeFromJson(e)];
+
 Decision decisionFromJson(Json j) => Decision(
   id: j['id'] as String,
   agent: j['agent'] as String,

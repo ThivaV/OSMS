@@ -44,6 +44,11 @@ class Entry:
     kind: str
     #: The entry's own picture, as a link (AGENTS.md: media stays where it is).
     image: str | None = None
+    #: A podcast episode's audio, as a link. Never the file: playback streams
+    #: from the publisher, and a bad enclosure fails closed to None.
+    audio: str | None = None
+    #: The episode's length in seconds, when the feed states one.
+    duration_s: int | None = None
 
     @property
     def content_hash(self) -> str:
@@ -105,6 +110,44 @@ def _safe_link(link: str | None) -> str | None:
         return check_url(link)
     except UnsafeUrl:
         return None
+
+
+def _enclosure(raw) -> str | None:
+    """The entry's audio enclosure address, first `audio/*` one wins, still
+    unvalidated: presence decides the kind, validation decides the link."""
+    for enclosure in raw.get("enclosures") or []:
+        if str(enclosure.get("type", "")).startswith("audio/"):
+            href = enclosure.get("href")
+            return href if isinstance(href, str) else None
+    return None
+
+
+#: Longer than this, a stated duration is a typo, not an episode.
+MAX_DURATION_S = 24 * 3600
+
+
+def _duration(value) -> int | None:
+    """`itunes:duration` shapes: seconds, `MM:SS`, `H:MM:SS`. Anything else —
+    including nothing — is None, never a guess."""
+    seconds: int | None = None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        seconds = int(value)
+    elif isinstance(value, str):
+        try:
+            parts = [int(part) for part in value.strip().split(":")]
+        except ValueError:
+            return None
+        if len(parts) == 1:
+            seconds = parts[0]
+        elif len(parts) == 2:
+            seconds = parts[0] * 60 + parts[1]
+        elif len(parts) == 3:
+            seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+    if seconds is None or not 0 < seconds <= MAX_DURATION_S:
+        return None
+    return seconds
 
 
 #: Media URLs that name an image file.
@@ -182,9 +225,24 @@ def _json_feed(body: bytes, source_type: str) -> tuple[FeedMeta, list[Entry]]:
             except ValueError:
                 published = None
         guid = str(raw.get("id") or link or hashlib.sha256(f"{title}\n{text}".encode()).hexdigest())[:1000]
-        kind = "paper" if source_type.startswith("arxiv") else ("post" if not title else "article")
+        enclosure, duration = None, None
+        if not source_type.startswith("arxiv"):
+            for attachment in raw.get("attachments") or []:
+                if isinstance(attachment, dict) and str(attachment.get("mime_type", "")).startswith("audio/"):
+                    url = attachment.get("url")
+                    enclosure = url if isinstance(url, str) else None
+                    duration = _duration(attachment.get("duration_in_seconds"))
+                    break
+        audio = _safe_link(enclosure)
+        if source_type.startswith("arxiv"):
+            kind = "paper"
+        elif enclosure:
+            kind = "episode"
+        else:
+            kind = "post" if not title else "article"
         image = safe_image(str(raw.get("image") or raw.get("banner_image") or ""))
-        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=published, kind=kind, image=image))
+        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=published, kind=kind,
+                             image=image, audio=audio, duration_s=duration))
     meta = FeedMeta(title=plain_text(str(feed.get("title") or ""), MAX_TITLE), language=normalise(feed.get("language")), ttl_minutes=None)
     return meta, entries
 
@@ -216,7 +274,16 @@ def parse_feed(body: bytes, *, source_type: str = "feed") -> tuple[FeedMeta, lis
         guid = (raw.get("id") or link or hashlib.sha256(f"{title}\n{text}".encode()).hexdigest())[:1000]
         if not title and not text:
             continue
-        kind = "paper" if source_type.startswith("arxiv") else ("post" if not title else "article")
+        enclosure = None if source_type.startswith("arxiv") else _enclosure(raw)
+        audio = _safe_link(enclosure)
+        duration = _duration(raw.get("itunes_duration")) if enclosure else None
+        if source_type.startswith("arxiv"):
+            kind = "paper"
+        elif enclosure:
+            kind = "episode"
+        else:
+            kind = "post" if not title else "article"
         image = None if kind == "paper" else _image(raw)
-        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=_published(raw), kind=kind, image=image))
+        entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=_published(raw), kind=kind,
+                             image=image, audio=audio, duration_s=duration))
     return meta, entries
