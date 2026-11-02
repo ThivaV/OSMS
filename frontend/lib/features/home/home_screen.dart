@@ -79,6 +79,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return _playback;
   }
 
+  /// Listen, on a story: its chapter of the briefing, from the chapter's start. Null when
+  /// the story isn't in the briefing or there is no audio; the button then says so.
+  VoidCallback? _listenTo(Story story, Briefing? briefing, BriefingPlayback? playback) {
+    final chapter = briefing?.chapters.indexWhere((c) => c.storyId == story.id) ?? -1;
+    if (briefing == null || playback == null || chapter < 0) return null;
+    return () => unawaited(() async {
+      await playback.seek(briefing.startOf(chapter));
+      await playback.play();
+    }());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -348,6 +359,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           : StoryDetailView(
               key: ValueKey(story.id),
               story: story,
+              onListen: _listenTo(story, briefing, playback),
               askQuestion: _askQuestion,
               askResult: _askResult,
               askThinking: _askThinking,

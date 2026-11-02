@@ -36,6 +36,9 @@ class StoryDetailView extends StatefulWidget {
   });
 
   final Story story;
+
+  /// Plays the story's chapter of the briefing. Null greys Listen out: the story isn't in
+  /// the latest briefing, which is where OSMS's audio comes from.
   final VoidCallback? onListen;
   final VoidCallback? onShare;
 
@@ -240,7 +243,7 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                 child: _StoryToolbar(
                   saved: _saved,
                   hasDisagreements: story.disagreements.isNotEmpty,
-                  onListen: widget.onListen ?? () {},
+                  onListen: widget.onListen,
                   onWhatsNew: () => _jumpTo(_whatsNew),
                   onDisagreements: () => _jumpTo(_disagreements),
                   onTimeline: () => _jumpTo(_timeline),
@@ -276,7 +279,7 @@ class _StoryToolbar extends StatelessWidget {
 
   final bool saved;
   final bool hasDisagreements;
-  final VoidCallback onListen;
+  final VoidCallback? onListen;
   final VoidCallback onWhatsNew;
   final VoidCallback onDisagreements;
   final VoidCallback onTimeline;
@@ -286,6 +289,7 @@ class _StoryToolbar extends StatelessWidget {
   final VoidCallback onShare;
 
   static const _compactBelow = 460.0;
+  static const _notInBriefing = 'Not in the latest briefing';
 
   @override
   Widget build(BuildContext context) {
@@ -307,12 +311,19 @@ class _StoryToolbar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (compact)
-                IconButton.filled(tooltip: 'Listen', onPressed: onListen, icon: const Icon(Icons.headphones_rounded))
-              else
-                FilledButton.icon(
+                IconButton.filled(
+                  tooltip: onListen == null ? _notInBriefing : 'Listen',
                   onPressed: onListen,
-                  icon: const Icon(Icons.headphones_rounded, size: Sizes.iconMd),
-                  label: const Text('Listen'),
+                  icon: const Icon(Icons.headphones_rounded),
+                )
+              else
+                Tooltip(
+                  message: onListen == null ? _notInBriefing : 'Play this story in the briefing',
+                  child: FilledButton.icon(
+                    onPressed: onListen,
+                    icon: const Icon(Icons.headphones_rounded, size: Sizes.iconMd),
+                    label: const Text('Listen'),
+                  ),
                 ),
               gap(),
               IconButton(

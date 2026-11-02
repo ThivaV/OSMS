@@ -107,6 +107,35 @@ final Json wire = {
   'why': ['2 sources', '1 new fact', 'Startups and product'],
 };
 
+/// A demo briefing with two chapters: stories 42 and 43.
+Briefing twoChapters() => briefingFromJson({
+  'id': '7',
+  'created_at': '2026-10-31T06:00:00Z',
+  'language': 'en',
+  'duration_ms': 64000,
+  'audio_url': 'http://api.example/briefings/7/audio?expires=1&signature=s',
+  'chapters': [
+    {
+      'story_id': '42',
+      'title': 'The Lumen Fold arrives',
+      'start_ms': 4000,
+      'duration_ms': 30000,
+      'new_fact_count': 2,
+      'sentences': [],
+      'checked_by': 'muse-voice-transcribe-1.0',
+    },
+    {
+      'story_id': '43',
+      'title': 'Kestrel comes to Aarhus',
+      'start_ms': 35000,
+      'duration_ms': 29000,
+      'new_fact_count': 1,
+      'sentences': [],
+      'checked_by': 'muse-voice-transcribe-1.0',
+    },
+  ],
+});
+
 void main() {
   test('a story survives the trip from the API, unknown kinds dropped', () {
     final story = storyFromJson(wire);
@@ -217,33 +246,7 @@ void main() {
 
   testWidgets('signed out, the demo briefing plays its real audio, chapter by chapter', (tester) async {
     final players = <FakePlayback>[];
-    final briefing = briefingFromJson({
-      'id': '7',
-      'created_at': '2026-10-31T06:00:00Z',
-      'language': 'en',
-      'duration_ms': 64000,
-      'audio_url': 'http://api.example/briefings/7/audio?expires=1&signature=s',
-      'chapters': [
-        {
-          'story_id': '42',
-          'title': 'The Lumen Fold arrives',
-          'start_ms': 4000,
-          'duration_ms': 30000,
-          'new_fact_count': 2,
-          'sentences': [],
-          'checked_by': 'muse-voice-transcribe-1.0',
-        },
-        {
-          'story_id': '43',
-          'title': 'Kestrel comes to Aarhus',
-          'start_ms': 35000,
-          'duration_ms': 29000,
-          'new_fact_count': 1,
-          'sentences': [],
-          'checked_by': 'muse-voice-transcribe-1.0',
-        },
-      ],
-    });
+    final briefing = twoChapters();
     await start(tester, demo: [storyFromJson(wire)], at: '/demo', briefing: briefing, players: players);
     expect(find.text('The Lumen Fold arrives'), findsWidgets); // The floating bar and the sidebar's.
     final player = players.single;
@@ -255,6 +258,25 @@ void main() {
     await tester.pump();
     expect(player.calls.last, 'seek 35000');
     expect(find.text('Kestrel comes to Aarhus'), findsOneWidget);
+  });
+
+  testWidgets('Listen plays the story’s chapter of the briefing; a story outside it can’t', (tester) async {
+    final players = <FakePlayback>[];
+    await start(
+      tester,
+      demo: [storyFromJson(wire), storyFromJson({...wire, 'id': '44', 'title': 'A story the briefing skipped'})],
+      at: '/demo',
+      briefing: twoChapters(),
+      players: players,
+    );
+    await tapText(tester, 'Lumen Fold arrives in Denmark and the US');
+    await tester.tap(find.widgetWithText(FilledButton, 'Listen'));
+    await tester.pump();
+    expect(players.single.calls, ['seek 4000', 'play'], reason: 'from the start of its chapter');
+
+    await tapText(tester, 'A story the briefing skipped');
+    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Listen')).onPressed, isNull);
+    expect(find.byTooltip('Not in the latest briefing'), findsOneWidget);
   });
 
   testWidgets('a reader sees new papers for their research interests, each saying why', (tester) async {
