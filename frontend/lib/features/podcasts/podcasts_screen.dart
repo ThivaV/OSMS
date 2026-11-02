@@ -15,6 +15,12 @@ class PodcastsScreen extends StatelessWidget {
   const PodcastsScreen({
     super.key,
     required this.episodes,
+    this.shows = const [],
+    this.selectedShowId,
+    this.onSelectShow,
+    this.hasMore = false,
+    this.loadingMore = false,
+    this.onLoadMore,
     this.loading = false,
     this.unavailable = false,
     this.samples = false,
@@ -28,6 +34,21 @@ class PodcastsScreen extends StatelessWidget {
   });
 
   final List<Episode> episodes;
+
+  /// Every show with episodes, alphabetical — stable while paging. The chips
+  /// hide for a single show; without [onSelectShow] they hide altogether,
+  /// never as dead taps.
+  final List<Source> shows;
+
+  /// One show's history, or null for every show.
+  final String? selectedShowId;
+  final ValueChanged<String?>? onSelectShow;
+
+  /// Older history waits behind the button; null action hides it.
+  final bool hasMore;
+  final bool loadingMore;
+  final VoidCallback? onLoadMore;
+
   final bool loading;
 
   /// The API couldn't be reached; says so instead of claiming there are none.
@@ -54,9 +75,12 @@ class PodcastsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.text;
-    final shows = {for (final e in episodes) e.show.id}.length;
     final rows = _rows(episodes);
+    final selectedShow = selectedShowId == null
+        ? null
+        : shows.where((s) => s.id == selectedShowId).firstOrNull;
     return CustomScrollView(
+      key: const ValueKey('podcastsList'),
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.xl, Space.lg, 0),
@@ -71,13 +95,40 @@ class PodcastsScreen extends StatelessWidget {
                       ? 'Collecting episodes…'
                       : episodes.isEmpty
                       ? 'Your shows, playable'
-                      : '${plural(episodes.length, 'episode', 'episodes')} from ${plural(shows, 'show')}',
+                      : selectedShow != null
+                      ? '${plural(episodes.length, 'episode', 'episodes')} from ${selectedShow.name}'
+                      : '${plural(episodes.length, 'episode', 'episodes')} from ${plural(shows.length, 'show')}',
                   style: t.bodySmall.copyWith(color: context.colors.textSecondary),
                 ),
               ],
             ),
           ),
         ),
+        if (shows.length > 1 && onSelectShow != null)
+          SliverToBoxAdapter(
+            child: SingleChildScrollView(
+              key: const ValueKey('showFilter'),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, 0),
+              child: Row(
+                children: [
+                  _ShowChip(
+                    label: 'All shows',
+                    selected: selectedShowId == null,
+                    onTap: () => onSelectShow!(null),
+                  ),
+                  for (final show in shows) ...[
+                    const SizedBox(width: Space.sm),
+                    _ShowChip(
+                      label: show.name,
+                      selected: selectedShowId == show.id,
+                      onTap: () => onSelectShow!(show.id),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         if (banner != null)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, 0),
@@ -127,7 +178,7 @@ class PodcastsScreen extends StatelessWidget {
               ),
             ),
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, bottomInset),
+            padding: EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, hasMore ? Space.sm : bottomInset),
             sliver: SliverList.separated(
               itemCount: rows.length,
               separatorBuilder: (_, _) => const SizedBox(height: Space.sm),
@@ -146,8 +197,70 @@ class PodcastsScreen extends StatelessWidget {
               },
             ),
           ),
+          if (hasMore)
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, bottomInset),
+              sliver: SliverToBoxAdapter(
+                child: loadingMore
+                    ? const Center(
+                        child: SizedBox.square(
+                          dimension: Sizes.iconLg,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: onLoadMore,
+                        icon: const Icon(Icons.history_rounded, size: Sizes.iconMd),
+                        label: const Text('Show older episodes'),
+                      ),
+              ),
+            ),
         ],
       ],
+    );
+  }
+}
+
+/// One show's chip: fill plus bold when selected, never colour alone. The row
+/// hides instead when there is nothing to choose between.
+class _ShowChip extends StatelessWidget {
+  const _ShowChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final t = context.text;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? c.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(Radii.pill),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Radii.pill),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Radii.pill),
+              border: Border.all(color: selected ? c.accent : c.border),
+            ),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: t.label.copyWith(
+                color: selected ? c.text : c.textSecondary,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

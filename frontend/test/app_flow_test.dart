@@ -162,6 +162,62 @@ void main() {
     expect(find.text('Ask this story'), findsOneWidget, reason: 'the episode opens its story');
   });
 
+  testWidgets('podcasts: show chips filter the playlist and older episodes page in', (tester) async {
+    final history = [
+      for (var i = 0; i < 55; i++)
+        Episode(
+          id: 'h-$i',
+          title: 'History $i',
+          show: i.isEven ? sample.gradientHour : sample.soundwavesDaily,
+          publishedAt: DateTime(2026, 1, 1).add(Duration(hours: i)),
+        ),
+    ];
+    await start(tester, auth: FakeAuth(signedIn: true), onboarded: true, readerEpisodes: history);
+    await tapText(tester, 'Podcasts');
+
+    final chips = find.byKey(const ValueKey('showFilter'));
+    expect(chips, findsOneWidget, reason: 'two shows to choose between');
+    expect(find.text('History 54'), findsOneWidget, reason: 'newest first');
+    expect(find.text('History 4'), findsNothing, reason: 'page one holds fifty');
+
+    // The button waits below fifty tall cards: outside the viewport a sliver
+    // never lays out, so drag the list until it builds, then expect it.
+    final list = find.byKey(const ValueKey('podcastsList'));
+    final older = find.text('Show older episodes');
+    for (var i = 0; i < 8 && older.evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -1500));
+      await tester.pumpAndSettle();
+    }
+    expect(older, findsOneWidget, reason: 'history waits behind the button');
+
+    await tester.tap(older);
+    await tester.pumpAndSettle();
+    // Back to the top: the subtitle counts what state holds, whatever the
+    // viewport has built.
+    for (var i = 0; i < 8 && chips.evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, 1500));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('55 episodes from 2 shows'), findsOneWidget, reason: 'the rest pages in, no gaps');
+    // And at the very bottom, no button waits: history ends here.
+    for (var i = 0; i < 8; i++) {
+      await tester.drag(list, const Offset(0, -1500));
+      await tester.pumpAndSettle();
+    }
+    expect(older, findsNothing, reason: 'history ends here');
+
+    final gradient = find.descendant(of: chips, matching: find.text('Gradient Hour'));
+    for (var i = 0; i < 8 && gradient.evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, 1500));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(gradient);
+    await tester.pumpAndSettle();
+    expect(find.text('History 54'), findsOneWidget, reason: 'still the gradient episodes');
+    expect(find.text('History 53'), findsNothing, reason: 'the other show filters out');
+    expect(find.text('Show older episodes'), findsNothing, reason: 'one show fits on a page');
+  });
+
   testWidgets('the sidebar files sources in topic folders that open, close and narrow the list', (tester) async {
     final semantics = tester.ensureSemantics();
     const blog = Source(id: '9', name: 'A blog no topic suggests', type: SourceType.feed, language: 'en');

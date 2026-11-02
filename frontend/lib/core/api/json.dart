@@ -176,6 +176,12 @@ Episode episodeFromJson(Json j) {
 
 List<Episode> episodesFromJson(Json j) => [for (final e in _list(j['episodes'])) episodeFromJson(e)];
 
+EpisodesPage episodesPageFromJson(Json j) => EpisodesPage(
+  episodes: episodesFromJson(j),
+  shows: [for (final s in _list(j['shows'])) sourceFromJson(s)],
+  nextCursor: j['next_cursor'] as String?,
+);
+
 Decision decisionFromJson(Json j) => Decision(
   id: j['id'] as String,
   agent: j['agent'] as String,

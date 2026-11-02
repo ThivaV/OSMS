@@ -33,3 +33,7 @@ class EpisodeOut(BaseModel):
 
 class EpisodesOut(BaseModel):
     episodes: list[EpisodeOut]
+    #: Opaque cursor for the next page; null when history ends here.
+    next_cursor: str | None = None
+    #: Every in-scope show with episodes, alphabetical — stable while paging.
+    shows: list[EpisodeShowOut] = []

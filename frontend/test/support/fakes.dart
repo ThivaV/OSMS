@@ -146,9 +146,31 @@ class FakeApi extends ApiClient {
   List<Episode> readerEpisodes = const [];
   List<Episode> demoEpisodes = const [];
 
+  /// Newest first like the API, one page at a time: the cursor is the last
+  /// episode's id, unknown ids page nowhere.
   @override
-  Future<List<Episode>> episodes({bool demo = false, int limit = 50}) async =>
-      (demo ? demoEpisodes : readerEpisodes).take(limit).toList();
+  Future<EpisodesPage> episodes({bool demo = false, int limit = 50, String? cursor, String? sourceId}) async {
+    final all = [...(demo ? demoEpisodes : readerEpisodes)]
+      ..sort((a, b) {
+        final at = b.publishedAt?.compareTo(a.publishedAt ?? DateTime.fromMillisecondsSinceEpoch(0)) ?? -1;
+        return at != 0 ? at : b.id.compareTo(a.id);
+      });
+    final shows = {for (final e in all) e.show.id: e.show}.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final rows = sourceId == null ? all : all.where((e) => e.show.id == sourceId).toList();
+    var start = 0;
+    if (cursor != null) {
+      final at = rows.indexWhere((e) => e.id == cursor);
+      if (at < 0) return EpisodesPage(episodes: const [], shows: shows);
+      start = at + 1;
+    }
+    final page = rows.skip(start).take(limit).toList();
+    return EpisodesPage(
+      episodes: page,
+      shows: shows,
+      nextCursor: start + page.length < rows.length ? page.last.id : null,
+    );
+  }
 
   /// The latest briefing, signed in or the demo's; null before the first.
   Briefing? latestBriefing;

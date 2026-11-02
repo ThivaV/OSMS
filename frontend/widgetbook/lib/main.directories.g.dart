@@ -284,6 +284,14 @@ final directories = <_widgetbook.WidgetbookNode>[
             builder: _osms_widgetbook_use_cases_podcasts.podcastsExtreme,
           ),
           _widgetbook.WidgetbookUseCase(
+            name: 'Filtered to one show',
+            builder: _osms_widgetbook_use_cases_podcasts.podcastsFiltered,
+          ),
+          _widgetbook.WidgetbookUseCase(
+            name: 'Loading older episodes',
+            builder: _osms_widgetbook_use_cases_podcasts.podcastsLoadingMore,
+          ),
+          _widgetbook.WidgetbookUseCase(
             name: 'Normal',
             builder: _osms_widgetbook_use_cases_podcasts.podcastsNormal,
           ),

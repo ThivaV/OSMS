@@ -9,10 +9,39 @@ import '../fixtures/fixtures.dart' as fx;
 Widget podcastsNormal(BuildContext context) => Material(
   child: PodcastsScreen(
     episodes: fx.sampleEpisodes,
+    shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
+    onSelectShow: (_) {},
+    hasMore: true,
+    onLoadMore: () {},
     current: fx.sampleEpisodes.first,
     onPlay: (_) {},
     onOpenStory: (_) {},
     onAddSource: () {},
+  ),
+);
+
+@widgetbook.UseCase(name: 'Filtered to one show', type: PodcastsScreen, path: '[Podcasts]')
+Widget podcastsFiltered(BuildContext context) => Material(
+  child: PodcastsScreen(
+    episodes: [fx.sampleEpisodes.first],
+    shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
+    selectedShowId: fx.gradientHour.id,
+    onSelectShow: (_) {},
+    onPlay: (_) {},
+    onOpenStory: (_) {},
+  ),
+);
+
+@widgetbook.UseCase(name: 'Loading older episodes', type: PodcastsScreen, path: '[Podcasts]')
+Widget podcastsLoadingMore(BuildContext context) => Material(
+  child: PodcastsScreen(
+    episodes: fx.sampleEpisodes,
+    shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
+    onSelectShow: (_) {},
+    hasMore: true,
+    loadingMore: true,
+    onPlay: (_) {},
+    onOpenStory: (_) {},
   ),
 );
 

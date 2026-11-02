@@ -198,8 +198,12 @@ flowchart TB
   afterwards. Images, videos and episode audio stay where they are, and no model sees
   them: a story shows its newest report's picture from the publisher, credited and
   linking back. `GET /episodes` (and `/demo/episodes`) serves a reader's episodes,
-  newest first, each with its show and the story it joined; the app's Podcasts screen
-  plays them through the same audio engine as the briefing, one audio at a time.
+  newest first, each with its show and the story it joined; cursor paging on
+  `(published_at, id)` with an opaque `next_cursor` walks the whole history
+  without skips or duplicates, `source_id` narrows to one show, and `shows`
+  lists every in-scope show for the app's filter chips. The app's Podcasts
+  screen pages history in behind an explicit older-action and plays episodes
+  through the same audio engine as the briefing, one audio at a time.
 
 ### Staying up to date
 

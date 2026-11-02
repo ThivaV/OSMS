@@ -15,6 +15,7 @@ import 'package:osms/features/briefing/briefing_player.dart';
 import 'package:osms/core/theme/appearance.dart';
 import 'package:osms/core/theme/palettes.dart';
 import 'package:osms/features/onboarding/onboarding_flow.dart';
+import 'package:osms/features/podcasts/podcasts_screen.dart';
 import 'package:osms/features/search/command_palette.dart';
 import 'package:osms/features/stories/today_overview.dart';
 import 'package:osms/shared/widgets/source_quote.dart';
@@ -252,6 +253,42 @@ final Map<String, Widget Function()> _screens = {
   'Story list empty, no sources': () =>
       Material(child: StoryList(stories: const [], onChooseSources: () {}, onAddSource: () {})),
   'Story list empty, sources followed': () => const Material(child: StoryList(stories: [], sourceCount: 40)),
+  'Podcasts normal': () => Material(
+    child: PodcastsScreen(
+      episodes: fx.sampleEpisodes,
+      shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
+      onSelectShow: (_) {},
+      hasMore: true,
+      onLoadMore: () {},
+      current: fx.sampleEpisodes.first,
+      onPlay: (_) {},
+      onOpenStory: (_) {},
+      onAddSource: () {},
+    ),
+  ),
+  'Podcasts filtered to one show': () => Material(
+    child: PodcastsScreen(
+      episodes: [fx.sampleEpisodes.first],
+      shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
+      selectedShowId: fx.gradientHour.id,
+      onSelectShow: (_) {},
+      onPlay: (_) {},
+      onOpenStory: (_) {},
+    ),
+  ),
+  'Podcasts loading older': () => Material(
+    child: PodcastsScreen(
+      episodes: fx.sampleEpisodes,
+      shows: const [fx.gradientHour, fx.soundwavesDaily, fx.tinkerersAudio],
+      onSelectShow: (_) {},
+      hasMore: true,
+      loadingMore: true,
+      onPlay: (_) {},
+      onOpenStory: (_) {},
+    ),
+  ),
+  'Podcasts empty': () => Material(child: PodcastsScreen(episodes: const [], onAddSource: () {})),
+  'Podcasts unavailable': () => const Material(child: PodcastsScreen(episodes: [], unavailable: true)),
   'Today overview extreme': () => Material(
     child: TodayOverview(
       stories: [fx.extremeStory, ...fx.stories],

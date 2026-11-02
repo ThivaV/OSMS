@@ -99,10 +99,15 @@ class ApiClient {
   /// The reader opened the story: what's new starts again from now.
   Future<void> markRead(String storyId) => _send('POST', '/stories/$storyId/read');
 
-  /// The reader's podcasts, newest first — or the demo's signed out.
-  Future<List<Episode>> episodes({bool demo = false, int limit = 50}) async => episodesFromJson(
-    (await _send('GET', '${demo ? '/demo' : ''}/episodes?limit=$limit', signedIn: !demo))!,
-  );
+  /// The reader's podcasts, newest first — or the demo's signed out. A page of
+  /// history at a time: pass the previous page's [cursor] for the next, and
+  /// [sourceId] for one show's history.
+  Future<EpisodesPage> episodes({bool demo = false, int limit = 50, String? cursor, String? sourceId}) async {
+    final query = StringBuffer('${demo ? '/demo' : ''}/episodes?limit=$limit');
+    if (cursor != null) query.write('&cursor=${Uri.encodeQueryComponent(cursor)}');
+    if (sourceId != null) query.write('&source_id=${Uri.encodeQueryComponent(sourceId)}');
+    return episodesPageFromJson((await _send('GET', query.toString(), signedIn: !demo))!);
+  }
 
   /// The reader's latest briefing, or the demo's signed out; null before the first.
   Future<Briefing?> briefing({bool demo = false}) async {

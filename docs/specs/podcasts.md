@@ -35,7 +35,8 @@ Play button is unwired. This spec closes the slice end to end.
   (phones get it through the Sources tab) and a ⌘K action. Empty state points
   at adding a podcast; episodes without audio say so instead of a dead button.
 - `Episode` model + wire parsing, `EpisodePlayback` (just_audio, fakes in
-  tests), Widgetbook cases (Normal/Empty/Extreme + playing/failed).
+  tests), Widgetbook cases (Normal/Empty/Extreme + playing/failed, plus
+  Filtered to one show and Loading older episodes).
 
 ## Rules
 
@@ -49,7 +50,34 @@ Play button is unwired. This spec closes the slice end to end.
 ## How to test
 
 - Backend: adapter unit tests (RSS + JSON enclosures, duration shapes, bad
-  URLs null); API tests (rule-7 visibility, demo public, story link, limit).
+  URLs null); API tests (rule-7 visibility, demo public, story link, limit,
+  full history walk without gaps, mid-browse insert, show filter, forged
+  cursor → 422).
 - App: `flutter analyze` + `flutter test` in both projects; Widgetbook regen.
+  Flow test: 55 fake episodes across two shows — first page holds fifty, the
+  button pages in the rest (subtitle counts 55, button gone), a show chip
+  filters to its own history. Render tests cover normal, filtered, loading
+  older, empty and unavailable.
 - By hand: `/demo` → Podcasts → play a sample; follow a real podcast feed,
   wait for fetch, play the enclosure, open "Discussed in".
+
+## Whole playlist: history, paging, show filter
+
+A reader with years of episodes reaches all of them, oldest last, and can
+narrow to one show's history. Research consensus: cursor (keyset) paging on a
+`(published_at, id)` composite with an opaque cursor — no skips or duplicates
+when new episodes land mid-browse — plus explicit per-show filters and an
+explicit older-action (no surprise infinite scroll).
+
+- API: `GET /episodes` (and `/demo/episodes`) take `cursor` (opaque,
+  base64url JSON of the last seen `(published_at, id)`; malformed → 422) and
+  `source_id` (one show's history; unknown → empty list, not 404). Responses
+  add `next_cursor` (null: history ends) and `shows` (every in-scope show with
+  episodes, alphabetical — the chips stay stable while paging or filtering).
+  `limit` stays the page size (default 50, max 100).
+- App: a `PodcastsController` accumulates pages (`Show older episodes`
+  appends; a filter resets to page one). Show chips sit under the header
+  ("All shows" + each show, hidden for a single show); the list keeps its
+  grouping, the subtitle names the filter.
+- Samples paginate nowhere (three invented episodes); the filter still works
+  over them so the demo shows the shape.

@@ -299,9 +299,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final loaded = ref.watch(storiesProvider);
     final view = loaded.value ?? const StoriesView(stories: []);
     final loading = !loaded.hasValue;
-    final episodesLoaded = ref.watch(episodesProvider);
-    final episodesView = episodesLoaded.value ?? const EpisodesView(episodes: []);
-    final episodesLoading = !episodesLoaded.hasValue;
+    final podcastsView = ref.watch(episodesProvider);
     final podcasts = _nav == 'podcasts';
     // The sample briefing and papers belong to the sample stories; a real briefing comes
     // with real stories.
@@ -383,10 +381,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     // Podcasts takes the list pane (and, with nothing open, the reading pane
     // through `overview` below): every episode, playable, sourced, storied.
     final podcastsScreen = PodcastsScreen(
-      episodes: podcasts ? episodesView.episodes : const [],
-      loading: episodesLoading,
-      unavailable: episodesView.unavailable,
-      samples: episodesView.samples,
+      episodes: podcasts ? podcastsView.episodes : const [],
+      shows: podcastsView.shows,
+      selectedShowId: podcastsView.selectedShowId,
+      onSelectShow: (id) => ref.read(episodesProvider.notifier).selectShow(id),
+      hasMore: podcastsView.hasMore,
+      loadingMore: podcastsView.loadingMore,
+      onLoadMore: () => ref.read(episodesProvider.notifier).loadMore(),
+      loading: podcastsView.loading,
+      unavailable: podcastsView.unavailable,
+      samples: podcastsView.samples,
       current: _episode,
       playback: _episode == null ? null : _episodePlaybackOf(_episode!),
       onPlay: _playEpisode,

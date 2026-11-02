@@ -72,3 +72,72 @@ def test_a_reader_hears_only_their_own_podcasts(client, auth) -> None:
     assert client.get("/episodes", headers=auth("bo")).json()["episodes"] == []
     limited = client.get("/episodes?limit=1", headers=auth("ada")).json()["episodes"]
     assert [e["title"] for e in limited] == ["A niche episode"]
+
+
+def _history(client, source_id: int, count: int, tag: str = "") -> None:
+    """A deep history on one show: one episode an hour apart."""
+    with client.app.state.sessions() as db:
+        db.add_all([
+            Item(source_id=source_id, guid=f"{tag}h{i}", link=f"https://gradienthour.example/{tag}h{i}",
+                 title=f"{tag}Hour {i}", text=f"Show notes {i}.", published_at=NOW - timedelta(hours=i),
+                 content_hash=f"{tag}h{i}", kind="episode", status="ready",
+                 audio_url=f"https://cdn.gradienthour.example/h{i}.mp3")
+            for i in range(count)
+        ])
+        db.commit()
+
+
+def _walk(client, headers, **params) -> list[str]:
+    """Every page to the end: titles in order, one request per page."""
+    titles, cursor, guard = [], None, 0
+    while guard < 10:
+        guard += 1
+        query = {"limit": 2, **params}
+        if cursor is not None:
+            query["cursor"] = cursor
+        body = client.get("/demo/episodes", params=query, headers=headers).json()
+        titles += [e["title"] for e in body["episodes"]]
+        cursor = body["next_cursor"]
+        if cursor is None:
+            return titles
+    raise AssertionError("history never ended")
+
+
+def test_history_pages_oldest_last_without_dupes_or_gaps(client) -> None:
+    ids = _seed(client)
+    _history(client, ids["demo"], 5)
+    # Hour 2 ties "Diffusion normals" to the hour; the id tie-break puts the
+    # later insert first, deterministically.
+    assert _walk(client, {}) == [
+        "Hour 0", "Hour 1", "Hour 2", "Diffusion normals", "Hour 3", "Hour 4", "Trailer",
+    ]
+
+
+def test_new_episodes_mid_browse_neither_dupe_nor_skip(client) -> None:
+    ids = _seed(client)
+    _history(client, ids["demo"], 3)
+    first = client.get("/demo/episodes", params={"limit": 2}).json()
+    assert [e["title"] for e in first["episodes"]] == ["Hour 0", "Hour 1"]
+    _history(client, ids["demo"], 1, tag="fresh")  # a fresh episode lands while browsing
+    second = client.get("/demo/episodes", params={"limit": 2, "cursor": first["next_cursor"]}).json()
+    # The fresh episode is newer than the cursor: it waits for a refresh, and
+    # nothing already seen repeats, nothing unseen is skipped.
+    assert [e["title"] for e in second["episodes"]] == ["Hour 2", "Diffusion normals"]
+    assert second["next_cursor"] is not None
+
+
+def test_one_shows_history_and_stable_show_list(client, auth) -> None:
+    ids = _seed(client)
+    _follow(client, "ada", ids["demo"], ids["private"])
+    headers = auth("ada")
+    only = client.get("/episodes", params={"source_id": ids["private"]}, headers=headers).json()
+    assert [e["title"] for e in only["episodes"]] == ["A niche episode"]
+    assert only["next_cursor"] is None
+    shows = [s["title"] for s in only["shows"]]
+    assert shows == ["Ada's Cast", "Gradient Hour"], "every show, alphabetical, filter or none"
+    assert client.get("/episodes", params={"source_id": 999999}, headers=headers).json()["episodes"] == []
+
+
+def test_a_forged_cursor_is_422(client) -> None:
+    assert client.get("/demo/episodes", params={"cursor": "not-a-cursor"}).status_code == 422
+    assert client.get("/demo/episodes", params={"cursor": "bm90LWpzb24="}).status_code == 422

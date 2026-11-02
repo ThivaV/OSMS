@@ -38,3 +38,16 @@ class Episode {
   /// Discussed in a named story: the row links there.
   bool get hasStory => storyId != null && storyTitle != null;
 }
+
+/// One page of the playlist: this page's episodes, every in-scope show (for
+/// the chips, stable while paging), and the cursor for the next page — null
+/// when history ends here.
+class EpisodesPage {
+  const EpisodesPage({required this.episodes, required this.shows, this.nextCursor});
+
+  final List<Episode> episodes;
+  final List<Source> shows;
+  final String? nextCursor;
+
+  bool get hasMore => nextCursor != null;
+}
