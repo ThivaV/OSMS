@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
+import '../../shared/widgets/osms_logo.dart';
 import '../../shared/widgets/section_header.dart';
 
 enum SignInStatus {
@@ -103,9 +104,21 @@ class _SignInPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('OSMS', style: t.display),
-        const SizedBox(height: Space.xs),
-        Text('One story, many sources', style: t.reading.copyWith(color: c.textSecondary)),
+        Row(
+          children: [
+            const OsmsLogo(size: 56),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('OSMS', style: t.display),
+                  Text('One story, many sources', style: t.reading.copyWith(color: c.textSecondary)),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: Space.xxl),
         SegmentedButton<SignInIntent>(
           showSelectedIcon: false,

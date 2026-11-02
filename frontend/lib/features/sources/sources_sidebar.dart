@@ -4,6 +4,7 @@ import '../../core/models/models.dart';
 import '../../core/theme/tokens.dart';
 import '../../shared/widgets/keycap.dart';
 import '../../shared/widgets/kind_icons.dart';
+import '../../shared/widgets/osms_logo.dart';
 import '../../shared/widgets/source_chip.dart';
 import '../auth/account_row.dart';
 import '../briefing/briefing_player.dart';
@@ -120,13 +121,21 @@ class _SourcesSidebarState extends State<SourcesSidebar> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.xl, Space.lg, Space.lg),
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: 'OSMS', style: t.headline),
-                TextSpan(text: '\nOne story, many sources', style: t.caption.copyWith(color: c.textTertiary)),
-              ],
-            ),
+          child: Row(
+            children: [
+              const OsmsLogo(size: 36),
+              const SizedBox(width: Space.sm + Space.xxs),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: 'OSMS', style: t.headline),
+                      TextSpan(text: '\nOne story, many sources', style: t.caption.copyWith(color: c.textTertiary)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         if (widget.onSearch != null)

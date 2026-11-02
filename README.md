@@ -1,3 +1,5 @@
+<img src="frontend/assets/brand/osms-icon.svg" alt="The OSMS mark: source threads converging into one story thread" width="112">
+
 # OSMS: One Story, Many Sources
 
 A news reader that groups articles, research papers, newsletters, podcasts, videos and

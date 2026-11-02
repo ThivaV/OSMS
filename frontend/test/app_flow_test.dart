@@ -11,6 +11,7 @@ import 'package:osms/core/session/session.dart';
 import 'package:osms/core/theme/appearance.dart';
 import 'package:osms/features/auth/demo_banner.dart';
 import 'package:osms/features/briefing/briefing_player.dart';
+import 'package:osms/shared/widgets/osms_logo.dart';
 import 'package:osms/sample/sample_content.dart' as sample;
 
 import 'support/fakes.dart';
@@ -27,6 +28,7 @@ void expectNoSamples() {
 void main() {
   testWidgets('signed out, the start is the sign-in and sign-up page, and nothing else', (tester) async {
     await start(tester);
+    expect(find.byType(OsmsLogo), findsOneWidget, reason: 'the mark beside the name');
     expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Sign in with Google'), findsOneWidget);
     expect(find.text('Email me a sign-in link'), findsOneWidget);

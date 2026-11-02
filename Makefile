@@ -66,7 +66,7 @@ tilt_disable = if $(tilt_up); then \
 .PHONY: help tools env setup app widgetbook auth api up ci stop-app stop-widgetbook stop-auth \
   stop-api stop-worker stop-glimmer worker glimmer glimmer-model fetch-now briefing illustrations pipeline-status eval stop down status widgetbook-gen widgetbook-build build-macos test-macos check \
   check-flutter check-backend check-auth eval-test clean _run-dir _need-tilt \
-  provision server-setup deploy seed-server build-web-prod build-macos-prod server-ssh server-logs \
+  provision server-setup deploy seed-server icons build-web-prod build-macos-prod server-ssh server-logs \
   server-status server-check-models
 
 help: ## List the commands
@@ -258,6 +258,9 @@ deploy: ## Deploy what is committed (web app, sign-in, API, worker), then build 
 
 seed-server: ## Copy your local stories to the server, without readers (FORCE=1 replaces the server's)
 	bash deploy/seed.sh
+
+icons: ## Redraw the app icons (macOS, web) from frontend/assets/brand's SVGs, with Google Chrome
+	node $(APP_DIR)/assets/brand/render.mjs
 
 build-web-prod: ## The web app for the deployed site (frontend/build/web)
 	$(need_domain)

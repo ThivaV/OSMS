@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="OSMS">
+  <!-- The browser-tab icon: the simplified mark, edge to edge. -->
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2D2A37"/>
+      <stop offset="1" stop-color="#17161B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#ink)"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M150 266 C 380 266 430 512 600 512" stroke="#B9A2FF" stroke-width="84"/>
+    <path d="M150 512 L 600 512" stroke="#A3B1C8" stroke-width="84"/>
+    <path d="M150 758 C 380 758 430 512 600 512" stroke="#E3A3B5" stroke-width="84"/>
+    <path d="M600 512 C 724 512 760 466 880 466" stroke="#F7F6F3" stroke-width="124"/>
+  </g>
+  <circle cx="600" cy="512" r="104" fill="#F7F6F3"/>
+  <circle cx="600" cy="512" r="48" fill="#6440C8"/>
+</svg>
