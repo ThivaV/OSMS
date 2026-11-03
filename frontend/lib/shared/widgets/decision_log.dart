@@ -44,7 +44,11 @@ class _DecisionLogSectionState extends State<DecisionLogSection> {
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
-              onPressed: () => setState(() => _loading = widget.load!()),
+              onPressed: () {
+                setState(() {
+                  _loading = widget.load!();
+                });
+              },
               icon: const Icon(Icons.expand_more_rounded),
               label: const Text('Show the decisions'),
             ),

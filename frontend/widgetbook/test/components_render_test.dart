@@ -391,6 +391,24 @@ final Map<String, Widget Function()> _screens = {
 };
 
 void main() {
+  testWidgets('Decisions load on tap without throwing', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: DecisionLogSection(load: () async => fx.halcyonDecisions)),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Show the decisions'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Show the decisions'), findsNothing, reason: 'the list replaces the button');
+    expect(find.textContaining('Muse Spark'), findsWidgets, reason: 'the loaded decisions name their models');
+  });
+
   for (final MapEntry(key: sizeName, value: size) in _sizes.entries) {
     for (final MapEntry(key: themeName, value: theme) in _themes.entries) {
       Future<void> pump(WidgetTester tester, Widget child) async {
