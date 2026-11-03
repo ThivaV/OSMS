@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:osms/core/api/json.dart';
 import 'package:osms/core/models/models.dart';
 import 'package:osms/features/story_detail/story_detail_view.dart';
 import 'package:osms/sample/sample_content.dart' as sample;
@@ -27,6 +28,34 @@ Future<void> _showSaved(WidgetTester tester) async {
 }
 
 void main() {
+  test('a found source reads from the wire shape the API sends', () {
+    // The shape `POST /me/sources/discover` answers with (invented content).
+    final found = discoveredSourceFromJson({
+      'source': {
+        'id': '',
+        'name': 'Lab Notes',
+        'type': 'mastodon',
+        'language': 'da',
+        'url': 'https://labnotes.example/',
+      },
+      'latest': [
+        {
+          'title': 'A new lab opens',
+          'url': 'https://labnotes.example/1',
+          'published_at': '2026-11-03T00:43:57Z',
+          'kind': 'article',
+        },
+        {'title': '', 'url': 'https://labnotes.example/2', 'published_at': null, 'kind': 'post'},
+      ],
+      'frequency': 'about 4 posts a week',
+      'already_followed': false,
+    });
+    expect([found.source.name, found.source.type, found.source.language], ['Lab Notes', SourceType.mastodon, 'da']);
+    expect(found.latest.map((i) => i.kind), [ItemKind.article, ItemKind.post]);
+    expect(found.latest.first.publishedAt, DateTime.utc(2026, 11, 3, 0, 43, 57).toLocal());
+    expect([found.frequency, found.alreadyFollowed], ['about 4 posts a week', false]);
+  });
+
   testWidgets('a saved story is kept by OSMS, listed under Saved, and unsaves', (tester) async {
     final story = sample.kestrel;
     final (_, api) = await start(
