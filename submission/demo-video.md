@@ -1,4 +1,8 @@
-# The 3-minute demo video
+# Recording the demo video by hand
+
+The finished video is `osms-demo.mp4` in this folder, presented by Biscuit and made by the
+scripts in `video/` (see [README.md](README.md)). This page is for recording the tour
+yourself instead, with your own voice.
 
 A shot-by-shot script for the hackathon video, using stories that are live on the demo
 today (Nov 3). Story numbers are the demo's ids; open one with the ⌘K palette or from

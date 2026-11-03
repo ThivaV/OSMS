@@ -231,3 +231,6 @@ data/
 # Node (auth/)
 node_modules/
 .DS_Store
+
+# The demo video is uploaded with the submission, never committed (submission/README.md).
+submission/osms-demo.mp4

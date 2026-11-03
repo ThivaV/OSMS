@@ -15,6 +15,10 @@ disagree, and how it developed, with every sentence traced to its sources.
   without an account: https://app.onestory-osms.duckdns.org/#/demo
 - Code: https://github.com/ThivaV/OSMS
 - macOS app: built from the same code (`make build-macos`, see SETUP.md)
+- Demo video (3:00, 1080p): `submission/osms-demo.mp4`, to upload with the form.
+  Biscuit, a cartoon dog, presents it: the problem and how OSMS solves it, the live web
+  app, the seven Meta models and the architecture. Every line is in
+  [`video/script.md`](video/script.md).
 
 ## What it does
 

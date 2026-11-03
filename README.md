@@ -122,7 +122,7 @@ Oct 27 – Nov 4, 2026.
 | Impact | One story, not ten summaries: `StoryCard`, `WhatsNewSection`, `DisagreementPanel`, `TodayOverview` |
 | Meta AI tooling | Table below; agents in `backend/app/agent/`, routing in `backend/app/config.py` |
 | Technical depth | Clustering + eval in `eval/`, decision log (`agent_runs`, `agent_steps`), `docs/architecture.md` |
-| Demo | 3-min video + the live site (https://app.onestory-osms.duckdns.org; without signing in, `/#/demo`) + `make widgetbook` catalogue + clickable shell (`[Layout]` → shell use cases) |
+| Demo | 3-min video (made in `submission/`, presented by Biscuit) + the live site (https://app.onestory-osms.duckdns.org; without signing in, `/#/demo`) + `make widgetbook` catalogue + clickable shell (`[Layout]` → shell use cases) |
 
 ## Which Meta models do what
 
