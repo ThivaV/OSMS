@@ -67,6 +67,7 @@ SCENES = [
         seconds=16,
         shot="app:story",
         layout="pip",
+        seed=11,  # seed 7 spoke a little low for Biscuit
         label='One story, three sources',
         points=('Every sentence cited', 'Links, never copies', "What's new since your last visit"),
     ),
@@ -103,6 +104,7 @@ SCENES = [
         seconds=16,
         shot="app:listen",
         layout="pip",
+        seed=11,  # seed 7 slurred "Muse Voice Transcribe"
         label='Your morning briefing',
         points=('Every sentence cites a checked fact', 'Voiced by SeamlessM4T v2', 'Heard back by Muse Voice Transcribe'),
     ),

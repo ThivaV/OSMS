@@ -37,8 +37,8 @@ PANEL_XY = (40, 40)  # a card
 BIG = (1312, 120, 560)  # Biscuit beside a card: x, y, size
 CAPTION_Y = 990
 
-# Parts of a recording to keep, in seconds: Ask's wait for its answer is cut.
-CUTS = {"ask": [(0, 5.2), (11.6, None)], "listenIn": [(0.8, None)]}
+# Parts of a recording to keep, in seconds: Ask's wait for its answer is cut, and the story opens sooner.
+CUTS = {"story": [(2.0, None)], "ask": [(0, 5.2), (11.6, None)], "listenIn": [(0.8, None)]}
 # The briefing's own voice: its chapter for story #706 opens with this sentence (SeamlessM4T v2).
 LISTEN_IN = {"start": 77.65, "seconds": 3.8, "line": "“Engadget reports that Apple launched its iPad mini last week.”"}
 DEMO_URL = "app.onestory-osms.duckdns.org/#/demo"
