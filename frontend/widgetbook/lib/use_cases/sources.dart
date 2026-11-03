@@ -127,13 +127,17 @@ Widget addSourceNormal(BuildContext context) {
       found: fx.foundSource,
       opmlFileName: 'reader-export.opml',
       opmlSources: fx.opmlSources(18),
+      onFind: (_) {},
+      onSubscribe: () {},
+      onImportOpml: () {},
       onFollowResearch: () {},
     ),
   );
 }
 
 @widgetbook.UseCase(name: 'Empty', type: AddSourceSheet, path: '[Sources]')
-Widget addSourceEmpty(BuildContext context) => const Frame(maxWidth: _sheetWidth, child: AddSourceSheet());
+Widget addSourceEmpty(BuildContext context) =>
+    Frame(maxWidth: _sheetWidth, child: AddSourceSheet(onFind: (_) {}, onFollowResearch: () {}));
 
 @widgetbook.UseCase(name: 'Extreme content', type: AddSourceSheet, path: '[Sources]')
 Widget addSourceExtreme(BuildContext context) => Frame(
@@ -142,6 +146,7 @@ Widget addSourceExtreme(BuildContext context) => Frame(
     status: AddSourceStatus.opml,
     opmlFileName: 'a-very-long-export-file-name-from-another-reader-2026-10-28.opml',
     opmlSources: fx.opmlSources(120),
+    onImportOpml: () {},
   ),
 );
 

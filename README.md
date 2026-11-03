@@ -102,7 +102,16 @@ Oct 27 – Nov 4, 2026.
   and history paging, and videos as link-out rows with their story when they joined
   one (`GET /videos`). Type chips filter the shelves; every row names its source
   documents. Spec: `docs/specs/listen.md`.
-- [ ] Still to do: related-by-meaning papers, adding sources from the app, the language
+- [x] **The last day (Nov 3):**
+  - **Add a source** from the app: paste a link, or a handle like `@name@mastodon.social`,
+    `@name.bsky.social` or `r/name`. OSMS finds the feed (a site's home page is enough),
+    shows its type, language, newest titles and how often it publishes, then follows it
+    and fetches it at once.
+  - **Saved**, kept by OSMS, so the web and the Mac show the same list.
+  - **Share** copies a story's title, summary and links to the original reports.
+  - The demo's sample podcast episodes say they are samples.
+  - Spec: `docs/specs/saved-and-add-source.md`.
+- [ ] Still to do: related-by-meaning papers, OPML import from the app, the language
   toggle, the editor's review loop and the Muse Wonder trial (see AGENTS.md,
   *Build plan*).
 

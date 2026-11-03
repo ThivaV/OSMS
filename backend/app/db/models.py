@@ -345,3 +345,13 @@ class ReadState(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     story_id: Mapped[int] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), primary_key=True)
     read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SavedStory(Base):
+    """A story a reader kept for later: theirs alone, on every device they sign in on."""
+
+    __tablename__ = "saved_stories"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    story_id: Mapped[int] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), primary_key=True)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

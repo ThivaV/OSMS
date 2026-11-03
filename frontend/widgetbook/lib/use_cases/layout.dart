@@ -252,7 +252,7 @@ class _ShellState extends State<_Shell> {
         onOpen: (s) => setState(() => _selected = s.id),
         onOpenPaper: (_) {},
       ),
-      detail: story == null ? null : StoryDetailView(key: ValueKey(story.id), story: story),
+      detail: story == null ? null : StoryDetailView(key: ValueKey(story.id), story: story, onSave: () {}, onShare: () {}),
       floatingPlayer: briefing == null ? null : BriefingFloatingBar(briefing: briefing),
       phoneNav: PillNav(destinations: _phoneTabs, selected: _phoneTab, onSelect: (i) => setState(() => _phoneTab = i)),
       phoneBody: switch (_phoneTab) {

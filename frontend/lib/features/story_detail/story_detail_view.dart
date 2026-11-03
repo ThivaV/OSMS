@@ -25,6 +25,8 @@ class StoryDetailView extends StatefulWidget {
     super.key,
     required this.story,
     this.onListen,
+    this.saved = false,
+    this.onSave,
     this.onShare,
     this.askQuestion,
     this.askResult,
@@ -40,6 +42,12 @@ class StoryDetailView extends StatefulWidget {
   /// Plays the story's chapter of the briefing. Null greys Listen out: the story isn't in
   /// the latest briefing, which is where OSMS's audio comes from.
   final VoidCallback? onListen;
+
+  /// Whether the reader saved it; [onSave] saves or unsaves. Null hides Save.
+  final bool saved;
+  final VoidCallback? onSave;
+
+  /// Null hides Share.
   final VoidCallback? onShare;
 
   /// Ask this story (secondary, rule 4). The parent owns the async work and
@@ -64,7 +72,6 @@ class _StoryDetailViewState extends State<StoryDetailView> {
   final _timeline = GlobalKey();
   final _sources = GlobalKey();
   final _ask = GlobalKey();
-  bool _saved = false;
 
   /// The original article, on its publisher's site: OSMS links, never republishes.
   static Future<void> _openOriginal(String url) async {
@@ -243,7 +250,7 @@ class _StoryDetailViewState extends State<StoryDetailView> {
               bottom: Space.lg,
               child: Center(
                 child: _StoryToolbar(
-                  saved: _saved,
+                  saved: widget.saved,
                   hasDisagreements: story.disagreements.isNotEmpty,
                   onListen: widget.onListen,
                   onWhatsNew: () => _jumpTo(_whatsNew),
@@ -251,8 +258,8 @@ class _StoryDetailViewState extends State<StoryDetailView> {
                   onTimeline: () => _jumpTo(_timeline),
                   onSources: () => _jumpTo(_sources),
                   onAsk: () => _jumpTo(_ask),
-                  onSave: () => setState(() => _saved = !_saved),
-                  onShare: widget.onShare ?? () {},
+                  onSave: widget.onSave,
+                  onShare: widget.onShare,
                 ),
               ),
             ),
@@ -287,8 +294,8 @@ class _StoryToolbar extends StatelessWidget {
   final VoidCallback onTimeline;
   final VoidCallback onSources;
   final VoidCallback onAsk;
-  final VoidCallback onSave;
-  final VoidCallback onShare;
+  final VoidCallback? onSave;
+  final VoidCallback? onShare;
 
   static const _compactBelow = 460.0;
   static const _notInBriefing = 'Not in the latest briefing';
@@ -354,21 +361,23 @@ class _StoryToolbar extends StatelessWidget {
                 onPressed: onAsk,
                 icon: const Icon(Icons.contact_support_outlined),
               ),
-              gap(),
-              IconButton(
-                tooltip: saved ? 'Saved' : 'Save for later',
-                visualDensity: density,
-                isSelected: saved,
-                onPressed: onSave,
-                icon: const Icon(Icons.bookmark_outline_rounded),
-                selectedIcon: const Icon(Icons.bookmark_rounded),
-              ),
-              IconButton(
-                tooltip: 'Share',
-                visualDensity: density,
-                onPressed: onShare,
-                icon: const Icon(Icons.share_outlined),
-              ),
+              if (onSave != null || onShare != null) gap(),
+              if (onSave != null)
+                IconButton(
+                  tooltip: saved ? 'Saved: tap to unsave' : 'Save for later',
+                  visualDensity: density,
+                  isSelected: saved,
+                  onPressed: onSave,
+                  icon: const Icon(Icons.bookmark_outline_rounded),
+                  selectedIcon: const Icon(Icons.bookmark_rounded),
+                ),
+              if (onShare != null)
+                IconButton(
+                  tooltip: 'Share',
+                  visualDensity: density,
+                  onPressed: onShare,
+                  icon: const Icon(Icons.share_outlined),
+                ),
             ],
           ),
         );

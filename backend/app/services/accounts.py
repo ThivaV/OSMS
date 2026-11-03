@@ -11,9 +11,12 @@ from app.auth.tokens import Claims
 from app.db.models import Briefing, Interest, Source, Subscription, Topic, User
 from app.schemas.account import (
     LANGUAGES,
+    MAX_SUBSCRIPTIONS,
+    DiscoveredOut,
     InterestIn,
     InterestOut,
     LanguageOut,
+    LatestOut,
     MeOut,
     OnboardingIn,
     OnboardingOptions,
@@ -24,6 +27,7 @@ from app.schemas.account import (
 )
 from app.services import interests as research
 from app.services import jobs
+from app.services.ingestion.discovery import LATEST, Discovered, feed_urls
 
 # Recording "last seen" on every request would make every read a write.
 LAST_SEEN_EVERY = timedelta(hours=1)
@@ -32,6 +36,14 @@ LAST_SEEN_EVERY = timedelta(hours=1)
 class UnknownIds(ValueError):
     def __init__(self, what: str, ids: list[str]) -> None:
         super().__init__(f"Unknown {what}: {', '.join(sorted(ids))}")
+
+
+class TooManySources(ValueError):
+    pass
+
+
+class NotFollowing(LookupError):
+    pass
 
 
 def _aware(moment: datetime) -> datetime:
@@ -149,6 +161,66 @@ def update_settings(db: Session, user: User, changes: SettingsIn) -> User:
         user.appearance = changes.appearance.model_dump()
     if changes.default_layout is not None:
         user.default_layout = changes.default_layout
+    db.commit()
+    return user
+
+
+def _existing(db: Session, found: Discovered) -> Source | None:
+    return db.scalar(select(Source).where(Source.feed_url.in_(feed_urls(found))).order_by(Source.id).limit(1))
+
+
+def discovered(db: Session, user: User, found: Discovered) -> DiscoveredOut:
+    """The preview before following: the source as OSMS would keep it, and its newest
+    titles and links."""
+    existing = _existing(db, found)
+    return DiscoveredOut(
+        source=SourceOut(
+            id=str(existing.id) if existing else "",
+            name=existing.title if existing else found.title,
+            type=existing.type if existing else found.type,
+            language=existing.language if existing else found.language,
+            url=found.html_url or found.feed_url,
+        ),
+        latest=[
+            LatestOut(title=e.title, url=e.link, published_at=e.published_at, kind=e.kind)
+            for e in found.entries[:LATEST]
+        ],
+        frequency=found.frequency,
+        already_followed=existing is not None and any(s.source_id == existing.id for s in user.subscriptions),
+    )
+
+
+def follow_source(db: Session, user: User, found: Discovered) -> User:
+    """Follow what discovery found: the source OSMS already has at that address, or a new
+    one, fetched at once. Other readers' sources are shared, never copied."""
+    source = _existing(db, found)
+    if source is not None and any(s.source_id == source.id for s in user.subscriptions):
+        return user
+    if len(user.subscriptions) >= MAX_SUBSCRIPTIONS:
+        raise TooManySources(f"OSMS follows at most {MAX_SUBSCRIPTIONS} sources per reader.")
+    if source is None:
+        source = Source(
+            type=found.type,
+            title=found.title,
+            feed_url=found.feed_url,
+            html_url=found.html_url,
+            language=found.language,
+            next_fetch_at=datetime.now(UTC),
+        )
+        db.add(source)
+        db.flush()
+    user.subscriptions.append(Subscription(source_id=source.id))
+    jobs.enqueue(db, "fetch-source", source.id)
+    db.commit()
+    return user
+
+
+def unfollow_source(db: Session, user: User, source_id: int) -> User:
+    """Stop following one source. The source stays: other readers may follow it."""
+    subscription = next((s for s in user.subscriptions if s.source_id == source_id), None)
+    if subscription is None:
+        raise NotFollowing(f"Not following source {source_id}.")
+    user.subscriptions.remove(subscription)
     db.commit()
     return user
 

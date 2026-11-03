@@ -32,6 +32,8 @@ class FeedMeta:
     title: str
     language: str | None
     ttl_minutes: int | None
+    #: The site the feed belongs to, when it says.
+    link: str | None = None
 
 
 @dataclass(frozen=True)
@@ -238,12 +240,19 @@ def _json_feed(body: bytes, source_type: str) -> tuple[FeedMeta, list[Entry]]:
             kind = "paper"
         elif enclosure:
             kind = "episode"
+        elif source_type == "youtube":
+            kind = "video"
         else:
             kind = "post" if not title else "article"
         image = safe_image(str(raw.get("image") or raw.get("banner_image") or ""))
         entries.append(Entry(guid=guid, link=link, title=title, text=text, published_at=published, kind=kind,
                              image=image, audio=audio, duration_s=duration))
-    meta = FeedMeta(title=plain_text(str(feed.get("title") or ""), MAX_TITLE), language=normalise(feed.get("language")), ttl_minutes=None)
+    meta = FeedMeta(
+        title=plain_text(str(feed.get("title") or ""), MAX_TITLE),
+        language=normalise(feed.get("language")),
+        ttl_minutes=None,
+        link=_safe_link(feed.get("home_page_url") if isinstance(feed.get("home_page_url"), str) else None),
+    )
     return meta, entries
 
 
@@ -261,6 +270,7 @@ def parse_feed(body: bytes, *, source_type: str = "feed") -> tuple[FeedMeta, lis
         title=plain_text(feed.get("title", ""), MAX_TITLE),
         language=normalise(feed.get("language")),
         ttl_minutes=int(ttl) if isinstance(ttl, str) and ttl.isdigit() else None,
+        link=_safe_link(feed.get("link")),
     )
     entries = []
     for raw in parsed.entries:
@@ -281,6 +291,8 @@ def parse_feed(body: bytes, *, source_type: str = "feed") -> tuple[FeedMeta, lis
             kind = "paper"
         elif enclosure:
             kind = "episode"
+        elif source_type == "youtube":
+            kind = "video"
         else:
             kind = "post" if not title else "article"
         image = None if kind == "paper" else _image(raw)

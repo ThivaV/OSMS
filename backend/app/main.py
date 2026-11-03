@@ -12,10 +12,13 @@ from app.auth.tokens import JwksKeys, TokenVerifier
 from app.clients.openai_compat import models_from_settings
 from app.config import SEED_OPML, Settings, check_routes
 from app.db.sqlite import make_engine, migrate, session_factory
+from app.services.ingestion.fetcher import Fetcher
 from app.services.ingestion.opml import load_seed
 
 
-def create_app(settings: Settings | None = None, verifier: TokenVerifier | None = None, models=None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, verifier: TokenVerifier | None = None, models=None, fetcher: Fetcher | None = None
+) -> FastAPI:
     settings = settings or Settings()
     # A misconfigured routing table fails here, before any agent decides anything.
     check_routes(settings.model_routes())
@@ -36,7 +39,11 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
         app.state.verifier = verifier or TokenVerifier(
             issuer=settings.auth_url, audience=settings.api_audience, keys=JwksKeys(settings.jwks_url)
         )
+        # Adding a source looks it up on the web: the same polite, checked fetcher as the worker's.
+        app.state.fetcher = fetcher or Fetcher()
         yield
+        if fetcher is None:
+            app.state.fetcher.client.close()
         engine.dispose()
 
     app = FastAPI(title="OSMS API", version="0.1.0", lifespan=lifespan)

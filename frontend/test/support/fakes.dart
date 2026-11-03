@@ -125,6 +125,52 @@ class FakeApi extends ApiClient {
   @override
   Future<void> markRead(String storyId) async => read.add(storyId);
 
+  /// What the reader saved, newest first, by id; every story the fake knows can be saved.
+  final List<String> savedIds = [];
+  bool refuseSaving = false;
+
+  @override
+  Future<List<Story>> savedStories() async => [
+    for (final id in savedIds) ...[...readerStories, ...demo].where((s) => s.id == id).take(1),
+  ];
+
+  @override
+  Future<void> saveStory(String storyId) async {
+    if (refuseSaving) throw const ApiException('OSMS had a problem. Try again in a moment.', status: 500);
+    savedIds
+      ..remove(storyId)
+      ..insert(0, storyId);
+  }
+
+  @override
+  Future<void> unsaveStory(String storyId) async => savedIds.remove(storyId);
+
+  /// What a link leads to; null means there is no feed there.
+  DiscoveredSource? discovered;
+  final List<String> discoveredFor = [];
+
+  @override
+  Future<DiscoveredSource> discoverSource(String query) async {
+    discoveredFor.add(query);
+    final found = discovered;
+    if (found == null) throw const ApiException('OSMS had a problem. Try again in a moment.', status: 404);
+    return found;
+  }
+
+  @override
+  Future<Account> followSource(String query) async {
+    final found = discovered;
+    if (found == null) throw const ApiException('OSMS had a problem. Try again in a moment.', status: 404);
+    subscriptions = [...subscriptions, found.source];
+    return _account;
+  }
+
+  @override
+  Future<Account> unfollowSource(String sourceId) async {
+    subscriptions = [for (final s in subscriptions) if (s.id != sourceId) s];
+    return _account;
+  }
+
   /// What the interest agent suggests; records the keywords it was asked about.
   InterestSuggestions suggestions = const InterestSuggestions();
   final List<List<String>> suggestedFor = [];

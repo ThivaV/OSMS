@@ -177,9 +177,10 @@ flowchart TB
 
 ### 1. Coming in
 
-- **Sources** are added from one box: a link (feed autodiscovery), a handle
-  (`@user@instance`, `r/name`, a YouTube channel, ...) or an OPML file. Sources are shared:
-  a feed two readers follow is fetched once.
+- **Sources** are added from one box: a link (feed autodiscovery: a site's home page is
+  enough) or a handle (`@user@instance`, `@name.bsky.social`, `r/name`), previewed before
+  following; OPML import is next. Sources are shared: a feed two readers follow is fetched
+  once.
 - **arXiv** is a main source, read two ways: category feeds, and searches built from each
   reader's research keywords. See *arXiv: from keywords to papers* below.
 - **The scheduler** checks every source at least one reader follows, each on its own
@@ -377,7 +378,7 @@ flowchart TB
 
 | Store | Where | What it holds |
 |---|---|---|
-| SQLite | `data/osms.db` | Users, topics, sources (with their check schedule), subscriptions, research interests and their matches, items, the jobs queue, stories (with their illustration's record), claims and their dated history, disagreements, timeline, read state, saved items, briefings, the agents' decision log (each run with the story or item it decided about) |
+| SQLite | `data/osms.db` | Users, topics, sources (with their check schedule), subscriptions, research interests and their matches, items, the jobs queue, stories (with their illustration's record), claims and their dated history, disagreements, timeline, read state, saved stories, briefings, the agents' decision log (each run with the story or item it decided about) |
 | SQLite | `data/auth.db` | Sign-in only: Better Auth's accounts, sessions, linked Google accounts and signing keys. Only the sign-in service opens it. |
 | Milvus Lite | `data/milvus.db` | One vector record per item that can join a story (dense + sparse BGE-M3, with its publication time for the window); papers join it with related-by-meaning matches (not yet) |
 | Briefing audio | `data/briefings/` | One WAV per briefing, served only by a signed, short-lived URL to its reader, deleted with their account. Podcast audio (later) only until it is transcribed |

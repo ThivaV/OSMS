@@ -145,3 +145,51 @@ def test_one_article_in_two_feeds_counts_once(client) -> None:
         db.commit()
     out = client.get("/demo/stories").json()["stories"][0]
     assert out["why"][0] == "1 source" and len(out["timeline"]) == 1
+
+
+def test_a_reader_saves_stories_newest_first_and_unsaves_them(client, auth) -> None:
+    ids = _seed(client)
+    ada = auth("ada")
+    client.get("/me", headers=ada)
+    _follow(client, "ada", ids["demo"], ids["private"])
+    assert client.get("/saved", headers=ada).json() == {"stories": []}
+    for story in ("launch", "niche", "launch"):  # saving again keeps the first time it was saved
+        assert client.put(f"/stories/{ids[story]}/saved", headers=ada).status_code == 204
+    saved = client.get("/saved", headers=ada).json()["stories"]
+    assert [s["id"] for s in saved] == [str(ids["niche"]), str(ids["launch"])]
+    assert saved[1]["whats_new"][0]["quote"] == "The booster landed."
+    for _ in range(2):  # idempotent
+        assert client.delete(f"/stories/{ids['niche']}/saved", headers=ada).status_code == 204
+    assert [s["id"] for s in client.get("/saved", headers=ada).json()["stories"]] == [str(ids["launch"])]
+
+
+def test_saved_stories_are_the_readers_own(client, auth) -> None:
+    ids = _seed(client)
+    for user in ("ada", "bo"):
+        client.get("/me", headers=auth(user))
+    _follow(client, "ada", ids["demo"], ids["private"])
+    _follow(client, "bo", ids["demo"])
+    client.put(f"/stories/{ids['launch']}/saved", headers=auth("ada"))
+    client.put(f"/stories/{ids['niche']}/saved", headers=auth("ada"))
+    assert client.get("/saved", headers=auth("bo")).json()["stories"] == [], "Ada's saves aren't Bo's"
+    assert client.put(f"/stories/{ids['niche']}/saved", headers=auth("bo")).status_code == 404
+    assert client.put("/stories/99999/saved", headers=auth("bo")).status_code == 404
+    # A story Ada's sources no longer reach drops out of her list (rule 7).
+    assert client.delete(f"/me/sources/{ids['private']}", headers=auth("ada")).status_code == 200
+    assert [s["id"] for s in client.get("/saved", headers=auth("ada")).json()["stories"]] == [str(ids["launch"])]
+
+
+def test_saving_needs_sign_in_and_deleting_the_reader_deletes_their_saves(client, auth) -> None:
+    ids = _seed(client)
+    assert client.get("/saved").status_code == 401
+    assert client.put(f"/stories/{ids['launch']}/saved").status_code == 401
+    assert client.delete(f"/stories/{ids['launch']}/saved").status_code == 401
+    client.get("/me", headers=auth("ada"))
+    _follow(client, "ada", ids["demo"])
+    client.put(f"/stories/{ids['launch']}/saved", headers=auth("ada"))
+    assert client.delete("/me", headers=auth("ada")).status_code == 204
+    with client.app.state.sessions() as db:
+        from app.db.models import SavedStory
+
+        assert db.scalars(select(SavedStory)).all() == []
+        assert db.get(Story, ids["launch"]) is not None  # shared stories stay

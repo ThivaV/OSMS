@@ -14,6 +14,7 @@ import '../../core/models/models.dart';
 import '../../core/session/briefing.dart';
 import '../../core/session/episodes.dart';
 import '../../core/session/research.dart';
+import '../../core/session/saved.dart';
 import '../../core/session/session.dart';
 import '../../core/session/stories.dart';
 import '../../core/session/videos.dart';
@@ -27,6 +28,7 @@ import '../auth/demo_banner.dart';
 import '../briefing/briefing_player.dart';
 import '../listen/listen_screen.dart';
 import '../search/command_palette.dart';
+import '../sources/add_source_dialog.dart';
 import '../sources/sources_sidebar.dart';
 import '../stories/story_list.dart';
 import '../stories/today_overview.dart';
@@ -240,6 +242,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (story.timeline.isNotEmpty) 'How did this story develop?',
   ];
 
+  /// Saves or unsaves at once; if OSMS refuses, the bookmark goes back and a note says so.
+  Future<void> _toggleSave(Story story) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await ref.read(savedProvider.notifier).toggle(story);
+    } on ApiException catch (e) {
+      messenger?.showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  /// Copies the story to share: its title, our summary and the original reports'
+  /// links. Links only, never the publishers' text (rule 5).
+  Future<void> _share(Story story) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final links = {
+      for (final event in story.timeline)
+        if (event.url != null && event.url!.startsWith('http')) event.url!: event.text,
+    };
+    final text = [
+      story.title,
+      '',
+      story.summary,
+      '',
+      'Reported by ${story.sources.map((s) => s.name).join(', ')}.',
+      for (final link in links.entries.take(_shareLinks)) '• ${link.value}: ${link.key}',
+      '',
+      'Shared from OSMS: One Story, Many Sources.',
+    ].join('\n');
+    await Clipboard.setData(ClipboardData(text: text));
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(
+          links.isEmpty
+              ? 'Copied the story to share.'
+              : 'Copied the story and ${links.length > _shareLinks ? _shareLinks : links.length} links to its reports.',
+        ),
+      ),
+    );
+  }
+
+  static const _shareLinks = 5;
+
   /// Sidebar taps: research interests live on their own page, everything else
   /// filters the story list (and clears any open story).
   void _selectNav(String id, Session session) {
@@ -252,10 +296,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   /// The list follows the sidebar: Today is everything, a topic or a source
-  /// narrows to its stories, Saved waits for the kept-store to land.
-  List<Story> _visibleStories(List<Story> stories, List<Topic> topics) {
+  /// narrows to its stories, Saved is what the reader saved.
+  List<Story> _visibleStories(List<Story> stories, List<Topic> topics, List<Story> saved) {
     final nav = _nav;
-    if (nav == 'today' || nav == 'saved') return nav == 'today' ? stories : const [];
+    if (nav == 'today') return stories;
+    if (nav == 'saved') return saved;
     final topic = topics.where((t) => t.id == nav).firstOrNull;
     if (topic != null) return stories.where((s) => s.topic == topic.name).toList();
     return stories.where((s) => s.sources.any((src) => src.id == nav)).toList();
@@ -375,22 +420,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final navSources = account?.subscriptions ?? demoSources;
     // A folder can be a topic the reader doesn't follow; selecting it still narrows the list.
     final listTopics = [...navTopics, ...allTopics.where((t) => !navTopics.any((n) => n.id == t.id))];
-    final stories = _visibleStories(view.stories, listTopics);
+    final savedView = ref.watch(savedProvider);
+    final stories = _visibleStories(view.stories, listTopics, savedView.stories);
     final saved = _nav == 'saved';
     // An episode's "Discussed in" opens its story wherever it is, keeping the
     // podcasts list behind it.
     final story =
         stories.where((s) => s.id == _selected).firstOrNull ??
-        view.stories.where((s) => s.id == _selected).firstOrNull;
+        view.stories.where((s) => s.id == _selected).firstOrNull ??
+        savedView.stories.where((s) => s.id == _selected).firstOrNull;
     final layout = _layout ?? account?.defaultLayout ?? StoryCardLayout.row;
     final sourceCount = account?.subscriptions.length ?? 0;
-    // Until sources can be added one by one from the app, onboarding is where a reader picks them.
+    // A reader without sources picks them in onboarding; anyone signed in can add one by link.
     final chooseSources = account != null && sourceCount == 0 ? () => context.go('/onboarding') : null;
+    final addSource = account == null ? null : () => unawaited(AddSourceDialog.show(context));
 
     Widget? banner() => account == null
         ? DemoBanner(
             signInAvailable: session.available && session.providers.any,
             samples: view.samples,
+            sampleEpisodes: listen && podcastsView.samples,
             onSignIn: () => context.go('/'),
           )
         : view.unavailable
@@ -422,6 +471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         if (phone) setState(() => _phoneTab = 0);
       },
       onSignIn: () => context.go('/'),
+      onAddSource: addSource,
       onSearch: withSearch ? () => _openPalette(context, session, view, navSources) : null,
       onSettings: () => context.go('/settings'),
       onWhatWeKeep: () => context.go('/what-we-keep'),
@@ -461,6 +511,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       videosLoading: videosLoading,
       onWatchVideo: _watchVideo,
       onOpenVideoStory: (v) => _selectStory(v.storyId!),
+      onAddSource: addSource,
       banner: banner(),
       bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,
     );
@@ -476,7 +527,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         banner: banner(),
         sourceCount: sourceCount,
         onChooseSources: saved ? null : chooseSources,
-        loading: loading,
+        onAddSource: saved ? null : addSource,
+        loading: saved ? savedView.loading : loading,
         emptyTitle: saved ? 'Nothing saved yet' : null,
         emptyBody: saved ? 'Save a story from its toolbar and it waits for you here.' : null,
         emptyIcon: saved ? Icons.bookmark_outline_rounded : null,
@@ -497,7 +549,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         banner: banner(),
         sourceCount: sourceCount,
         onChooseSources: saved ? null : chooseSources,
-        loading: loading,
+        onAddSource: saved ? null : addSource,
+        loading: saved ? savedView.loading : loading,
         emptyTitle: saved ? 'Nothing saved yet' : null,
         emptyBody: saved ? 'Save a story from its toolbar and it waits for you here.' : null,
         onOpen: (s) => _selectStory(s.id),
@@ -508,6 +561,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               key: ValueKey(story.id),
               story: story,
               onListen: _listenTo(story, briefing, playback),
+              // The invented samples aren't worth keeping or passing on.
+              saved: savedView.contains(story.id),
+              onSave: view.samples ? null : () => unawaited(_toggleSave(story)),
+              onShare: view.samples ? null : () => unawaited(_share(story)),
               askQuestion: _askQuestion,
               askResult: _askResult,
               askThinking: _askThinking,
@@ -536,13 +593,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             onBeforePlay: () => unawaited(_episodePlayback?.pause()),
           ),
         ),
-        2 => const Padding(
-          padding: EdgeInsets.all(Space.lg),
-          child: QuietNote(
-            icon: Icons.bookmark_outline_rounded,
-            title: 'Nothing saved yet',
-            body: 'Save a story from its toolbar and it waits for you here.',
-          ),
+        2 => StoryList(
+          stories: savedView.stories,
+          title: 'Saved',
+          selectedId: _selected,
+          layout: layout,
+          bottomInset: briefing == null ? Space.xl : ThreePaneLayout.floatingInset,
+          loading: savedView.loading,
+          emptyTitle: 'Nothing saved yet',
+          emptyBody: 'Save a story from its toolbar and it waits for you here.',
+          emptyIcon: Icons.bookmark_outline_rounded,
+          onSelect: (s) => _selectStory(s.id),
         ),
         3 => sidebar(withSearch: false, phone: true),
         _ => null,

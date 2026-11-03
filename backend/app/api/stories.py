@@ -83,6 +83,23 @@ def mark_read(story_id: int, reader: Reader, db: Db) -> None:
     stories.mark_read(db, reader.id, story_id)
 
 
+@router.get("/saved")
+def saved(reader: Reader, db: Db) -> StoriesOut:
+    """The reader's saved stories, newest saved first: theirs alone (rule 7)."""
+    return StoriesOut(stories=stories.saved_stories(db, reader.id))
+
+
+@router.put("/stories/{story_id}/saved", status_code=status.HTTP_204_NO_CONTENT)
+def save_story(story_id: int, reader: Reader, db: Db) -> None:
+    _visible_story(db, story_id, stories.reader_source_ids(db, reader.id))
+    stories.save(db, reader.id, story_id)
+
+
+@router.delete("/stories/{story_id}/saved", status_code=status.HTTP_204_NO_CONTENT)
+def unsave_story(story_id: int, reader: Reader, db: Db) -> None:
+    stories.unsave(db, reader.id, story_id)
+
+
 @router.get("/demo/stories")
 def demo_stories(db: Db) -> StoriesOut:
     """Public: the demo account's stories, for signed-out visitors and judges."""

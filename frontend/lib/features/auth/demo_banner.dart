@@ -5,13 +5,23 @@ import '../../core/theme/tokens.dart';
 /// Above the story list while signed out: this is the demo, and how to get
 /// your own. Judges can keep reading without an account.
 class DemoBanner extends StatelessWidget {
-  const DemoBanner({super.key, this.signInAvailable = true, this.samples = false, this.onSignIn});
+  const DemoBanner({
+    super.key,
+    this.signInAvailable = true,
+    this.samples = false,
+    this.sampleEpisodes = false,
+    this.onSignIn,
+  });
 
   final bool signInAvailable;
 
   /// The demo's stories are invented samples, until OSMS collects real ones. Invented
   /// stories never pass for real ones, so the banner says so.
   final bool samples;
+
+  /// The demo's podcast episodes are invented too, with stand-in music so the player
+  /// can be tried. Shown on Listen, where they appear.
+  final bool sampleEpisodes;
 
   /// One way in: signing in creates the account for someone new, and takes a reader who
   /// has one, on any device, straight to their stories.
@@ -29,6 +39,7 @@ class DemoBanner extends StatelessWidget {
         Text(
           [
             if (samples) 'Its stories are invented samples until OSMS starts collecting real ones.',
+            if (sampleEpisodes) 'Its podcast episodes are invented samples, with stand-in music so you can try the player.',
             signInAvailable
                 ? 'Sign in to choose your own topics and sources. New here? Signing in creates your account.'
                 : 'Sign-in is unavailable right now. You can keep reading the demo.',

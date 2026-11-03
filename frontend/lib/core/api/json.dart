@@ -25,6 +25,27 @@ Source sourceFromJson(Json j, {bool followed = false}) => Source(
   followed: followed,
 );
 
+/// A source found from a link or handle, with its latest posts: titles and links only.
+DiscoveredSource discoveredSourceFromJson(Json j) {
+  final source = sourceFromJson(j['source'] as Json, followed: j['already_followed'] == true);
+  return DiscoveredSource(
+    source: source,
+    latest: [
+      for (final (i, item) in _list(j['latest']).indexed)
+        Item(
+          id: '${source.id}-$i',
+          source: source,
+          kind: _byName(ItemKind.values, item['kind']) ?? ItemKind.article,
+          publishedAt: item['published_at'] == null ? DateTime.now() : _time(item['published_at']),
+          title: item['title'] as String?,
+          url: item['url'] as String?,
+        ),
+    ],
+    frequency: j['frequency'] as String?,
+    alreadyFollowed: j['already_followed'] == true,
+  );
+}
+
 ResearchInterest interestFromJson(Json j) => ResearchInterest(
   id: j['id'] as String,
   keywords: _strings(j['keywords']),

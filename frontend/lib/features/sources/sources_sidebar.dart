@@ -216,12 +216,12 @@ class _SourcesSidebarState extends State<SourcesSidebar> {
                   padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xs),
                   child: Text('No sources yet', style: t.caption.copyWith(color: c.textTertiary)),
                 ),
-              if (user != null) ...[
+              if (user != null && widget.onAddSource != null) ...[
                 const SizedBox(height: Space.sm),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
-                    onPressed: widget.onAddSource ?? () {},
+                    onPressed: widget.onAddSource,
                     icon: const Icon(Icons.add_rounded, size: Sizes.iconMd),
                     label: const Text('Add a source'),
                   ),

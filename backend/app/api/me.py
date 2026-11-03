@@ -1,5 +1,6 @@
-"""The signed-in reader: profile, onboarding picks, research interests, settings and
-"Delete my account". Every route acts on the reader the token names, and only them."""
+"""The signed-in reader: profile, onboarding picks, the sources they add one by one,
+research interests, settings and "Delete my account". Every route acts on the reader
+the token names, and only them."""
 
 from typing import Annotated
 
@@ -8,15 +9,30 @@ from pydantic import Field
 
 from app.api.deps import Db, Kit, Reader
 from app.api.stories import _within_limit
-from app.schemas.account import MAX_TERMS, InterestsIn, MeOut, OnboardingIn, OnboardingOptions, SettingsIn, Strict, Term
+from app.schemas.account import (
+    MAX_TERMS,
+    DiscoveredOut,
+    InterestsIn,
+    MeOut,
+    OnboardingIn,
+    OnboardingOptions,
+    SettingsIn,
+    SourceQueryIn,
+    Strict,
+    Term,
+)
 from app.schemas.stories import PaperOut, ResearchOut
 from app.services import accounts, interest_agent, stories
 from app.services import interests as research
+from app.services.ingestion import discovery
+from app.services.ingestion.safety import UnsafeUrl
 
 router = APIRouter()
 
 #: The interest agent runs as the reader types (debounced): a looser limit than asking.
 SUGGEST_LIMIT = 30
+#: Finding and following a source fetches from the web on the reader's behalf.
+DISCOVER_LIMIT = 20
 
 
 @router.get("/onboarding/options")
@@ -46,6 +62,41 @@ def replace_interests(body: InterestsIn, reader: Reader, db: Db) -> MeOut:
 @router.patch("/me/settings")
 def update_settings(changes: SettingsIn, reader: Reader, db: Db) -> MeOut:
     return accounts.me(accounts.update_settings(db, reader, changes))
+
+
+def _discover(request: Request, reader: Reader, query: str) -> discovery.Discovered:
+    if not _within_limit(f"discover:{reader.id}", DISCOVER_LIMIT):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many lookups; try again in a few minutes.")
+    try:
+        return discovery.discover(request.app.state.fetcher, query)
+    except UnsafeUrl:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That isn't an address OSMS can follow.")
+    except discovery.NotFollowable:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No feed found at that address.")
+
+
+@router.post("/me/sources/discover")
+def discover_source(body: SourceQueryIn, request: Request, reader: Reader, db: Db) -> DiscoveredOut:
+    """What a link or handle would follow, before following it. Nothing is stored."""
+    return accounts.discovered(db, reader, _discover(request, reader, body.query))
+
+
+@router.post("/me/sources")
+def follow_source(body: SourceQueryIn, request: Request, reader: Reader, db: Db) -> MeOut:
+    """Follow a link or handle. It is looked up again here: the app's preview is never
+    trusted for the address."""
+    try:
+        return accounts.me(accounts.follow_source(db, reader, _discover(request, reader, body.query)))
+    except accounts.TooManySources as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error))
+
+
+@router.delete("/me/sources/{source_id}")
+def unfollow_source(source_id: int, reader: Reader, db: Db) -> MeOut:
+    try:
+        return accounts.me(accounts.unfollow_source(db, reader, source_id))
+    except accounts.NotFollowing:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "You don't follow that source.")
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

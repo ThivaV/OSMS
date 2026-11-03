@@ -9,7 +9,18 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Claim, Disagreement, Item, ReadState, Source, Story, Subscription, Topic, TopicSource
+from app.db.models import (
+    Claim,
+    Disagreement,
+    Item,
+    ReadState,
+    SavedStory,
+    Source,
+    Story,
+    Subscription,
+    Topic,
+    TopicSource,
+)
 from app.schemas.stories import (
     ClaimOut,
     DisagreementOut,
@@ -246,3 +257,30 @@ def mark_read(db: Session, user_id: str, story_id: int) -> datetime:
     db.add(state)
     db.commit()
     return now
+
+
+def saved_stories(db: Session, user_id: str) -> list[StoryOut]:
+    """The reader's saved stories, newest saved first. A story their sources no longer
+    reach drops out of the list (rule 7); the row stays, should they follow it again."""
+    followed = reader_source_ids(db, user_id)
+    read = dict(db.execute(select(ReadState.story_id, ReadState.read_at).where(ReadState.user_id == user_id)).all())
+    saved = db.scalars(
+        select(SavedStory.story_id).where(SavedStory.user_id == user_id).order_by(SavedStory.saved_at.desc())
+    ).all()
+    return [
+        story_out(db, db.get(Story, i), followed=followed, read_at=read.get(i))
+        for i in saved
+        if visible_to(db, i, followed)
+    ]
+
+
+def save(db: Session, user_id: str, story_id: int) -> None:
+    """Saving again keeps the first time it was saved."""
+    if db.get(SavedStory, (user_id, story_id)) is None:
+        db.add(SavedStory(user_id=user_id, story_id=story_id))
+        db.commit()
+
+
+def unsave(db: Session, user_id: str, story_id: int) -> None:
+    db.query(SavedStory).filter(SavedStory.user_id == user_id, SavedStory.story_id == story_id).delete()
+    db.commit()

@@ -9,7 +9,8 @@ import '../../shared/widgets/source_chip.dart';
 enum AddSourceStatus { idle, searching, found, notFound, opml }
 
 /// One box for a link or handle, OPML import, and a preview of what was found
-/// before subscribing. The caller provides scrolling (a bottom sheet or dialog).
+/// before subscribing. The caller provides scrolling (a bottom sheet or dialog) and
+/// does the finding: this only shows [status] and reports what the reader asks for.
 class AddSourceSheet extends StatefulWidget {
   const AddSourceSheet({
     super.key,
@@ -18,9 +19,27 @@ class AddSourceSheet extends StatefulWidget {
     this.found,
     this.opmlFileName,
     this.opmlSources = const [],
+    this.message,
+    this.subscribing = false,
     this.onClose,
+    this.onFind,
+    this.onSubscribe,
+    this.onImportOpml,
     this.onFollowResearch,
   });
+
+  /// Looks up what was typed. Without it, Find does nothing.
+  final ValueChanged<String>? onFind;
+
+  /// Follows [found].
+  final VoidCallback? onSubscribe;
+  final bool subscribing;
+
+  /// Why the last try failed, when it wasn't "no feed there".
+  final String? message;
+
+  /// Without it there is no OPML button.
+  final VoidCallback? onImportOpml;
 
   /// Opens the arXiv interests editor.
   final VoidCallback? onFollowResearch;
@@ -37,6 +56,11 @@ class AddSourceSheet extends StatefulWidget {
 
 class _AddSourceSheetState extends State<AddSourceSheet> {
   late final _controller = TextEditingController(text: widget.query);
+
+  void _find() {
+    final query = _controller.text.trim();
+    if (query.isNotEmpty && widget.status != AddSourceStatus.searching) widget.onFind?.call(query);
+  }
 
   @override
   void dispose() {
@@ -76,6 +100,9 @@ class _AddSourceSheetState extends State<AddSourceSheet> {
               Expanded(
                 child: TextField(
                   controller: _controller,
+                  autofocus: widget.onFind != null,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _find(),
                   style: t.body,
                   decoration: const InputDecoration(
                     hintText: 'https://… or @handle',
@@ -84,7 +111,7 @@ class _AddSourceSheetState extends State<AddSourceSheet> {
                 ),
               ),
               const SizedBox(width: Space.sm),
-              FilledButton(onPressed: () {}, child: const Text('Find')),
+              FilledButton(onPressed: widget.onFind == null ? null : _find, child: const Text('Find')),
             ],
           ),
           const SizedBox(height: Space.md),
@@ -92,23 +119,33 @@ class _AddSourceSheetState extends State<AddSourceSheet> {
             spacing: Space.sm,
             runSpacing: Space.sm,
             children: [
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.upload_file_rounded, size: Sizes.iconMd),
-                label: const Text('Import an OPML file'),
-              ),
-              OutlinedButton.icon(
-                onPressed: widget.onFollowResearch ?? () {},
-                icon: const Icon(Icons.science_outlined, size: Sizes.iconMd),
-                label: const Text('Follow research on arXiv'),
-              ),
+              if (widget.onImportOpml != null)
+                OutlinedButton.icon(
+                  onPressed: widget.onImportOpml,
+                  icon: const Icon(Icons.upload_file_rounded, size: Sizes.iconMd),
+                  label: const Text('Import an OPML file'),
+                ),
+              if (widget.onFollowResearch != null)
+                OutlinedButton.icon(
+                  onPressed: widget.onFollowResearch,
+                  icon: const Icon(Icons.science_outlined, size: Sizes.iconMd),
+                  label: const Text('Follow research on arXiv'),
+                ),
             ],
           ),
           const SizedBox(height: Space.xl),
+          if (widget.message != null) ...[
+            Text(widget.message!, style: t.bodySmall.copyWith(color: c.textSecondary)),
+            const SizedBox(height: Space.lg),
+          ],
           switch (widget.status) {
             AddSourceStatus.idle => const _Idle(),
             AddSourceStatus.searching => _Searching(query: widget.query),
-            AddSourceStatus.found => _Found(found: widget.found!),
+            AddSourceStatus.found => _Found(
+              found: widget.found!,
+              subscribing: widget.subscribing,
+              onSubscribe: widget.onSubscribe,
+            ),
             AddSourceStatus.notFound => const _NotFound(),
             AddSourceStatus.opml => _OpmlPreview(fileName: widget.opmlFileName ?? 'subscriptions.opml', sources: widget.opmlSources),
           },
@@ -202,9 +239,11 @@ class _Searching extends StatelessWidget {
 }
 
 class _Found extends StatelessWidget {
-  const _Found({required this.found});
+  const _Found({required this.found, this.subscribing = false, this.onSubscribe});
 
   final DiscoveredSource found;
+  final bool subscribing;
+  final VoidCallback? onSubscribe;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +297,8 @@ class _Found extends StatelessWidget {
                     const SizedBox(width: Space.sm),
                     Expanded(
                       child: Text(
-                        item.title ?? item.text ?? '',
+                        // Social posts have no titles; the preview never shows their text.
+                        (item.title?.isNotEmpty ?? false) ? item.title! : 'A ${item.kind.singular}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: t.bodySmall,
@@ -279,9 +319,14 @@ class _Found extends StatelessWidget {
                     label: const Text('Following'),
                   )
                 : FilledButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.add_rounded, size: Sizes.iconMd),
-                    label: const Text('Subscribe'),
+                    onPressed: subscribing ? null : onSubscribe,
+                    icon: subscribing
+                        ? const SizedBox.square(
+                            dimension: Sizes.iconMd,
+                            child: CircularProgressIndicator(strokeWidth: Sizes.focusRing),
+                          )
+                        : const Icon(Icons.add_rounded, size: Sizes.iconMd),
+                    label: Text(subscribing ? 'Subscribing…' : 'Subscribe'),
                   ),
           ),
         ],

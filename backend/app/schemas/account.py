@@ -1,6 +1,7 @@
 """What the app sends and gets back about a reader. Inputs are strict: known values
 only, capped sizes, unknown fields refused."""
 
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
@@ -111,3 +112,27 @@ class MeOut(BaseModel):
     appearance: Appearance | None
     default_layout: str | None
     onboarded: bool
+
+
+class SourceQueryIn(Strict):
+    """A link or handle to follow: a page, a feed, `@name@host`, `@name.bsky.social`, `r/name`."""
+
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class LatestOut(BaseModel):
+    """One of a found source's newest entries: its title and link, nothing more (rule 5)."""
+
+    title: str
+    url: str | None
+    published_at: datetime | None
+    kind: Kind
+
+
+class DiscoveredOut(BaseModel):
+    #: `id` is the source OSMS already has at that address, or empty.
+    source: SourceOut
+    latest: list[LatestOut]
+    #: How often it publishes, e.g. "about 4 posts a week".
+    frequency: str | None
+    already_followed: bool

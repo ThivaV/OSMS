@@ -110,6 +110,13 @@ class SessionController extends AsyncNotifier<Session> {
   Future<void> completeOnboarding(OnboardingPicks picks) async =>
       _accountChanged(await _api.completeOnboarding(picks));
 
+  /// Follows what a link or handle leads to. Throws [ApiException] with a message for
+  /// the reader; status 404 means there was no feed there.
+  Future<void> followSource(String query) async => _accountChanged(await _api.followSource(query));
+
+  /// Throws [ApiException] with a message for the reader.
+  Future<void> unfollowSource(String sourceId) async => _accountChanged(await _api.unfollowSource(sourceId));
+
   /// Replaces the first research interest (or adds one), keeping the others.
   Future<void> saveInterest(InterestDraft draft) async {
     final others = [

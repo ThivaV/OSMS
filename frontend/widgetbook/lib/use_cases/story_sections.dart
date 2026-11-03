@@ -203,10 +203,13 @@ class _LiveAskState extends State<_LiveAsk> {
 // ── The whole story page ─────────────────────────────────────────────────────
 
 @widgetbook.UseCase(name: 'Normal', type: StoryDetailView, path: '[Story]')
-Widget storyPageNormal(BuildContext context) => Material(child: StoryDetailView(story: fx.halcyon));
+Widget storyPageNormal(BuildContext context) =>
+    Material(child: StoryDetailView(story: fx.halcyon, onSave: () {}, onShare: () {}));
 
 @widgetbook.UseCase(name: 'Empty', type: StoryDetailView, path: '[Story]')
-Widget storyPageEmpty(BuildContext context) => Material(child: StoryDetailView(story: fx.selene));
+Widget storyPageEmpty(BuildContext context) =>
+    Material(child: StoryDetailView(story: fx.selene, onSave: () {}, onShare: () {}));
 
 @widgetbook.UseCase(name: 'Extreme content', type: StoryDetailView, path: '[Story]')
-Widget storyPageExtreme(BuildContext context) => Material(child: StoryDetailView(story: fx.extremeStory));
+Widget storyPageExtreme(BuildContext context) =>
+    Material(child: StoryDetailView(story: fx.extremeStory, saved: true, onSave: () {}, onShare: () {}));

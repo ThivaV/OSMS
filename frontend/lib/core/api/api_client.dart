@@ -54,6 +54,7 @@ class ApiClient {
       throw ApiException(switch (response.statusCode) {
         401 => 'Sign in again to continue.',
         422 => 'Something you picked isn’t available any more. Try again.',
+        429 => 'That’s a lot at once. Try again in a few minutes.',
         503 => 'Sign-in is unavailable right now. Try again in a moment.',
         _ => 'OSMS had a problem. Try again in a moment.',
       }, status: response.statusCode);
@@ -98,6 +99,24 @@ class ApiClient {
 
   /// The reader opened the story: what's new starts again from now.
   Future<void> markRead(String storyId) => _send('POST', '/stories/$storyId/read');
+
+  /// The reader's saved stories, newest saved first: the same on every device.
+  Future<List<Story>> savedStories() async => storiesFromJson((await _send('GET', '/saved'))!, base: base);
+
+  Future<void> saveStory(String storyId) => _send('PUT', '/stories/$storyId/saved');
+
+  Future<void> unsaveStory(String storyId) => _send('DELETE', '/stories/$storyId/saved');
+
+  /// What a link or handle leads to, before following it. A 404 means there is no feed there.
+  Future<DiscoveredSource> discoverSource(String query) async =>
+      discoveredSourceFromJson((await _send('POST', '/me/sources/discover', body: {'query': query}))!);
+
+  /// Follows what [query] leads to; OSMS looks it up again itself. Returns the account
+  /// with the source added.
+  Future<Account> followSource(String query) async =>
+      accountFromJson((await _send('POST', '/me/sources', body: {'query': query}))!);
+
+  Future<Account> unfollowSource(String sourceId) async => accountFromJson((await _send('DELETE', '/me/sources/$sourceId'))!);
 
   /// The reader's podcasts, newest first — or the demo's signed out. A page of
   /// history at a time: pass the previous page's [cursor] for the next, and
