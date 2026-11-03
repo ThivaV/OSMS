@@ -1,9 +1,10 @@
 # Spec: Podcasts — browse, play, sources (Nov 2026)
 
 **Goal:** a reader can see all their podcasts in one place, play any episode,
-and see where it came from — the show, and the story it joined. Today episodes
-are a dead end: ingestion drops enclosures, no endpoint serves them, and every
-Play button is unwired. This spec closes the slice end to end.
+and see where it came from — the show, and the story it joined. Episodes were
+a dead end: ingestion dropped enclosures, no endpoint served them, and every
+Play button was unwired. Built: this spec closed the slice end to end
+(migration `0009`, `backend/app/api/episodes.py`).
 
 ## Inputs
 
@@ -58,7 +59,7 @@ Play button is unwired. This spec closes the slice end to end.
   button pages in the rest (subtitle counts 55, button gone), a show chip
   filters to its own history. Render tests cover normal, filtered, loading
   older, empty and unavailable.
-- By hand: `/demo` → Podcasts → play a sample; follow a real podcast feed,
+- By hand: `/demo` → Listen → play a sample; follow a real podcast feed,
   wait for fetch, play the enclosure, open "Discussed in".
 
 ## Whole playlist: history, paging, show filter

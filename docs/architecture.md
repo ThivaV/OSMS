@@ -13,7 +13,7 @@ flowchart LR
         social["Mastodon, Bluesky, Reddit"]
         video["YouTube"]
         pods["Podcasts"]
-        mail["Newsletters"]
+        mail["Newsletters, later"]
     end
 
     subgraph backend["Backend: Python"]
@@ -25,7 +25,7 @@ flowchart LR
 
     subgraph models["Meta models"]
         metaapi["Meta Model API: Muse Spark, Muse Wonder, Muse Image, SAM 3.1, Muse Voice Transcribe"]
-        openweights["Open weights: Muse Spark Open on Baseten, Muse Glimmer local"]
+        openweights["Open weights: Muse Spark Open on Fireworks, Muse Glimmer local only"]
     end
 
     subgraph stores["Storage: files on one disk"]
@@ -60,7 +60,8 @@ flowchart LR
 Plain code does the heavy, predictable work: fetching, parsing, embedding, vector search.
 Meta models make the judgement calls: is this item in scope, is this the same event, what
 are the facts, is this new, is this a real disagreement, what matters today and how to
-say it. A different model checks everything generated before a reader sees it.
+say it. Before a reader sees them, facts get a second Muse Spark pass (the verifier), and
+other models check the illustrations and the English and Tamil briefing audio.
 
 ## Signing in
 
@@ -120,9 +121,9 @@ flowchart TB
         sched["Scheduler: sources someone follows; new subscriptions at once"]
         fetch["Fetcher: polite HTTP, link safety checks"]
         adapt["Adapter per source type: one Item shape"]
-        inbox["Newsletter inbox"]
-        audio["Podcast audio"]
-        stt["Muse Voice Transcribe"]
+        inbox["Newsletter inbox, later"]
+        audio["Podcast audio, later: episodes are links today"]
+        stt["Muse Voice Transcribe, later"]
     end
 
     subgraph processing["2. Processing"]
@@ -144,7 +145,7 @@ flowchart TB
         db_items[("SQLite: items")]
         db_stories[("SQLite: stories, claims and their history, disagreements, timeline")]
         vec[("Milvus Lite: item and story vectors")]
-        tmp[("Temporary audio, deleted after transcription")]
+        tmp[("Later: temporary audio, deleted after transcription")]
     end
 
     add --> db_sources
@@ -153,11 +154,11 @@ flowchart TB
     db_interests --> sched
     sched --> fetch
     fetch --> adapt
-    inbox --> adapt
-    fetch --> audio
-    audio --> tmp
-    audio --> stt
-    stt --> adapt
+    inbox -.-> adapt
+    fetch -.-> audio
+    audio -.-> tmp
+    audio -.-> stt
+    stt -.-> adapt
     adapt --> clean
     clean --> triage
     triage -->|"out"| dropped
@@ -189,14 +190,15 @@ flowchart TB
   `429`. It only follows public http(s) links, re-checked after every redirect. An article
   page is read only as far as `</head>`, for its link-preview image, and only where
   robots.txt allows.
-- **One adapter per source type** turns feeds, papers, posts, videos, episodes and
-  newsletters into the same `Item`: source, kind, title, text, link, time, language, media
+- **One adapter per source type** turns feeds, papers, posts, videos and episodes (and
+  newsletters, later) into the same `Item`: source, kind, title, text, link, time, language, media
   links. A paper also carries its authors, categories, arXiv id and version. An entry
   with an audio enclosure becomes kind `episode`, keeping the enclosure as a link plus
   the feed's stated duration; a hostile enclosure fails closed to null, the item stays.
-- **Podcasts** are the only media we download, and only to transcribe them with Muse Voice
-  Transcribe, biased towards the source's and story's names; the audio is deleted
-  afterwards. Images, videos and episode audio stay where they are, and no model sees
+- **Podcasts** are kept as links: an episode joins stories from its feed text. Later (not
+  built yet), they become the only media we download, and only to transcribe them with
+  Muse Voice Transcribe, biased towards the source's and story's names; the audio is
+  deleted afterwards. Images, videos and episode audio stay where they are, and no model sees
   them: a story shows its newest report's picture from the publisher, credited and
   linking back. `GET /episodes` (and `/demo/episodes`) serves a reader's episodes,
   newest first, each with its show and the story it joined; cursor paging on
@@ -212,8 +214,8 @@ flowchart TB
 
 ### Staying up to date
 
-Sources are checked on a schedule, and sources that can push trigger a fetch the moment
-they publish. Either way, every new or changed item starts the pipeline at once.
+Sources are checked on a schedule (later, sources that can push will trigger a fetch the
+moment they publish). Either way, every new or changed item starts the pipeline at once.
 
 ```mermaid
 flowchart LR
@@ -225,19 +227,19 @@ flowchart LR
         push["Push, later: WebSub, Bluesky Jetstream"]
     end
 
-    mailin["A newsletter email arrives"]
+    mailin["A newsletter email arrives, later"]
     check["Fetch with a conditional request"]
     same["Nothing new: schedule the next check"]
     jobs[("SQLite: jobs queue")]
     pipe["Pipeline: clean, triage, embed, cluster, claims, verify, write"]
-    updated["story.updated"]
-    appview["The app refreshes"]
+    updated[("SQLite: stories")]
+    appview["The app refreshes: it asks every minute"]
     editor["Briefing and its editor agent: daily from 06:00 UTC; on big changes later"]
 
     triggers --> check
     check -->|"unchanged"| same
     check -->|"new or changed items"| jobs
-    mailin --> jobs
+    mailin -.-> jobs
     jobs --> pipe
     pipe --> updated
     updated --> appview
@@ -250,7 +252,7 @@ flowchart LR
 - **Conditional requests** make a check almost free when nothing changed: no parsing, no
   model calls.
 - **Push** (later, once the backend is public): WebSub for feeds with a hub, YouTube
-  included; Bluesky Jetstream for posts; newsletters already arrive by email. A slow
+  included; Bluesky Jetstream for posts; newsletters by email (also later). A slow
   safety-net check stays on, because pushes can be missed.
 - **arXiv** updates once a day (midnight US Eastern, around 06:00 Danish time), so its
   category feeds and interest searches run once, just after.
@@ -334,7 +336,8 @@ flowchart TB
   checks every item: is it inside rule 3, is it noise (ads, giveaways, sponsored posts),
   which language is it in, and which names does it mention (companies, products, places;
   never the publisher)? What it is unsure about goes to Muse Spark, and so does anything
-  it keeps that the rule-3 word list flags. Without Glimmer, the word list decides.
+  it keeps that the rule-3 word list flags. Without Glimmer, Muse Spark triages every item;
+  the word list decides only when Muse Spark can't answer either.
   Dropped items keep their reason on the item; the run is in the decision log.
 - **Save first:** an item is stored before it is embedded, and indexing is a job that
   retries, so a Milvus Lite outage never loses an item.
@@ -438,9 +441,9 @@ verifier pass and the review loop. Spec: `docs/specs/morning-briefing.md`.
 
 | Agent | Model | Job | Technique |
 |---|---|---|---|
-| Triage | Muse Glimmer 30B, local | Every new item: in scope, noise, language and the names it mentions | Always-on local agent; Muse Spark decides what it's unsure about; a word list without it |
+| Triage | Muse Glimmer 30B, local | Every new item: in scope, noise, language and the names it mentions | Always-on local agent; Muse Spark decides what it's unsure about, and every item without it; a word list when Muse Spark can't answer either |
 | Interest | Muse Spark | Research keywords → related terms, categories and a rule-3 check; yes or no on borderline papers (later) | Structured output; the reader confirms the plan |
-| Judge | Muse Spark Open, on Baseten | Same event or not, for borderline pairs | One call, a structured verdict with a reason; Muse Spark as backup |
+| Judge | Muse Spark Open, on Fireworks | Same event or not, for borderline pairs | One call, a structured verdict with a reason; Muse Spark as backup |
 | Claims | Muse Spark | Facts from an article, episode or paper, each with its quote | Structured output; Muse Spark Open as backup |
 | Verifier | Muse Spark | Keeps only real new facts and real disagreements | Critic: a second model pass checks the first; unsure cases at maximum reasoning |
 | Editor | Muse Spark, or Muse Wonder if the task set favours it | The briefing's agent: what changed meaningfully, ranking per reader, what each briefing covers | One structured call today; the orchestrator (plans, delegates, calls tools) later |
@@ -455,13 +458,14 @@ briefing now**. The ask agent runs when a reader asks a story a question.
 
 ### How they work
 
-- **Tools, not free text.** Agents act only through typed tools (Muse Spark tool calling)
-  that validate their inputs and outputs. Tools are plain code over SQLite and Milvus Lite.
+- **Tools, later.** No agent uses tools yet: each makes one structured call, and plain code
+  over SQLite and Milvus Lite does the rest. The bounded tool loop (typed tools through Muse
+  Spark tool calling, validating their inputs and outputs) is there for later.
 - **Structured output.** Every model step returns JSON matching a schema; a step that
   doesn't validate is retried once with the error, then logged as failed.
   Both live in `backend/app/agent/runtime.py`: `call_once` for the judge/claims
-  style agents, `run_tool_loop` for orchestrator-style ones, each behind a
-  `ModelClient` interface: `clients/openai_compat.py` (since Oct 30) and, for local
+  style agents, `run_tool_loop` for orchestrator-style ones (only tests use it so far),
+  each behind a `ModelClient` interface: `clients/openai_compat.py` (since Oct 30) and, for local
   Muse Glimmer, `clients/ollama.py` (Ollama's raw API in Glimmer's own turn format);
   tests use fakes. Lists a model must fill are required in its schema. No framework, one
   file.
@@ -514,14 +518,15 @@ contributor variants are allowed there.
 ## Meta models and how they work together
 
 Muse Spark is the centre: its agents make the judgement calls. Open-weight models take the
-high-volume work and the second opinion on clustering, and a different model checks
-every generated output before a reader sees it.
+high-volume work and the second opinion on clustering. Before a reader sees them, facts
+get a second Muse Spark pass, and other models check the illustrations and the English
+and Tamil briefing audio.
 
 ```mermaid
 flowchart LR
     subgraph arrive["As items arrive"]
-        pod["Podcast audio"]
-        voice1["Muse Voice Transcribe"]
+        pod["Podcast audio, later"]
+        voice1["Muse Voice Transcribe, later"]
         item["New item"]
         triage["Triage: Muse Glimmer, local; Muse Spark when unsure"]
         cluster["Embed and cluster: plain code"]
@@ -542,8 +547,8 @@ flowchart LR
 
     reader["The reader"]
 
-    pod --> voice1
-    voice1 --> item
+    pod -.-> voice1
+    voice1 -.-> item
     item --> triage
     triage --> cluster
     cluster -->|"borderline pair"| judge
@@ -565,19 +570,20 @@ flowchart LR
 | Model | Runs on | What OSMS uses it for |
 |---|---|---|
 | **Muse Spark 1.3** | Meta Model API | The interest, claims, verifier, editor, writer and ask agents; what triage is unsure about |
-| **Muse Spark Open** | Open weights on Baseten | The judge: same event or not? Backup for claims and verifier |
-| **Muse Glimmer 30B** | Open weights: Ollama locally; a GPU or hosted provider when deployed | The triage agent, on every item |
+| **Muse Spark Open** | Open weights on Fireworks (serverless) | The judge: same event or not? Backup for claims and verifier |
+| **Muse Glimmer 30B** | Open weights: Ollama, locally only; deployed there is none, and Muse Spark triages | The triage agent, on every item |
 | **Muse Wonder** | Meta Model API | The editor, if the agent task set favours it; Harness²'s proposer |
 | **Muse Image** | Meta Model API | An illustration for a story no source has a picture for, in one house style |
 | **SAM 3.1** | Meta Model API | Checks each illustration for people, faces, logos and text; crops it around its subject |
-| **Muse Voice Transcribe** | Meta Model API | Podcast episodes; checks the briefing audio against its script |
+| **Muse Voice Transcribe** | Meta Model API | Checks the English and Tamil briefing audio against its script; podcast episodes later |
 | **Muse Code** | CLI | A coding agent for parts of the build (listed in the README) |
 
-- **The cheapest model that can decide, decides.** Muse Glimmer, a small open model,
-  sees every item; Muse Spark only sees what is in scope or unsure. Clear cluster matches
-  need no model at all.
-- **Every output gets a second opinion from a different model:** the verifier checks the
-  claims agent, SAM 3.1 checks Muse Image, Muse Voice Transcribe checks the TTS.
+- **The cheapest model that can decide, decides.** Locally, Muse Glimmer, a small open
+  model, sees every item and Muse Spark only what is in scope or unsure; deployed, without
+  Glimmer, Muse Spark triages every item. Clear cluster matches need no model at all.
+- **Second opinions:** the verifier, a second Muse Spark pass, checks the claims agent.
+  Different models check whether two items are one event (the judge, Muse Spark Open),
+  Muse Image (SAM 3.1) and the English and Tamil TTS (Muse Voice Transcribe).
 - **Backups both ways.** Muse Spark Open and Muse Spark cover for each other, but only
   for agents that see public source text, so personal data never reaches a second
   provider.
@@ -585,7 +591,7 @@ flowchart LR
   models and records quality, cost and latency; the model per agent is one line of
   config.
 - **Illustrations, not photos.** Muse Image's prompt comes from OSMS's own summary, in a
-  house style anchored on renders of the drawn story art. SAM 3.1 looks for people,
+  house style set by a text prompt (no reference images yet). SAM 3.1 looks for people,
   faces, logos and text; a flagged illustration is redrawn once, then the card keeps the
   drawn art. Every illustration is labelled as one.
 - **Not used:** web search grounding, arXiv PDFs, YouTube video, and third-party images
@@ -630,7 +636,7 @@ flowchart LR
     subgraph cloud["Deployed"]
         box["One Google Cloud VM with a disk: Caddy (HTTPS), the web app, sign-in, API, worker, Milvus Lite"]
         meta["Meta Model API: Muse Spark, Muse Wonder, Muse Image, SAM 3.1, Muse Voice Transcribe"]
-        baseten["Baseten: Muse Spark Open"]
+        baseten["Baseten: Muse Spark Open, wired but not activated"]
         fireworks["Fireworks: Muse Spark Open"]
     end
 

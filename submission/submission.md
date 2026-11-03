@@ -14,10 +14,12 @@ disagree, and how it developed, with every sentence traced to its sources.
 - Live app: https://app.onestory-osms.duckdns.org (sign in with Google), or the demo
   without an account: https://app.onestory-osms.duckdns.org/#/demo
 - Code: https://github.com/ThivaV/OSMS
-- macOS app: built from the same code (`make build-macos`, see SETUP.md)
+- macOS app: built from the same code, talking to the live site (`make build-macos-prod`,
+  see DEPLOY.md)
 - Demo video (3:00, 1080p): `submission/osms-demo.mp4`, to upload with the form.
   Biscuit, a cartoon dog, presents it: the problem and how OSMS solves it, the live web
-  app, the seven Meta models and the architecture. Every line is in
+  app, the seven Meta models, where and why Fireworks runs the judge, and the architecture.
+  Every line is in
   [`video/script.md`](video/script.md).
 
 ## What it does
@@ -26,8 +28,9 @@ Every morning the same news reaches you many times: three tech sites, a newspape
 your own language, a podcast, an arXiv paper. OSMS reads all of them and groups the
 reports of one event into one story:
 
-- **One summary, every sentence cited.** Each fact is pulled from a report, checked by a
-  second model against its quote, and shown with the sources behind it. A quote stays in
+- **One summary, every sentence cited.** Each fact is pulled from a report with the quote
+  it rests on, checked against that quote by code and by a second Muse Spark pass (the
+  verifier), and shown with the sources behind it. A quote stays in
   its own language, with a labelled translation.
 - **What's new since you last looked**, so a story you've read only shows what changed.
 - **Where sources disagree**, side by side, and **corrections** kept in a dated timeline
@@ -36,7 +39,8 @@ reports of one event into one story:
   what it changed, its tokens and latency.
 - **A morning briefing** you can listen to: a few minutes on the top stories, every
   sentence citing a checked fact, voiced by open-weight speech models and transcribed
-  back by Muse Voice Transcribe before anyone hears it.
+  back before anyone hears it: by Muse Voice Transcribe in English and Tamil, by
+  SeamlessM4T v2's own recognition in Danish.
 - **Ask this story:** answers only from its checked facts, or says the sources never
   said it.
 - **Research on arXiv:** type your interests; OSMS fetches the new papers that match and
@@ -53,15 +57,39 @@ reports of one event into one story:
 | Muse Spark Open (Fireworks) | The judge: are two reports about the same event? A different model from the one that writes |
 | Muse Image | An illustration for a story no source has a picture for |
 | SAM 3.1 | Checks each illustration for people, faces, logos and text, and crops it around its subject |
-| Muse Voice Transcribe | Listens back to every briefing chapter and checks it against the script |
+| Muse Voice Transcribe | Listens back to every English and Tamil briefing chapter and checks it against the script |
 | SeamlessM4T v2 | The briefing's voice in English and Danish |
 | MMS-TTS | The briefing's voice in Tamil |
 
-The rule throughout: nothing generated reaches a reader unchecked. Facts are verified
-against their quotes, illustrations by SAM 3.1, the briefing's audio by Muse Voice
-Transcribe, and whether two reports are one event by a different model from the one that
+The rule throughout: what's generated is checked before a reader sees it. Facts are
+checked against their quotes, by code and by the verifier; summaries and answers keep only
+sentences that cite a checked fact; illustrations are checked by SAM 3.1; the briefing's
+audio is transcribed back (Muse Voice Transcribe, and SeamlessM4T v2 for Danish); and the
+close calls on whether two reports are one event go to a different model from the one that
 writes. Every agent run is logged with its model, prompt version, reason, tokens and
 latency, and shown on the story it decided about.
+
+## Where Fireworks fits
+
+Fireworks serves **Muse Spark Open**, the open-weight judge, from its serverless
+endpoint (`accounts/fireworks/models/muse-spark-open`): on the live site, and in
+development whenever `FIREWORKS_API_KEY` is set. Every "same story?" call in a story's
+*How OSMS decided* names that model.
+
+- **The judge.** When the clustering rule can't settle whether two reports are one event,
+  Muse Spark Open decides, with a reason that is shown on the story.
+- **The backup.** If the Meta Model API fails, the agents that find and check facts (claims
+  and verifier) fail over to Muse Spark Open on Fireworks.
+
+Why Fireworks:
+
+- **Serverless open weights.** OSMS runs on one CPU server with no GPU; Fireworks serves
+  the open model per token, a few dollars in all.
+- **An independent judge.** A different model, from a different provider, from Muse
+  Spark, which writes the summaries.
+- **Only public text.** Only agents that see public source text may use a second provider.
+  The ones that see a reader's data (interests, Ask, the editor and the writer) never fail
+  over, so no reader data reaches Fireworks.
 
 ## How it's built
 

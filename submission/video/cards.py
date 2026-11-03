@@ -1,4 +1,4 @@
-"""The cards Biscuit presents: the problem, the Meta models, the architecture, the close.
+"""The cards Biscuit presents: the problem, the Meta models, Fireworks, the architecture, the close.
 
 Each card is a light panel in the app's style. Its parts appear when Biscuit says them: `cue`
 turns a phrase of the scene's caption into the second it is spoken.
@@ -128,9 +128,10 @@ MODELS = [
     ("Muse Spark Open", "open weights, via Fireworks", "The judge: are two reports the same event?", "Muse Spark Open"),
     ("Muse Image", "Meta Model API", "An illustration when no source has a picture", "Muse Image"),
     ("SAM 3.1", "Meta Model API", "Checks each illustration for faces, logos and text, then crops it", "SAM 3.1"),
-    ("SeamlessM4T v2", "open weights", "The briefing’s voice in English and Danish", "SeamlessM4T"),
+    ("SeamlessM4T v2", "open weights", "The briefing’s voice in English and Danish; checks the Danish", "SeamlessM4T"),
     ("MMS-TTS", "open weights", "The briefing’s voice in Tamil", "MMS-TTS"),
-    ("Muse Voice Transcribe", "Meta Model API", "Listens back to every briefing chapter before it’s published", "speak the briefing"),
+    ("Muse Voice Transcribe", "Meta Model API", "Listens back to every English and Tamil chapter before it’s published",
+     "speak the briefing"),  # fmt: skip
 ]
 
 
@@ -165,6 +166,49 @@ def meta_card(cue: Cue) -> Card:
     return c
 
 
+# Why the judge runs on Fireworks (backend/app/config.py, DEPLOY.md, agent/guardrails.py).
+WHY_FIREWORKS = [
+    ("Serverless open weights", "Muse Spark Open with no GPU on our one CPU server, paid per token", "serverless"),
+    ("An independent judge", "A different model, from a different provider, than Muse Spark, which writes", "independent judge"),
+    ("A ready backup", "If the Meta Model API fails, the agents that find and check facts fail over to it", "ready backup"),
+]
+
+
+def fireworks_card(cue: Cue) -> Card:
+    c = Card()
+    c.header("WHERE FIREWORKS FITS", "The judge runs on Fireworks.")
+    c.add(text_image("A real call from story #706’s decision log: are these two reports one event?", sans(20, 550), INK3),
+          (PAD, 180), 0.3)  # fmt: skip
+    receipt = box((INNER, 196), radius=14)
+    d = ImageDraw.Draw(receipt)
+    x = 22
+    for text, f, fill in [("Same story?", sans(22, 650), INK), ("accounts/fireworks/models/muse-spark-open", sans(21, 650), ACCENT),
+                          ("03:32", sans(20, 500), INK3)]:  # fmt: skip
+        d.text((x, 18), text, font=f, fill=fill)
+        x += int(f.getlength(text)) + 16
+    d.text((22, 54), "Three new iPad models are reportedly launching early next year, here’s what’s coming · 9to5Mac",
+           font=sans(18, 450), fill=INK3)  # fmt: skip
+    quote = ("“Item A previews three future iPads launching next year while Item B reports Geekbench results for the "
+             "already-unveiled OLED iPad mini, different announcements.”")  # fmt: skip
+    y = 86
+    for line in wrap(quote, sans(21, 450), INNER - 44):
+        d.text((22, y), line, font=sans(21, 450), fill=INK)
+        y += 28
+    d.text((22, y + 8), "1143 tokens · 5.1 s", font=sans(18, 500), fill=INK3)
+    c.add(receipt, (PAD, 214), 0.5)
+    for i, (title, body, at) in enumerate(WHY_FIREWORKS):
+        row = box((INNER, 92), radius=14, fill=ACCENT_SOFT, border=ACCENT)
+        d = ImageDraw.Draw(row)
+        d.ellipse((22, 26, 62, 66), fill=ACCENT)
+        d.text((42, 46), str(i + 1), font=sans(22, 700), fill=SURFACE, anchor="mm")
+        d.text((84, 14), title, font=sans(25, 700), fill=INK)
+        d.text((84, 52), body, font=sans(20, 450), fill=INK2)
+        c.add(row, (PAD, 440 + i * 108), cue(at))
+    c.add(text_image("✓  Only public source text ever goes to Fireworks; a reader’s data never does.", sans(22, 600), INK),
+          (PAD, 784), cue("ready backup") + 0.8)  # fmt: skip
+    return c
+
+
 def _node(title, body, size, fill=SURFACE, border=BORDER, title_f=None):
     img = box(size, fill=fill, border=border, radius=14)
     d = ImageDraw.Draw(img)
@@ -196,10 +240,10 @@ def _arrow(card: Card, x0, y0, x1, y1, t0):
 STAGES = [
     ("Triage", "Muse Spark", "triages"),
     ("Embed", "BGE-M3 vectors", "clusters"),
-    ("Cluster", "judge: Muse Spark Open", "clusters"),
+    ("Cluster", "judge: Muse Spark Open on Fireworks", "clusters"),
     ("Facts", "found, then checked: Muse Spark", "checks"),
     ("Write", "summary, briefing script: Muse Spark", "writes"),
-    ("Voice", "SeamlessM4T v2, MMS-TTS, heard back by Voice Transcribe", "writes"),
+    ("Voice", "SeamlessM4T v2, MMS-TTS; heard back before anyone hears it", "writes"),
 ]
 
 
@@ -248,7 +292,8 @@ def outro_card(cue: Cue) -> Card:
     b = cue("Try the demo")
     c.add(text_image("Try the demo, no account needed", sans(26, 600), INK2), (PAD, 420), b)
     c.add(text_image("app.onestory-osms.duckdns.org/#/demo", sans(42, 700), ACCENT), (PAD, 456), b + 0.2)
-    c.add(text_image("Web and macOS, one codebase · built for the Meta AI hackathon", sans(24, 500), INK3), (PAD, 556), b + 0.5)
+    c.add(text_image("Web and macOS, one codebase · the judge served by Fireworks · built for the Meta AI hackathon",
+                     sans(24, 500), INK3), (PAD, 556), b + 0.5)  # fmt: skip
     chips = [pill(m[0], sans(21, 600), INK, SURFACE, BORDER, pad=(16, 8)) for m in MODELS]
     for i, (img, xy) in enumerate(zip(chips, _flow(chips, PAD, 620, INNER))):
         c.add(img, xy, cue("One story") + i * 0.08)
@@ -263,6 +308,7 @@ CARDS = {
     "title": title_card,
     "problem": problem_card,
     "meta": meta_card,
+    "fireworks": fireworks_card,
     "architecture": architecture_card,
     "outro": outro_card,
 }

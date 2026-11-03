@@ -21,7 +21,8 @@ Oct 27 – Nov 4, 2026.
   add-source sheet, onboarding, sign-in, settings + five palettes, Today
   overview, floating bars, ⌘K palette, research interests editor. Each with
   Normal / Empty / Extreme use cases, light + dark, phone / tablet / desktop.
-  Open it with `make widgetbook` (http://localhost:8090).
+  Open it with `make widgetbook` (it opens in Chrome; under `make up` it is on
+  http://localhost:8090).
 - [x] **Sign-up and sign-in, end to end (Oct 29):** an open-source sign-in service
   ([Better Auth](https://better-auth.com), in `auth/`) with Google and, in local
   development, email links; the API (`backend/`) checks its short-lived tokens and keeps
@@ -59,12 +60,13 @@ Oct 27 – Nov 4, 2026.
   summaries need `META_API_KEY`. Spec: `docs/specs/story-pipeline.md`.
 - [x] **Days 7–8, built Oct 31, on the web and macOS apps alike:**
   - **Triage on Muse Glimmer**, local through Ollama: rule 3, noise, language and names
-    for every item; what it is unsure about goes to Muse Spark, and a word list stands in
-    without it.
+    for every item; what it is unsure about goes to Muse Spark. Without Muse Glimmer,
+    Muse Spark triages every item, and a word list stands in only when that can't answer.
   - **The morning briefing, OSMS's podcast:** the editor picks the stories, the writer
     scripts them with every sentence citing a checked fact, SeamlessM4T v2 (English,
-    Danish) and MMS-TTS (Tamil) voice them, and Muse Voice Transcribe checks every chapter
-    before anyone hears it. The app plays it. Spec: `docs/specs/morning-briefing.md`.
+    Danish) and MMS-TTS (Tamil) voice them, and every chapter is transcribed back before
+    anyone hears it: by Muse Voice Transcribe in English and Tamil, by SeamlessM4T v2's own
+    recognition in Danish. The app plays it. Spec: `docs/specs/morning-briefing.md`.
   - **Papers:** each research interest becomes one shared arXiv search, fetched daily with
     a 30-day backfill; new papers reach "New research for you" with the words they
     matched; the interest agent suggests related terms and flags political keywords as
@@ -126,13 +128,14 @@ Oct 27 – Nov 4, 2026.
 
 ## Which Meta models do what
 
-Muse Spark agents make the judgement calls, and a different model checks every generated
-output before a reader sees it.
+Muse Spark agents make the judgement calls. A second Muse Spark pass checks every fact;
+different models decide whether two reports are one event (Muse Spark Open) and check the
+illustrations (SAM 3.1) and the English and Tamil briefing audio (Muse Voice Transcribe).
 
 | Model | What OSMS uses it for | Status |
 |---|---|---|
 | Muse Spark | The interest, claims, verifier, editor, writer and ask agents | In use |
-| Muse Spark Open (open weights; Fireworks, or Baseten) | The judge: are two items about the same event? | On Fireworks when deployed; Muse Spark judges where neither is set up |
+| Muse Spark Open (open weights, on Fireworks) | The judge: are two items about the same event? Also the backup for the claims and verifier agents | In use, on Fireworks (deployed and locally, with `FIREWORKS_API_KEY`); without a key, Muse Spark judges |
 | Muse Glimmer (open weights) | Triage of every incoming item | In use locally (Ollama); deployed, Muse Spark triages, since Fireworks serves Glimmer only from a paid dedicated deployment |
 | Muse Wonder | The overnight editor, if our agent tests favour it | Not yet |
 | Muse Image | An illustration for a story no source has a picture for | In use, from three sources |
@@ -171,7 +174,7 @@ Ollama for triage, and the Widgetbook component catalogue.
 | Google Chrome | running in the browser | |
 | [Tilt](https://tilt.dev) | running everything at once | `brew install tilt` |
 | XCode | only for the macOS desktop app | App Store |
-| [Ollama](https://ollama.com) | only for triage on Muse Glimmer (18 GB; without it, a word list) | `brew install ollama` |
+| [Ollama](https://ollama.com) | only for triage on Muse Glimmer (18 GB; without it, Muse Spark triages) | `brew install ollama` |
 
 `make tools` tells you what is missing.
 
@@ -207,11 +210,12 @@ The app needs `auth` and `api` running to sign in; without them its start page s
 sign-in is unavailable (the demo is at http://localhost:8080/#/demo). Real stories need the `worker`: its first run fetches every
 seed source and embeds the news with BGE-M3 (`make setup` installs it; the model, about
 2.3 GB, downloads on first use). For facts, disagreements and summaries, put
-`META_API_KEY` in `.env` (and `BASETEN_API_KEY` + `BASETEN_BASE_URL` for the judge on
-Muse Spark Open); without keys, stories still form from clear matches, with no facts.
+`META_API_KEY` in `.env` (and `FIREWORKS_API_KEY` for the judge, Muse Spark Open on
+Fireworks); without keys, stories still form from clear matches, with no facts.
 The same key gives Ask, the briefing and illustrations. The briefing's voices (about
 9.5 GB) download on its first run. Triage uses Muse Glimmer when `make glimmer` is running
-and the model is in Ollama, and a word list otherwise.
+and the model is in Ollama, Muse Spark otherwise, and a word list only without
+`META_API_KEY`.
 
 ### The macOS app
 

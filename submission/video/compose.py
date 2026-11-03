@@ -40,6 +40,8 @@ CAPTION_Y = 990
 # Parts of a recording to keep, in seconds: Ask's wait for its answer is cut, and the story opens sooner.
 CUTS = {"story": [(2.0, None)], "ask": [(0, 5.2), (11.6, None)], "listenIn": [(0.8, None)]}
 # The briefing's own voice: its chapter for story #706 opens with this sentence (SeamlessM4T v2).
+MIN_HOLD = 0.8  # the closing card, held after Biscuit's goodbye
+MAX_SPEED = 1.08  # faster than this, Biscuit would gabble
 LISTEN_IN = {"start": 77.65, "seconds": 3.8, "line": "“Engadget reports that Apple launched its iPad mini last week.”"}
 DEMO_URL = "app.onestory-osms.duckdns.org/#/demo"
 URLS = {"yours": "localhost:8080 · a local copy, signed in as a test reader"}
@@ -87,6 +89,7 @@ class Segment:
     shot: str | None = None
     speech: tuple[float, float] = (0.0, 0.0)
     captions: list[tuple[float, str]] = field(default_factory=list)
+    speed: float = 1.0  # Biscuit's clip plays this much faster, picture and voice together
 
     @property
     def frames(self) -> int:
@@ -119,7 +122,7 @@ def caption_chunks(text: str, width: int, f) -> list[str]:
 
 
 def timeline() -> list[Segment]:
-    segs = []
+    spoken = []
     for scene in SCENES:
         clip = BUILD / "dog" / f"{scene.key}.mp4"
         if clip.exists():
@@ -127,7 +130,17 @@ def timeline() -> list[Segment]:
             seconds = min(duration(clip), end + 0.35)
         else:  # not made yet: a still can still be looked at, from the planned length
             begin, end, seconds = 0.3, scene.seconds - 0.3, scene.seconds
-        seg = Segment(scene.key, round(seconds * FPS) / FPS, scene.layout, scene, speech=(begin, end))
+        spoken.append((scene, begin, end, seconds))
+    # Every line stays in: when they don't fit the three minutes, Biscuit talks a little
+    # faster throughout (same pitch, lips still in step) rather than losing a word.
+    room = TOTAL - LISTEN_IN["seconds"] - MIN_HOLD
+    speed = max(1.0, sum(s[3] for s in spoken) / room)
+    if speed > MAX_SPEED:
+        sys.exit(f"Biscuit would have to talk {speed:.2f}x as fast; shorten a line in scenes.py")
+    segs = []
+    for scene, begin, end, seconds in spoken:
+        begin, end = begin / speed, end / speed
+        seg = Segment(scene.key, round(seconds / speed * FPS) / FPS, scene.layout, scene, speech=(begin, end), speed=speed)
         if scene.shot.startswith("card:"):
             seg.card = scene.shot[5:]
         else:
@@ -196,10 +209,12 @@ def app_frames(seg: Segment):
 
 def dog_frames(seg: Segment, size: int, crop: str):
     clip = BUILD / "dog" / f"{seg.scene.key}.mp4"
-    if not clip.exists():
+    speed = f"setpts=PTS/{seg.speed:.5f}," if clip.exists() else ""
+    if not clip.exists():  # a still of Biscuit stands in until the clip is made
         clip = BUILD / "first-frame.png"
     cmd = ["ffmpeg", "-loglevel", "error", "-i", str(clip), "-vf",
-           f"fps={FPS},{crop}scale={size}:{size}:flags=lanczos,format=rgb24", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]  # fmt: skip
+           f"{speed}fps={FPS},{crop}scale={size}:{size}:flags=lanczos,format=rgb24",
+           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]  # fmt: skip
     return frames_of(cmd, (size, size))
 
 
@@ -388,8 +403,9 @@ def soundtrack(segs: list[Segment]) -> Path:
         tail = f"afade=t=in:d=0.02,afade=t=out:st={max(0, d - 0.06):.3f}:d=0.06,apad,atrim=0:{d:.4f}"
         if seg.scene:
             clip = BUILD / "dog" / f"{seg.scene.key}.mp4"
-            gain = -16 - loudness(clip, 0, d)
-            cmd = ["-i", str(clip), "-af", f"atrim=0:{d:.4f},volume={gain:.2f}dB,alimiter=limit=0.9,{tail}"]
+            gain = -16 - loudness(clip, 0, d * seg.speed)
+            cmd = ["-i", str(clip), "-af",
+                   f"atempo={seg.speed:.5f},atrim=0:{d:.4f},volume={gain:.2f}dB,alimiter=limit=0.9,{tail}"]  # fmt: skip
         elif seg.key == "listenIn":
             src = BUILD / "briefing-audio"
             gain = -16 - loudness(src, LISTEN_IN["start"], d)

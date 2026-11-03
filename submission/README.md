@@ -5,7 +5,8 @@ built, tested or deployed with OSMS.
 
 - **`osms-demo.mp4`**: the demo video, 3:00 exactly, 1080p at 30 fps. Biscuit, a cartoon
   dog, presents it with its own voice: the problem OSMS solves and how, a tour of the live
-  web app, the Meta models it uses, and its architecture. Built by the scripts in
+  web app, the Meta models it uses, where and why Fireworks runs its judge, and its
+  architecture. Built by the scripts in
   `video/`. It's git-ignored: upload it to the submission form, don't commit it.
 - **`submission.md`**: the text for the form, the links, and the post on X.
 - **`demo-video.md`**: a shot list for recording the tour by hand, if you'd rather narrate
@@ -26,7 +27,8 @@ The video is put together on a Mac (Apple Silicon, 48 GB) from five parts:
    generated media to be disclosed, so the closing card says Biscuit is AI-generated.
 2. **Listening back** (`video/check_speech.py`). Meta's SeamlessM4T v2, run on this Mac,
    transcribes every clip, and the transcript is compared with the line. It's the same
-   idea as OSMS's briefings, which Muse Voice Transcribe hears before a reader does. A
+   idea as OSMS's briefings, whose chapters are transcribed back before a reader hears them
+   (by Muse Voice Transcribe in English and Tamil). A
    low score means a clip needs another take (another `seed` in `video/scenes.py`).
 3. **The app** (`video/record.mjs`). Headless Chrome records the live demo through
    DevTools: real clicks on the app's own controls, a drawn pointer, 1440×810 points at
@@ -34,12 +36,14 @@ The video is put together on a Mac (Apple Silicon, 48 GB) from five parts:
    OSMS, signed in as a made-up test reader. The demo has no account, so this is the only
    way to show it without anyone's real one.
 4. **The cards** (`video/cards.py`, `video/look.py`): the problem, the seven Meta models,
-   the architecture and the close. They use the app's fonts and colours, and each part
-   appears as Biscuit says it.
+   Fireworks (where the judge runs, and why), the architecture and the close. They use
+   the app's fonts and colours, and each part appears as Biscuit says it.
 5. **The cut** (`video/compose.py`): every scene timed to Biscuit's speech, captions
    from the script, and one line of the real morning briefing (SeamlessM4T v2's voice).
-   The total is 180.0 s to the frame: whatever is left after the lines goes to a short
-   title and the closing card. `scenes.py` is where every line lives.
+   The total is 180.0 s to the frame. When the lines run longer than that, Biscuit's
+   clips play a little faster, picture and voice together with the pitch kept (1.06x now,
+   never more than 1.08x). When they run shorter, the time left goes to a short title and
+   the closing card. `scenes.py` is where every line lives.
 
 ## Making it again
 
@@ -47,7 +51,7 @@ The video is put together on a Mac (Apple Silicon, 48 GB) from five parts:
 PY=~/src/dev/modelsgoalsdataknowledge/.venv/bin/python   # Pillow, torch, transformers, ltx-2-mlx
 cd submission/video
 
-$PY dog.py                       # Biscuit's eleven clips (about 80 min); kept clips are skipped
+$PY dog.py                       # Biscuit's twelve clips (about 90 min); kept clips are skipped
 HF_HUB_OFFLINE=1 $PY check_speech.py   # SeamlessM4T v2 listens back; scores in build/speech-check.json
 
 # The live demo, in a headless Chrome:

@@ -12,7 +12,8 @@ and illustrations.
   with `language="da"`/`"en"`) next to the arXiv categories; plus every source a reader
   follows.
 - `.env`: `META_API_KEY` (Muse Spark: claims, verifier, writer, and the judge's backup),
-  `BASETEN_API_KEY` + `BASETEN_BASE_URL` (Muse Spark Open: the judge). All optional.
+  `FIREWORKS_API_KEY` (Muse Spark Open: the judge; `BASETEN_API_KEY` +
+  `BASETEN_BASE_URL` instead, preferred only when set). All optional.
 - The BGE-M3 weights (`uv sync --extra models`, downloaded on first use).
 
 ## Outputs
@@ -91,5 +92,6 @@ and illustrations.
 ## Not yet
 
 - The agent task set in `eval/agents/`; your labels and the first eval numbers.
-- Baseten for the judge: until the account is approved, Muse Spark judges (its backup).
+- Baseten for the judge: wired, not activated. Muse Spark Open on Fireworks has judged
+  since Nov 1; Muse Spark is its backup.
   Real Muse Spark calls run since Oct 31: facts, summaries, Ask, the briefing.

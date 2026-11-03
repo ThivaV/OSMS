@@ -14,7 +14,7 @@ deploys `main` when the tests pass. Running OSMS on your Mac is in [SETUP.md](SE
 | The server | one Compute Engine VM, `e2-highmem-4` (4 vCPU, 32 GB), `europe-north1` (Finland), Ubuntu 24.04, 100 GB disk |
 | The data | `/var/lib/osms/data` on the server's disk: `osms.db`, `auth.db`, `milvus.db`, briefings, illustrations; a snapshot every night, kept a week |
 | Secrets | Google Secret Manager; only the server's own identity can read them |
-| Open-weight models | Fireworks: Muse Spark Open (the judge); Baseten stays first for it once it is set up. Muse Glimmer isn't serverless on Fireworks, so triage runs on Muse Spark here |
+| Open-weight models | Fireworks, serverless: Muse Spark Open, the judge, and the backup for the claims and verifier agents. (The code would prefer Baseten if `BASETEN_BASE_URL` were set; the server never sets it.) Muse Glimmer isn't serverless on Fireworks, so triage runs on Muse Spark here |
 | Other models | Meta Model API (your hackathon credit) |
 
 Caddy answers on ports 80 and 443 and gets the HTTPS certificates on its own; sign-in,

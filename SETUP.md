@@ -15,7 +15,7 @@ to Google Cloud is in [DEPLOY.md](DEPLOY.md).
 | Google Chrome | the web app | |
 | [Tilt](https://tilt.dev) | running everything at once (optional) | `brew install tilt` |
 | Xcode | only for the macOS desktop app | App Store |
-| [Ollama](https://ollama.com) | only for triage on Muse Glimmer; without it, a word list | `brew install ollama` |
+| [Ollama](https://ollama.com) | only for triage on Muse Glimmer; without it, Muse Spark triages | `brew install ollama` |
 
 `make tools` tells you what is missing.
 
@@ -41,10 +41,10 @@ triages.
    | Setting | Gives you | Without it |
    |---|---|---|
    | `META_API_KEY` | facts, summaries, Ask, the briefing, illustrations | stories still form, titled by their first headline, with no facts |
-   | `BASETEN_API_KEY`, `BASETEN_BASE_URL` | the judge on Muse Spark Open | Muse Spark judges instead |
+   | `FIREWORKS_API_KEY` | the judge on Muse Spark Open (Fireworks), and the backup for the claims and verifier agents | Muse Spark judges instead |
    | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google | sign in with an email link from the sign-in log |
 
-3. **Muse Glimmer, once** (skip it to triage with the word list). Start Ollama, either in
+3. **Muse Glimmer, once** (skip it and Muse Spark triages). Start Ollama, either in
    its own terminal or as part of `make up`, then download the model:
 
    ```bash
@@ -88,7 +88,7 @@ check that the whole stack still starts. It runs the worker too (see below).
 One terminal per service, in this order:
 
 ```bash
-make glimmer              # 1. Ollama, for triage (skip it to use the word list)
+make glimmer              # 1. Ollama, for triage (skip it and Muse Spark triages)
 make auth                 # 2. sign-in, http://localhost:3000
 make api                  # 3. the API, http://localhost:8000/docs
 make worker               # 4. the story pipeline
@@ -96,9 +96,10 @@ make app                  # 5. the web app in Chrome, http://localhost:8080
 ```
 
 - **The order matters a little.** The worker checks for Muse Glimmer when it starts:
-  started before Ollama (or before the model is downloaded), it triages with the word
-  list until you restart it. The app needs sign-in and the API to sign in; without them
-  its start page says sign-in is unavailable (the demo is at http://localhost:8080/#/demo).
+  started before Ollama (or before the model is downloaded), it triages with Muse Spark
+  (the word list without `META_API_KEY`) until you restart it. The app needs sign-in and
+  the API to sign in; without them its start page says sign-in is unavailable (the demo is
+  at http://localhost:8080/#/demo).
 - **Other ways to run the app:** `make app DEVICE=macos` (the desktop app, needs Xcode)
   or `make app DEVICE=web-server` (a local web server, no browser opened). The web app
   always uses port 8080: sign-in only trusts the origins it knows.
@@ -180,9 +181,10 @@ make check-auth         # type-check and test sign-in
 ## When something is off
 
 - **"Port already in use":** `make status`, then `make stop`.
-- **The worker says `triage: the word list`:** Ollama wasn't running, or Muse Glimmer
-  wasn't downloaded, when it started. Run `make glimmer` (or check `glimmer` in Tilt) and
-  `make glimmer-model`, then restart the worker.
+- **The worker says `triage: Muse Spark, without Muse Glimmer`:** Ollama wasn't running,
+  or Muse Glimmer wasn't downloaded, when it started. Run `make glimmer` (or check
+  `glimmer` in Tilt) and `make glimmer-model`, then restart the worker. It says
+  `triage: the word list` when `META_API_KEY` is missing too.
 - **No facts, answers or briefing:** `META_API_KEY` is missing from `.env`.
 - **The first briefing takes a while:** the voices download first (about 9.5 GB).
 - **Tilt refuses to start because it can see a kube context:** start it with `make up`.

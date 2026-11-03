@@ -145,6 +145,16 @@ SCENES = [
         layout="big",
     ),
     Scene(
+        "fireworks",
+        say="And Fireworks runs Muse Spark Open, serverless: no G P U of our own, an independent judge, and a ready "
+        "backup if Meta's A P I goes down.",
+        caption="And Fireworks runs Muse Spark Open, serverless: no GPU of our own, an independent judge, and a ready "
+        "backup if Meta's API goes down.",
+        seconds=12,
+        shot="card:fireworks",
+        layout="big",
+    ),
+    Scene(
         "architecture",
         say="Under the hood, a pipeline, not a chatbot. A safe fetcher feeds a Fast A P I worker that triages, "
         "clusters, checks and writes. One Flutter app serves web and Mac, and articles stay as links, never "

@@ -1,6 +1,6 @@
 # Spec: Eval harness (Oct 30)
 
-**Goal:** make `cd eval && python run_eval.py` real: label validation, the two
+**Goal:** make `cd eval && python3 run_eval.py labels/` real: label validation, the two
 specified metrics, and a results file the author can trust — before the first
 eval numbers on Day 5. It scores clustering; it never sets thresholds. The
 author owns the methodology; this spec only mechanizes what AGENTS.md and the
@@ -41,7 +41,8 @@ folder structure already say (`eval/labels/`, `run_eval.py`, `eval/results/`).
 ## How to test
 
 - `cd eval && python3 -m unittest -v` (or `make eval-test` from the root).
-- `python run_eval.py` with no labels exits 0 with "nothing to score".
+- `python3 run_eval.py labels/` with no labels exits 0 with "nothing to score"; the
+  labels folder is required (`make eval` passes it).
 - A perfect predictions file scores 1.0 everywhere; an all-singletons
   prediction against grouped gold scores pairwise recall 0. Precision with no
   predicted pairs is 1.0 only when the gold has no pairs either, else 0.0 —

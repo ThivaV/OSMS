@@ -1,13 +1,15 @@
 # Spec: Meta models, routing, backups and checks
 
 **Goal:** one model layer that every agent and service uses. Each agent runs on the Meta
-model that suits it, fails over safely, and every generated output is checked by a
-different model before a reader sees it. AGENTS.md (*Meta models*, *Agents*) has the why.
+model that suits it, fails over safely, and what it generates is checked before a reader
+sees it: facts by a second Muse Spark pass, illustrations by SAM 3.1, briefing audio by
+transcribing it back. AGENTS.md (*Meta models*, *Agents*) has the why.
 
 ## Inputs
 
 - Keys from the environment (names in `.env.example`): `META_API_KEY`,
-  `BASETEN_API_KEY`, `GLIMMER_BASE_URL`, `GLIMMER_API_KEY`.
+  `FIREWORKS_API_KEY`, `BASETEN_API_KEY`, `BASETEN_BASE_URL`, `GLIMMER_BASE_URL`,
+  `GLIMMER_API_KEY`.
 - Model ids pinned in `backend/app/config.py`, never in the environment.
 - Endpoints for Muse Image, SAM 3.1 and Muse Voice Transcribe from dev.meta.ai/docs,
   confirmed against the live API on Oct 31 (below).
@@ -17,7 +19,7 @@ different model before a reader sees it. AGENTS.md (*Meta models*, *Agents*) has
 - **A routing table** in `config.py`: for each agent (triage, interest, judge, claims,
   verifier, editor, writer, ask), its model id, endpoint, reasoning effort and backup.
 - **One text client** over httpx, no SDK (`clients/openai_compat.py`), for Meta Model
-  API, Baseten and a hosted Muse Glimmer, all OpenAI-compatible. **Local Muse Glimmer**
+  API, Fireworks, Baseten and a hosted Muse Glimmer, all OpenAI-compatible. **Local Muse Glimmer**
   through Ollama's raw generate API in Glimmer's own turn format (`clients/ollama.py`):
   through Ollama's `/v1/chat/completions` its answers come back empty.
 - **Media clients** in `backend/app/clients/`: Muse Image and SAM 3.1
